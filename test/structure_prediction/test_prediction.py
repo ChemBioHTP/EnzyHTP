@@ -22,35 +22,38 @@ def test_predict_structure_unsupported_engine():
         predict_structure(sequence, engine="unsupported_engine")
 
 
-@patch('enzy_htp._interface.alphafold_interface.subprocess.run')
-@patch('enzy_htp.structure_prediction.prediction.af2_predict')
-def test_predict_structure_single_sequence(mock_af2_predict, mock_subprocess):
+@patch('enzy_htp.structure_prediction.prediction.PREDICTION_ENGINES')
+def test_predict_structure_single_sequence(mock_engines):
     """Test predict_structure with a single sequence."""
     # Arrange
     sequence = "ACDEFGHIKLMNPQRSTVWY"
     mock_structure = Mock(spec=Structure)
-    mock_af2_predict.return_value = {"seq_0": mock_structure}
+    mock_af2_predict = Mock(return_value={sequence: mock_structure})
+    mock_engines.__getitem__.return_value = mock_af2_predict
+    mock_engines.__contains__.return_value = True
     
     # Act
     result = predict_structure(sequence, engine="alphafold2")
     
     # Assert
     assert isinstance(result, dict)
-    assert "seq_0" in result
-    assert result["seq_0"] == mock_structure
+    assert sequence in result
+    assert result[sequence] == mock_structure
     mock_af2_predict.assert_called_once_with([sequence], None)
 
 
-@patch('enzy_htp.structure_prediction.prediction.af2_predict')
-def test_predict_structure_multiple_sequences(mock_af2_predict):
+@patch('enzy_htp.structure_prediction.prediction.PREDICTION_ENGINES')
+def test_predict_structure_multiple_sequences(mock_engines):
     """Test predict_structure with multiple sequences."""
     # Arrange
     sequences = ["ACDEFGHIKLMNPQRSTVWY", "DEFGHIKLMNPQRSTVWY"]
     mock_structures = {
-        "seq_0": Mock(spec=Structure),
-        "seq_1": Mock(spec=Structure)
+        sequences[0]: Mock(spec=Structure),
+        sequences[1]: Mock(spec=Structure)
     }
-    mock_af2_predict.return_value = mock_structures
+    mock_af2_predict = Mock(return_value=mock_structures)
+    mock_engines.__getitem__.return_value = mock_af2_predict
+    mock_engines.__contains__.return_value = True
     
     # Act
     result = predict_structure(sequences, engine="alphafold2")
@@ -58,19 +61,21 @@ def test_predict_structure_multiple_sequences(mock_af2_predict):
     # Assert
     assert isinstance(result, dict)
     assert len(result) == 2
-    assert "seq_0" in result
-    assert "seq_1" in result
+    assert sequences[0] in result
+    assert sequences[1] in result
     mock_af2_predict.assert_called_once_with(sequences, None)
 
 
-@patch('enzy_htp.structure_prediction.prediction.af2_predict')
-def test_predict_structure_with_cluster_job_config(mock_af2_predict):
+@patch('enzy_htp.structure_prediction.prediction.PREDICTION_ENGINES')
+def test_predict_structure_with_cluster_job_config(mock_engines):
     """Test predict_structure with cluster job configuration."""
     # Arrange
     sequence = "ACDEFGHIKLMNPQRSTVWY"
     cluster_config = ClusterJobConfig(res_keywords={"partition": "gpu", "walltime": "02:00:00"})
     mock_structure = Mock(spec=Structure)
-    mock_af2_predict.return_value = {"seq_0": mock_structure}
+    mock_af2_predict = Mock(return_value={sequence: mock_structure})
+    mock_engines.__getitem__.return_value = mock_af2_predict
+    mock_engines.__contains__.return_value = True
     
     # Act
     result = predict_structure(sequence, engine="alphafold2", cluster_job_config=cluster_config)
@@ -80,13 +85,15 @@ def test_predict_structure_with_cluster_job_config(mock_af2_predict):
     mock_af2_predict.assert_called_once_with([sequence], cluster_config)
 
 
-@patch('enzy_htp.structure_prediction.prediction.af2_predict')
-def test_predict_structure_with_kwargs(mock_af2_predict):
+@patch('enzy_htp.structure_prediction.prediction.PREDICTION_ENGINES')
+def test_predict_structure_with_kwargs(mock_engines):
     """Test predict_structure with additional keyword arguments."""
     # Arrange
     sequence = "ACDEFGHIKLMNPQRSTVWY"
     mock_structure = Mock(spec=Structure)
-    mock_af2_predict.return_value = {"seq_0": mock_structure}
+    mock_af2_predict = Mock(return_value={sequence: mock_structure})
+    mock_engines.__getitem__.return_value = mock_af2_predict
+    mock_engines.__contains__.return_value = True
     
     # Act
     result = predict_structure(
@@ -101,6 +108,34 @@ def test_predict_structure_with_kwargs(mock_af2_predict):
     mock_af2_predict.assert_called_once_with(
         [sequence], None, num_models=3, num_recycles=5
     )
+
+
+@patch('enzy_htp.structure_prediction.prediction.PREDICTION_ENGINES')
+@patch('enzy_htp.structure_prediction.prediction._parse_sequences_input')
+def test_predict_structure_with_fasta_file(mock_parse_input, mock_engines):
+    """Test predict_structure with FASTA file input."""
+    # Arrange
+    from pathlib import Path
+    fasta_file = Path("/fake/path/to/sequences.fasta")
+    sequences = ["ACDEFGHIKLMNPQRSTVWY", "DEFGHIKLMNPQRSTVWY"]
+    mock_structures = {
+        sequences[0]: Mock(spec=Structure),
+        sequences[1]: Mock(spec=Structure)
+    }
+    
+    mock_parse_input.return_value = sequences
+    mock_af2_predict = Mock(return_value=mock_structures)
+    mock_engines.__getitem__.return_value = mock_af2_predict
+    mock_engines.__contains__.return_value = True
+    
+    # Act
+    result = predict_structure(fasta_file, engine="alphafold2")
+    
+    # Assert
+    assert isinstance(result, dict)
+    assert len(result) == 2
+    mock_parse_input.assert_called_once_with(fasta_file)
+    mock_af2_predict.assert_called_once_with(sequences, None)
 
 
 def test_prediction_engines_registry():

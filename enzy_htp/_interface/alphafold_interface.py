@@ -6,6 +6,7 @@ Date: 2025-08-16
 from __future__ import annotations
 import tempfile
 import os
+import re
 from typing import Union, List, Optional, Dict, Tuple
 from pathlib import Path
 from dataclasses import dataclass
@@ -18,7 +19,7 @@ from enzy_htp._config.alphafold_config import AlphafoldConfig
 from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
-from enzy_htp.chemical.sequence import create_fasta_from_sequences
+from enzy_htp.chemical.sequence import create_fasta_from_sequences,parse_fasta_file
 
 
 @dataclass
@@ -26,6 +27,7 @@ class AlphaFold2ResultEgg(ModelingResultEgg):
     """Result egg for AlphaFold2 predictions.
     
     Contains information about expected output files from AlphaFold2 predictions.
+    Each result egg should only be associated with one job.
     """
     fasta_path: str
     """Path to the input FASTA file."""
@@ -34,10 +36,13 @@ class AlphaFold2ResultEgg(ModelingResultEgg):
     """Directory where prediction results will be stored."""
     
     sequence_ids: List[str]
-    """List of sequence identifiers."""
+    """List of sequence identifiers in this job."""
     
-    jobs: List[ClusterJob]
-    """List of cluster jobs for array execution."""
+    job: ClusterJob
+    """Single cluster job for this result egg."""
+    
+    interface: 'AlphafoldInterface'
+    """Reference to the parent interface for accessing helper methods."""
     
     def get_expected_output_files(self) -> Dict[str, str]:
         """Get expected output PDB file paths for each sequence.
@@ -45,27 +50,11 @@ class AlphaFold2ResultEgg(ModelingResultEgg):
         Returns:
             Dict mapping sequence IDs to expected PDB file paths
         """
-        result_files = {}
+        # Get all available files first
+        filename_to_path = self.interface._find_output_files_map(self.output_dir)
         
-        # Look for PDB files in output directory
-        for pdb_file in self.output_dir.glob("**/*.pdb"):
-            filename = pdb_file.stem
-            
-            # Extract sequence identifier from filename
-            if filename.startswith("seq_"):
-                seq_id = filename.split("_")[1]
-                seq_key = f"seq_{seq_id}"
-                
-                # Prefer relaxed over unrelaxed, and higher ranked models
-                if seq_key not in result_files or (
-                    "unrelaxed" in result_files[seq_key] and "unrelaxed" not in str(pdb_file)
-                ):
-                    result_files[seq_key] = str(pdb_file)
-            else:
-                # Fallback: use filename as key
-                result_files[filename] = str(pdb_file)
-        
-        return result_files
+        # Filter and select best files for this job's sequences
+        return self.interface._select_best_files_for_sequences(filename_to_path, self.sequence_ids)
 
 
 class AlphafoldInterface(BaseInterface):
@@ -143,7 +132,7 @@ class AlphafoldInterface(BaseInterface):
 
             if cluster_job_config:
                 # Run on cluster using array jobs
-                result_egg = self.make_job(
+                result_eggs = self.make_job(
                     fasta_path=fasta_path,
                     out_dir=out_dir,
                     num_models=num_models,
@@ -160,8 +149,9 @@ class AlphafoldInterface(BaseInterface):
                 )
                 
                 # Submit and wait for array jobs
+                all_jobs = [egg.job for egg in result_eggs]
                 failed_jobs = ClusterJob.wait_to_array_end_plus(
-                    result_egg.jobs,
+                    all_jobs,
                     period=job_check_period,
                     array_size=array_size
                 )
@@ -170,7 +160,11 @@ class AlphafoldInterface(BaseInterface):
                     _LOGGER.error(f"{len(failed_jobs)} AlphaFold2 jobs failed")
                     raise RuntimeError(f"{len(failed_jobs)} AlphaFold2 jobs failed")
                 
-                result_files = result_egg.get_expected_output_files()
+                # Collect results from all eggs
+                result_files = {}
+                for egg in result_eggs:
+                    egg_files = egg.get_expected_output_files()
+                    result_files.update(egg_files)
             else:
                 # Run locally
                 result_files = self.run(
@@ -188,10 +182,16 @@ class AlphafoldInterface(BaseInterface):
                 )
 
             # Parse results into Structure objects
+            # Map sequence IDs back to full sequences for return values
+            fasta_sequences = parse_fasta_file(fasta_path)
+            seq_id_to_sequence = {seq_id: seq for seq_id, seq in fasta_sequences}
+            
             structures = {}
             for seq_id, pdb_path in result_files.items():
                 structure = stru_parser.get_structure(pdb_path)
-                structures[seq_id] = structure
+                # Use full sequence as key instead of sequence ID
+                full_sequence = seq_id_to_sequence[seq_id]
+                structures[full_sequence] = structure
 
             return structures
 
@@ -262,7 +262,7 @@ class AlphafoldInterface(BaseInterface):
         
         try:
             # Use env_manager to run command
-            result = self.env_manager_.run_command(
+            self.env_manager_.run_command(
                 exe=cmd[0],
                 args=cmd[1:],
             )
@@ -272,7 +272,11 @@ class AlphafoldInterface(BaseInterface):
             _LOGGER.error(f"AlphaFold2 execution failed: {e}")
             raise RuntimeError(f"AlphaFold2 execution failed: {e}")
         
-        return self._find_output_files(out_dir)
+        # Get all files and select best ones for sequences
+        filename_to_path = self._find_output_files_map(out_dir)
+        fasta_sequences = parse_fasta_file(fasta_path)
+        sequence_ids = [seq_id for seq_id, _ in fasta_sequences]
+        return self._select_best_files_for_sequences(filename_to_path, sequence_ids)
 
     def make_job(
         self,
@@ -289,7 +293,7 @@ class AlphafoldInterface(BaseInterface):
         additional_options: Optional[List[str]] = None,
         cluster_job_config: Optional[Union[ClusterJobConfig, Dict]] = None,
         seq_per_job: int = 1,
-    ) -> AlphaFold2ResultEgg:
+    ) -> List[AlphaFold2ResultEgg]:
         """Create cluster jobs for running AlphaFold2 with array support.
         
         Args:
@@ -308,7 +312,7 @@ class AlphafoldInterface(BaseInterface):
             seq_per_job: Number of sequences per job
             
         Returns:
-            AlphaFold2ResultEgg containing job information
+            List of AlphaFold2ResultEgg objects, one per job
         """
         out_dir = Path(out_dir)
         out_dir.mkdir(exist_ok=True)
@@ -318,13 +322,11 @@ class AlphafoldInterface(BaseInterface):
         fasta_sequences = parse_fasta_file(fasta_path)
         
         # Create individual jobs for array execution
-        jobs = []
-        sequence_ids = []
+        result_eggs = []
         
         for i in range(0, len(fasta_sequences), seq_per_job):
             job_sequences = fasta_sequences[i:i+seq_per_job]
             job_seq_ids = [seq_id for seq_id, _ in job_sequences]
-            sequence_ids.extend(job_seq_ids)
             
             # Create FASTA for this job
             job_fasta_path = create_fasta_from_sequences(
@@ -379,14 +381,18 @@ class AlphafoldInterface(BaseInterface):
                 sub_dir=str(out_dir)
             )
             
-            jobs.append(job)
+            # Create result egg for this single job
+            result_egg = AlphaFold2ResultEgg(
+                fasta_path=job_fasta_path,
+                output_dir=out_dir,
+                sequence_ids=job_seq_ids,
+                job=job,
+                interface=self
+            )
+            
+            result_eggs.append(result_egg)
         
-        return AlphaFold2ResultEgg(
-            fasta_path=fasta_path,
-            output_dir=out_dir,
-            sequence_ids=sequence_ids,
-            jobs=jobs
-        )
+        return result_eggs
 
     def _build_colabfold_container_command(
         self, 
@@ -537,35 +543,87 @@ class AlphafoldInterface(BaseInterface):
         
         return cmd
 
-    def _find_output_files(self, out_dir: Path) -> Dict[str, str]:
-        """Find output PDB files in the output directory.
+    def _find_output_files_map(self, out_dir: Path) -> Dict[str, str]:
+        """Find output PDB files in the output directory and return filename-to-path mapping.
         
         Args:
             out_dir: Output directory to search
             
         Returns:
-            Dict mapping sequence IDs to PDB file paths
+            Dict mapping filenames to PDB file paths
         """
-        result_files = {}
+        filename_to_path = {}
         
         # Look for PDB files
         for pdb_file in out_dir.glob("**/*.pdb"):
-            # Extract sequence identifier from filename
-            # ColabFold typically names files like: seq_0_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000.pdb
             filename = pdb_file.stem
-            
-            # Try to extract sequence ID (assumes format starts with seq_N)
-            if filename.startswith("seq_"):
-                seq_id = filename.split("_")[1]
-                seq_key = f"seq_{seq_id}"
-                
-                # Prefer relaxed over unrelaxed, and higher ranked models
-                if seq_key not in result_files or (
-                    "unrelaxed" in result_files[seq_key] and "unrelaxed" not in str(pdb_file)
-                ):
-                    result_files[seq_key] = str(pdb_file)
-            else:
-                # Fallback: use filename as key
-                result_files[filename] = str(pdb_file)
+            filename_to_path[filename] = str(pdb_file)
         
+        return filename_to_path
+    
+    def _select_best_files_for_sequences(self, filename_to_path: Dict[str, str], sequence_ids: List[str]) -> Dict[str, str]:
+        """Filter and select the best files for the given sequences.
+        
+        Args:
+            filename_to_path: Mapping of filename to file path
+            sequence_ids: List of sequence identifiers to find files for
+            
+        Returns:
+            Dict mapping sequence IDs to the best PDB file path for each sequence
+        """
+        result_files = {}
+        
+        for seq_id in sequence_ids:
+            # Find all files for this sequence
+            seq_files = {}
+            
+            for filename, filepath in filename_to_path.items():
+                # Check if this file belongs to the current sequence
+                if filename.startswith(f"{seq_id}_"):
+                    seq_files[filename] = filepath
+            
+            if seq_files:
+                # Select the best file: prefer relaxed over unrelaxed, and higher ranked models
+                best_filename = self._select_best_file(seq_files.keys())
+                result_files[seq_id] = seq_files[best_filename]
+            else:
+                _LOGGER.warning(f"No files found for sequence ID {seq_id}. "
+                "AlphaFold may have error on sequence.")
+
         return result_files
+    
+    def _select_best_file(self, filenames: List[str]) -> str:
+        """Select the best filename from a list based on ranking and relaxation status.
+        
+        Args:
+            filenames: List of filenames to choose from
+            
+        Returns:
+            The best filename
+        """
+        if not filenames:
+            _LOGGER.error("No filenames provided to select best file")
+            raise ValueError("No filenames provided")
+            
+        if len(filenames) == 1:
+            return list(filenames)[0]
+        
+        relaxed_files = []
+        unrelaxed_files = []
+        
+        for filename in filenames:
+            if "unrelaxed" in filename:
+                unrelaxed_files.append(filename)
+            else:
+                relaxed_files.append(filename)
+        
+        # Prefer relaxed files
+        candidates = relaxed_files if relaxed_files else unrelaxed_files
+        
+        # If we have multiple candidates, prefer higher ranked models
+        # Look for patterns like rank_001, rank_002, etc.
+        return min(candidates, key=self._get_rank)
+
+    def _get_rank(self, filename):
+        match = re.search(r'rank_(\d+)', filename)
+        return int(match.group(1)) if match else 999  # Lower rank number is better
