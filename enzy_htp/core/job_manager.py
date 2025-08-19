@@ -748,6 +748,10 @@ class ClusterJobConfig:
         return self.res_keywords.get("node_cores", None)
 
     @property
+    def core_type(self):
+        return self.res_keywords.get("core_type", None)
+
+    @property
     def mem_per_core(self):
         return self.res_keywords.get("mem_per_core", None)
     # endregion
