@@ -72,7 +72,7 @@ class AlphafoldInterface(BaseInterface):
         out_dir: Union[str, Path, None] = None,
         # cluster job related
         cluster_job_config: Optional[Union[ClusterJobConfig, Dict]] = None,
-        core_type: str = "gpu",
+        non_armer_core_type: str = "gpu",
         array_size: int = 0,
         job_check_period: int = 30,
         seq_per_job: int = 1,
