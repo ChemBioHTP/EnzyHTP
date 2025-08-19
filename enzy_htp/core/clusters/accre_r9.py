@@ -110,6 +110,7 @@ export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
         "walltime" : "time=",
         "account" : "account=",
         "exclude_node_id" : "exclude=",
+        "qos" : "qos="
     }
 
     PARTITION_VALUE_MAP = {
