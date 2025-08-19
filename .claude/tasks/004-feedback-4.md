@@ -2,7 +2,7 @@
 
 1. I made some changes to the code you wrote. Make sure you are up to date.
 2. `_get_rank` need type hinting and docstring
-3. We need some test for the alternative install of alphafold2. I have put you on a HPC environment (ACCRE R9), where you can test the AF2 install and when cluster_job_config is not None. A scratch submission script for running the AF2 install here is (use this as a reference only, we dont like how this script is designed):
+3. We need some test for the alternative install of alphafold2 and HPC submission. I have put you on a HPC environment (ACCRE R9), where you can test the AF2 install and when cluster_job_config is not None. A scratch submission script for running the AF2 install here is (use this as a reference only, we dont like how this script is designed):
    ```
     #SBATCH --account=csb_gpu_acc
     #SBATCH --partition=batch_gpu
