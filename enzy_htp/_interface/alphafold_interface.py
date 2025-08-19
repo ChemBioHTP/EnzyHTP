@@ -1,80 +1,203 @@
-"""Defines an AlphafoldInterface class that serves as a bridge for enzy_htp to utilize Alphafold software.
+"""Defines an AlphafoldInterface class that serves as a bridge for enzy_htp to utilize AlphaFold2 software.
 
-Author: Gemini
+Author: Gemini, Claude Code
 Date: 2025-08-16
 """
 from __future__ import annotations
 import tempfile
-import subprocess
 import os
-from typing import Union, List, Optional, Dict
+from typing import Union, List, Optional, Dict, Tuple
 from pathlib import Path
+from dataclasses import dataclass
 
 from .base_interface import BaseInterface
+from .handle_types.modeling_engine import ModelingResultEgg
 from enzy_htp.structure import Structure
 from enzy_htp.structure.structure_io.pdb_io import PDBParser
 from enzy_htp._config.alphafold_config import AlphafoldConfig
 from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core import file_system as fs
+from enzy_htp.chemical.sequence import create_fasta_from_sequences
+
+
+@dataclass
+class AlphaFold2ResultEgg(ModelingResultEgg):
+    """Result egg for AlphaFold2 predictions.
+    
+    Contains information about expected output files from AlphaFold2 predictions.
+    """
+    fasta_path: str
+    """Path to the input FASTA file."""
+    
+    output_dir: Path
+    """Directory where prediction results will be stored."""
+    
+    sequence_ids: List[str]
+    """List of sequence identifiers."""
+    
+    jobs: List[ClusterJob]
+    """List of cluster jobs for array execution."""
+    
+    def get_expected_output_files(self) -> Dict[str, str]:
+        """Get expected output PDB file paths for each sequence.
+        
+        Returns:
+            Dict mapping sequence IDs to expected PDB file paths
+        """
+        result_files = {}
+        
+        # Look for PDB files in output directory
+        for pdb_file in self.output_dir.glob("**/*.pdb"):
+            filename = pdb_file.stem
+            
+            # Extract sequence identifier from filename
+            if filename.startswith("seq_"):
+                seq_id = filename.split("_")[1]
+                seq_key = f"seq_{seq_id}"
+                
+                # Prefer relaxed over unrelaxed, and higher ranked models
+                if seq_key not in result_files or (
+                    "unrelaxed" in result_files[seq_key] and "unrelaxed" not in str(pdb_file)
+                ):
+                    result_files[seq_key] = str(pdb_file)
+            else:
+                # Fallback: use filename as key
+                result_files[filename] = str(pdb_file)
+        
+        return result_files
+
 
 class AlphafoldInterface(BaseInterface):
-    """Class that provides a direct inteface for enzy_htp to utilize Alphafold software.
-    """
+    """Class that provides a direct interface for enzy_htp to utilize AlphaFold2 software."""
 
     def __init__(self, parent, config: AlphafoldConfig = None) -> None:
         """Simplistic constructor that optionally takes an AlphafoldConfig object as its only argument.
         Calls parent class."""
         super().__init__(parent, config, AlphafoldConfig)
 
-    def af2_predict(self, sequences: List[str], cluster_job_config: Optional[Union[ClusterJobConfig, Dict]] = None, **kwargs) -> Dict[str, Structure]:
-        """Wrapper for running AlphaFold2 prediction.
+    def af2_predict(
+        self, 
+        sequences: List[str], 
+        out_dir: Union[str, Path, None] = None,
+        # cluster job related
+        cluster_job_config: Optional[Union[ClusterJobConfig, Dict]] = None,
+        array_size: int = 0,
+        job_check_period: int = 30,
+        seq_per_job: int = 1,
+        # AlphaFold2 specific
+        num_models: int = 5,
+        num_recycles: int = 3,
+        num_relax: int = 0,
+        relax_max_iteration: int = 200,
+        use_templates: bool = False,
+        max_template_date: Optional[str] = None,
+        model_preset: Optional[str] = None,
+        db_preset: str = "reduced_dbs",
+        additional_options: Optional[List[str]] = None,
+        **kwargs
+    ) -> Dict[str, Structure]:
+        """Science API for AlphaFold2 structure prediction.
 
-        This function is a wrapper for the `run` method. It handles the submission of the job to a cluster if
-        `cluster_job_config` is provided.
-        
         Args:
             sequences: List of amino acid sequences to predict
+            out_dir: Output directory for results. If None, creates temporary directory.
             cluster_job_config: Configuration for cluster job submission
-            **kwargs: Additional arguments passed to run() or make_job()
+            array_size: Number of jobs to run simultaneously (for cluster submission)
+            job_check_period: Time cycle for job state checking (seconds)
+            seq_per_job: Number of sequences per job (for array execution)
+            num_models: Number of models to generate
+            num_recycles: Number of recycling iterations
+            num_relax: Number of structures to relax
+            relax_max_iteration: Maximum relaxation iterations
+            use_templates: Whether to use templates
+            max_template_date: Maximum template date
+            model_preset: Model preset configuration
+            db_preset: Database preset
+            additional_options: Additional command-line options
+            **kwargs: Additional arguments
             
         Returns:
             Dict mapping sequence identifiers to Structure objects
         """
-        parser = PDBParser()
-        # Create temporary FASTA file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False) as fasta_file:
-            for i, seq in enumerate(sequences):
-                fasta_file.write(f">seq_{i}\n{seq}\n")
-            fasta_path = fasta_file.name
-
+        temp_paths = []
+        stru_parser = PDBParser()
+        
         try:
+            # Create FASTA file using helper function
+            sequence_ids = [f"seq_{i}" for i in range(len(sequences))]
+            fasta_path = create_fasta_from_sequences(
+                sequences, 
+                sequence_ids, 
+                delete_on_close=False
+            )
+            temp_paths.append(fasta_path)
+
             # Create output directory
-            out_dir = Path(kwargs.get('out_dir', tempfile.mkdtemp(prefix='alphafold_')))
+            if out_dir is None:
+                out_dir = Path(tempfile.mkdtemp(prefix='alphafold2_'))
+                temp_paths.append(str(out_dir))
+            else:
+                out_dir = Path(out_dir)
             out_dir.mkdir(exist_ok=True)
 
             if cluster_job_config:
-                # Run on cluster
-                job = self.make_job(fasta_path, out_dir, **kwargs)
-                job.submit()
-                job.wait_to_finish()
-                if job.get_status() != "completed":
-                    raise RuntimeError(f"AlphaFold job failed with status: {job.get_status()}")
-                result_files = self._find_output_files(out_dir)
+                # Run on cluster using array jobs
+                result_egg = self.make_job(
+                    fasta_path=fasta_path,
+                    out_dir=out_dir,
+                    num_models=num_models,
+                    num_recycles=num_recycles,
+                    num_relax=num_relax,
+                    relax_max_iteration=relax_max_iteration,
+                    use_templates=use_templates,
+                    max_template_date=max_template_date,
+                    model_preset=model_preset,
+                    db_preset=db_preset,
+                    additional_options=additional_options,
+                    cluster_job_config=cluster_job_config,
+                    seq_per_job=seq_per_job
+                )
+                
+                # Submit and wait for array jobs
+                failed_jobs = ClusterJob.wait_to_array_end_plus(
+                    result_egg.jobs,
+                    period=job_check_period,
+                    array_size=array_size
+                )
+                
+                if failed_jobs:
+                    _LOGGER.error(f"{len(failed_jobs)} AlphaFold2 jobs failed")
+                    raise RuntimeError(f"{len(failed_jobs)} AlphaFold2 jobs failed")
+                
+                result_files = result_egg.get_expected_output_files()
             else:
                 # Run locally
-                result_files = self.run(fasta_path, out_dir, **kwargs)
+                result_files = self.run(
+                    fasta_path=fasta_path,
+                    out_dir=out_dir,
+                    num_models=num_models,
+                    num_recycles=num_recycles,
+                    num_relax=num_relax,
+                    relax_max_iteration=relax_max_iteration,
+                    use_templates=use_templates,
+                    max_template_date=max_template_date,
+                    model_preset=model_preset,
+                    db_preset=db_preset,
+                    additional_options=additional_options
+                )
 
             # Parse results into Structure objects
             structures = {}
             for seq_id, pdb_path in result_files.items():
-                structure = parser.get_structure(pdb_path)
+                structure = stru_parser.get_structure(pdb_path)
                 structures[seq_id] = structure
 
             return structures
 
         finally:
-            # Clean up temporary FASTA file
-            os.unlink(fasta_path)
+            # Clean up temporary files
+            fs.clean_temp_file_n_dir(temp_paths)
 
     def run(
         self,
@@ -82,7 +205,6 @@ class AlphafoldInterface(BaseInterface):
         out_dir: Union[str, Path],
         num_models: int = 5,
         num_recycles: int = 3,
-        database_source: Optional[str] = None,
         num_relax: int = 0,
         relax_max_iteration: int = 200,
         use_templates: bool = False,
@@ -91,14 +213,13 @@ class AlphafoldInterface(BaseInterface):
         db_preset: str = "reduced_dbs",
         additional_options: Optional[List[str]] = None,
     ) -> Dict[str, str]:
-        """Execute AlphaFold prediction locally.
+        """Execute AlphaFold2 prediction locally.
         
         Args:
             fasta_path: Path to input FASTA file
             out_dir: Output directory for results
             num_models: Number of models to generate
             num_recycles: Number of recycling iterations
-            database_source: Database source for MSA
             num_relax: Number of structures to relax
             relax_max_iteration: Maximum relaxation iterations
             use_templates: Whether to use templates
@@ -115,44 +236,41 @@ class AlphafoldInterface(BaseInterface):
         
         config = self.config_
         
+        # build command
         if config.INSTALL_TYPE == "colabfold_container":
             cmd = self._build_colabfold_container_command(
                 fasta_path, out_dir, num_models, num_recycles, 
                 num_relax, relax_max_iteration, use_templates, 
                 model_preset, additional_options
             )
-        elif config.INSTALL_TYPE == "alphafold_native":
-            cmd = self._build_alphafold_native_command(
+        elif config.INSTALL_TYPE == "alphafold2_native_container":
+            cmd = self._build_alphafold2_native_container_command(
                 fasta_path, out_dir, max_template_date, 
                 model_preset, db_preset, additional_options
             )
-        elif config.INSTALL_TYPE == "colabfold_python":
-            cmd = self._build_colabfold_python_command(
+        elif config.INSTALL_TYPE == "alphafold2_native_python":
+            cmd = self._build_alphafold2_native_python_command(
                 fasta_path, out_dir, num_models, num_recycles,
                 num_relax, relax_max_iteration, use_templates,
                 model_preset, additional_options
             )
         else:
+            _LOGGER.error(f"Unsupported install type: {config.INSTALL_TYPE}")
             raise ValueError(f"Unsupported install type: {config.INSTALL_TYPE}")
         
-        _LOGGER.info(f"Running AlphaFold command: {' '.join(cmd)}")
+        _LOGGER.info(f"Running AlphaFold2 command: {' '.join(cmd)}")
         
         try:
-            result = subprocess.run(
-                cmd, 
-                capture_output=True, 
-                text=True, 
-                check=True,
-                cwd=out_dir
+            # Use env_manager to run command
+            result = self.env_manager_.run_command(
+                exe=cmd[0],
+                args=cmd[1:],
             )
-            _LOGGER.info(f"AlphaFold completed successfully")
-            _LOGGER.debug(f"stdout: {result.stdout}")
+            _LOGGER.info(f"AlphaFold2 completed successfully")
             
-        except subprocess.CalledProcessError as e:
-            _LOGGER.error(f"AlphaFold failed with return code {e.returncode}")
-            _LOGGER.error(f"stdout: {e.stdout}")
-            _LOGGER.error(f"stderr: {e.stderr}")
-            raise RuntimeError(f"AlphaFold execution failed: {e.stderr}")
+        except Exception as e:
+            _LOGGER.error(f"AlphaFold2 execution failed: {e}")
+            raise RuntimeError(f"AlphaFold2 execution failed: {e}")
         
         return self._find_output_files(out_dir)
 
@@ -162,7 +280,6 @@ class AlphafoldInterface(BaseInterface):
         out_dir: Union[str, Path],
         num_models: int = 5,
         num_recycles: int = 3,
-        database_source: Optional[str] = None,
         num_relax: int = 0,
         relax_max_iteration: int = 200,
         use_templates: bool = False,
@@ -171,15 +288,15 @@ class AlphafoldInterface(BaseInterface):
         db_preset: str = "reduced_dbs",
         additional_options: Optional[List[str]] = None,
         cluster_job_config: Optional[Union[ClusterJobConfig, Dict]] = None,
-    ) -> ClusterJob:
-        """Create a cluster job for running AlphaFold.
+        seq_per_job: int = 1,
+    ) -> AlphaFold2ResultEgg:
+        """Create cluster jobs for running AlphaFold2 with array support.
         
         Args:
             fasta_path: Path to input FASTA file
             out_dir: Output directory for results
             num_models: Number of models to generate
             num_recycles: Number of recycling iterations
-            database_source: Database source for MSA
             num_relax: Number of structures to relax
             relax_max_iteration: Maximum relaxation iterations
             use_templates: Whether to use templates
@@ -188,59 +305,88 @@ class AlphafoldInterface(BaseInterface):
             db_preset: Database preset
             additional_options: Additional command-line options
             cluster_job_config: Configuration for cluster job
+            seq_per_job: Number of sequences per job
             
         Returns:
-            ClusterJob object ready for submission
+            AlphaFold2ResultEgg containing job information
         """
         out_dir = Path(out_dir)
         out_dir.mkdir(exist_ok=True)
         
-        config = self.config_
+        # Parse FASTA to get sequences
+        from enzy_htp.chemical.sequence import parse_fasta_file
+        fasta_sequences = parse_fasta_file(fasta_path)
         
-        if config.INSTALL_TYPE == "colabfold_container":
-            cmd = self._build_colabfold_container_command(
-                fasta_path, out_dir, num_models, num_recycles, 
-                num_relax, relax_max_iteration, use_templates, 
-                model_preset, additional_options
+        # Create individual jobs for array execution
+        jobs = []
+        sequence_ids = []
+        
+        for i in range(0, len(fasta_sequences), seq_per_job):
+            job_sequences = fasta_sequences[i:i+seq_per_job]
+            job_seq_ids = [seq_id for seq_id, _ in job_sequences]
+            sequence_ids.extend(job_seq_ids)
+            
+            # Create FASTA for this job
+            job_fasta_path = create_fasta_from_sequences(
+                [seq for _, seq in job_sequences],
+                job_seq_ids,
+                output_path=out_dir / f"job_{i//seq_per_job}.fasta"
             )
-        elif config.INSTALL_TYPE == "alphafold_native":
-            cmd = self._build_alphafold_native_command(
-                fasta_path, out_dir, max_template_date, 
-                model_preset, db_preset, additional_options
+            
+            # Build command for this job
+            config = self.config_
+            
+            if config.INSTALL_TYPE == "colabfold_container":
+                cmd = self._build_colabfold_container_command(
+                    job_fasta_path, out_dir, num_models, num_recycles, 
+                    num_relax, relax_max_iteration, use_templates, 
+                    model_preset, additional_options
+                )
+            elif config.INSTALL_TYPE == "alphafold2_native_container":
+                cmd = self._build_alphafold2_native_container_command(
+                    job_fasta_path, out_dir, max_template_date, 
+                    model_preset, db_preset, additional_options
+                )
+            elif config.INSTALL_TYPE == "alphafold2_native_python":
+                cmd = self._build_alphafold2_native_python_command(
+                    job_fasta_path, out_dir, num_models, num_recycles,
+                    num_relax, relax_max_iteration, use_templates,
+                    model_preset, additional_options
+                )
+            else:
+                raise ValueError(f"Unsupported install type: {config.INSTALL_TYPE}")
+            
+            # Create ClusterJob
+            if isinstance(cluster_job_config, dict):
+                job_config = ClusterJobConfig.from_dict(cluster_job_config)
+            else:
+                job_config = cluster_job_config or ClusterJobConfig()
+            
+            # Use ClusterJob.config_job to create the job properly
+            if not job_config.has_cluster():
+                # For testing/local execution, skip cluster creation
+                # In real usage, user should provide cluster in job_config
+                raise ValueError("cluster_job_config must specify a cluster for job execution")
+            
+            if not job_config.has_res_keywords():
+                job_config.res_keywords = {}
+            
+            job = ClusterJob.config_job(
+                commands=' '.join(cmd),
+                cluster=job_config.cluster,
+                env_settings=[],
+                res_keywords=job_config.res_keywords,
+                sub_dir=str(out_dir)
             )
-        elif config.INSTALL_TYPE == "colabfold_python":
-            cmd = self._build_colabfold_python_command(
-                fasta_path, out_dir, num_models, num_recycles,
-                num_relax, relax_max_iteration, use_templates,
-                model_preset, additional_options
-            )
-        else:
-            raise ValueError(f"Unsupported install type: {config.INSTALL_TYPE}")
+            
+            jobs.append(job)
         
-        # Create ClusterJob
-        if isinstance(cluster_job_config, dict):
-            job_config = ClusterJobConfig.from_dict(cluster_job_config)
-        else:
-            job_config = cluster_job_config or ClusterJobConfig()
-        
-        # Use ClusterJob.config_job to create the job properly
-        if not job_config.has_cluster():
-            # Import default cluster
-            from enzy_htp.core.clusters import LocalCluster
-            job_config.cluster = LocalCluster()
-        
-        if not job_config.has_res_keywords():
-            job_config.res_keywords = {}
-        
-        job = ClusterJob.config_job(
-            commands=' '.join(cmd),
-            cluster=job_config.cluster,
-            env_settings=[],
-            res_keywords=job_config.res_keywords,
-            sub_dir=str(out_dir)
+        return AlphaFold2ResultEgg(
+            fasta_path=fasta_path,
+            output_dir=out_dir,
+            sequence_ids=sequence_ids,
+            jobs=jobs
         )
-        
-        return job
 
     def _build_colabfold_container_command(
         self, 
@@ -271,12 +417,15 @@ class AlphafoldInterface(BaseInterface):
             expanded_host_path = os.path.expanduser(host_path)
             cmd.extend(["-B", f"{expanded_host_path}:{container_path_bind}"])
         
+        # Bind work directory dynamically
+        cmd.extend(["-B", f"{out_dir}:/work"])
+        
         # Container image
         cmd.append(container_path)
         
         # ColabFold command
         cmd.append("colabfold_batch")
-        cmd.extend([fasta_path, str(out_dir)])
+        cmd.extend([fasta_path, "/work"])
         
         # Add options
         cmd.extend(["--num-models", str(num_models)])
@@ -304,7 +453,7 @@ class AlphafoldInterface(BaseInterface):
         
         return cmd
 
-    def _build_alphafold_native_command(
+    def _build_alphafold2_native_container_command(
         self,
         fasta_path: str,
         out_dir: Path,
@@ -313,7 +462,7 @@ class AlphafoldInterface(BaseInterface):
         db_preset: str,
         additional_options: Optional[List[str]]
     ) -> List[str]:
-        """Build command for native AlphaFold execution."""
+        """Build command for native AlphaFold2 execution."""
         config = self.config_
         
         cmd = ["python", config.EXECUTABLE_PATH]
@@ -344,7 +493,7 @@ class AlphafoldInterface(BaseInterface):
         
         return cmd
 
-    def _build_colabfold_python_command(
+    def _build_alphafold2_native_python_command(
         self,
         fasta_path: str,
         out_dir: Path,
@@ -356,7 +505,7 @@ class AlphafoldInterface(BaseInterface):
         model_preset: str,
         additional_options: Optional[List[str]]
     ) -> List[str]:
-        """Build command for ColabFold Python execution."""
+        """Build command for AlphaFold2 Python execution."""
         config = self.config_
         
         cmd = [config.EXECUTABLE_PATH]

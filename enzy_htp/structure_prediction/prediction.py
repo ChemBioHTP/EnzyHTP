@@ -5,8 +5,7 @@ from typing import Dict, Callable, Optional, Union
 from enzy_htp.core.job_manager import ClusterJobConfig
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.structure import Structure
-from enzy_htp._interface.alphafold_interface import af2_predict
-
+from enzy_htp import interface
 
 def predict_structure(
         sequences: Union[str, list[str]], engine: str = "alphafold2", 
@@ -35,5 +34,5 @@ def predict_structure(
 
 
 PREDICTION_ENGINES: Dict[str, Callable] = {
-    "alphafold2": af2_predict,
+    "alphafold2": interface.alphafold.af2_predict,
 }
