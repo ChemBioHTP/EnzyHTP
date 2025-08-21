@@ -3,17 +3,13 @@
 Author: QZ Shao <shaoqz@icloud.com>
 Date: 2025-01-14"""
 from functools import partial
-import pickle
 from enzy_htp.preparation import protonate_stru, remove_hydrogens
 from enzy_htp.mutation import assign_mutant, mutate_stru
 from enzy_htp.geometry import equi_md_sampling
-from enzy_htp.quantum import single_point
-from enzy_htp.analysis import bond_dipole, ele_field_strength_at_along, ele_stab_energy_of_bond
 from enzy_htp import interface
 import enzy_htp.structure.structure_constraint as stru_cons
 from enzy_htp.structure import PDBParser
-from enzy_htp.chemical.level_of_theory import QMLevelOfTheory
-from enzy_htp.core.clusters.accre import Accre
+from enzy_htp.core.clusters.accre_r9 import AccreR9
 
 # ==============
 # == settings ==
@@ -39,23 +35,25 @@ constraints = [
     partial(stru_cons.create_angle_constraint, "B.254.CAE", "B.254.H2", "A.101.OE2", 180.0),
 ]
 # length on MD simulation
-prod_time = 10.0 # unit: ns
+prod_time = 1.0 # unit: ns
 # number of replica
 num_rep = 3 
 # temp of MD
 prod_temperature = 300.0 #unit: K
 # set up your ACCRE info
 accre_res_account = "csb_gpu_acc"
-accre_gpu_queue = "pascal"
+accre_gpu_queue = "batch_gpu"
+accre_gpu_type = "nvidia_rtx_a6000:1" # This means 1 * A6000 GPU
 
 
 # ============================
 # ==== main script lines =====
 md_hpc_job_config = {
-    "cluster" : Accre(),
+    "cluster" : AccreR9(),
     "res_keywords" : {
         "account" : accre_res_account, 
-        "partition" : accre_gpu_queue
+        "partition" : accre_gpu_queue,
+        "node_cores" : accre_gpu_type,
     }
 }
 
