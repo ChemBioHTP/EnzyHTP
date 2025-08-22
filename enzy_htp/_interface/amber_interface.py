@@ -1586,11 +1586,12 @@ class AmberInterface(BaseInterface):
                 raise new_e from e
             else:
                 raise e
+        else:
+            # tleap can also sliently fail, so we need to check the output file
+            tleap_error = self._find_tleap_error(tleap_out_path)
         finally:
             fs.clean_temp_file_n_dir(temp_path_list)
 
-        # tleap can also sliently fail, so we need to check the output file
-        tleap_error = self._find_tleap_error(tleap_out_path)
         if tleap_error.error_info_list:
             raise tleap_error
 
