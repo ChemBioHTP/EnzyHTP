@@ -146,6 +146,95 @@ class Mole2Interface(BaseInterface):
         
         return mole2_volume, boundary_residue_keys, inner_residue_keys
 
+    def _parse_mesh_file(self, mesh_filepath: str) -> Tuple[pv.PolyData, np.ndarray]:
+        """Parse mesh file from Mole2 .mesh and return PyVista mesh and center-of-mass."""
+        
+        # Sanity checks for file existence and readability
+        if not path.exists(mesh_filepath):
+            raise FileNotFoundError(f"Mesh file not found: {mesh_filepath}")
+        
+        if not path.isfile(mesh_filepath):
+            raise ValueError(f"Path is not a file: {mesh_filepath}")
+            
+        lines:List[str] = fs.lines_from_file(mesh_filepath) # Read cavity_X.mesh file lines.
+        
+        # Check if file is empty
+        if not lines:
+            raise ValueError(f"Mesh file is empty: {mesh_filepath}")
+        
+        # Check if first line can be parsed as integer (number of points)
+        try:
+            num_lines = int(lines.pop(0))
+        except (ValueError, IndexError) as exc:
+            raise ValueError(f"Invalid mesh file format - first line should be number of points: {mesh_filepath}") from exc
+        
+        # Check if we have enough lines for the declared number of points
+        if len(lines) < num_lines:
+            raise ValueError(f"Mesh file has insufficient data - declared {num_lines} points but only {len(lines)} lines available: {mesh_filepath}")
+        
+        points = []
+        
+        # Parse point coordinates with error handling
+        for i, ll in enumerate(lines[:num_lines]):        # Read point coordinates by number.
+            try:
+                point_coords = np.array(ll.split()).astype(float)
+                if len(point_coords) != 3:
+                    raise ValueError(f"Point {i+1} should have 3 coordinates, got {len(point_coords)}")
+                points.append(point_coords)
+            except (ValueError, TypeError) as exc:
+                raise ValueError(f"Invalid point coordinates at line {i+1}: '{ll}' in file {mesh_filepath}") from exc
+        
+        points = np.array(points)           # Convert to numpy array
+        
+        lines = lines[num_lines:]       # The remaining rows are surface data.
+        
+        # Check if we have surface data
+        if not lines:
+            raise ValueError(f"Mesh file missing surface data: {mesh_filepath}")
+        
+        # Parse number of polygons with error handling
+        try:
+            num_pgons = int(lines.pop(0))   # Surface number.
+        except (ValueError, IndexError) as exc:
+            raise ValueError(f"Invalid surface data format - cannot parse number of polygons: {mesh_filepath}") from exc
+        
+        # Parse connectivity data with error handling
+        try:
+            cnct = list(map(int,lines))     # Convert face data to integer list
+        except ValueError as exc:
+            raise ValueError(f"Invalid connectivity data - non-integer values found: {mesh_filepath}") from exc
+        
+        cnct.reverse()                  # Reverse for later processing
+
+        surfaces = []
+        original_cnct_len = len(cnct)
+        while cnct:
+            n = cnct.pop()              # Get number of vertices in surface.
+            surfaces.append([n-1] + [cnct.pop() for _ in range(n)][:-1])    # Store [number of vertices + vertex index]
+            continue
+    
+        # Check if we have valid surfaces
+        if not surfaces:
+            raise ValueError(f"No valid surfaces found in mesh file: {mesh_filepath}")
+    
+        com = 0.0
+        verts = list()
+        for ss in surfaces:
+            for idx in ss[1:-1]:            # Get the vertex index of the face (skip the first element: the vertex number).
+                verts.append(points[idx])   # Collect vertex coordinates.
+        
+        # Check if we have vertices for center-of-mass calculation
+        if not verts:
+            raise ValueError(f"No vertices found for center-of-mass calculation: {mesh_filepath}")
+        
+        verts = np.array(verts)
+        com = np.mean(verts,axis=0)     # Calculate the geometric center of the cavity.
+
+        mesh = pv.PolyData(var_inp=points, faces=np.hstack(surfaces))
+        mesh = mesh.clean()
+        mesh = mesh.triangulate()
+        return mesh, com
+
     def _parse_cavity(self, stru: Structure, mesh_filepath: str, probe: float, inner: float, 
             mesh_density: float, cavity_id: int = None, 
             cavity_xml_filepath: str = None, cavity_type: Literal["Cavity", "Void"] = "Cavity") -> Cavity:
@@ -162,40 +251,7 @@ class Mole2Interface(BaseInterface):
         Returns:
             A newly constructed Mole2Cavity.
         """
-        
-        lines:List[str] = fs.lines_from_file(mesh_filepath) # Read cavity_X.mesh file lines.
-        points = []
-        num_lines = int(lines.pop(0))       # The first line is the number of points.
-        
-        for ll in lines[:num_lines]:        # Read point coordinates by number.
-            points.append(np.array(ll.split()).astype(float))
-        points = np.array(points)           # Convert to numpy array
-        
-        lines = lines[num_lines:]       # The remaining rows are surface data.
-        num_pgons = int(lines.pop(0))   # Surface number.
-        
-        cnct = list(map(int,lines))     # Convert face data to integer list
-        cnct.reverse()                  # Reverse for later processing
-
-        surfaces = []
-        while cnct:
-            n = cnct.pop()              # Get number of vertices in surface.
-            surfaces.append([n-1] + [cnct.pop() for _ in range(n)][:-1])    # Store [number of vertices + vertex index]
-            continue
-    
-        com = 0.0
-        verts = list()
-        for ss in surfaces:
-            for idx in ss[1:-1]:            # Get the vertex index of the face (skip the first element: the vertex number).
-                verts.append(points[idx])   # Collect vertex coordinates.
-        
-        verts = np.array(verts)
-        com = np.mean(verts,axis=0)     # Calculate the geometric center of the cavity.
-
-        # print(f"Surface elements: {len(surfaces)}, Surface count: {num_pgons}")
-        mesh = pv.PolyData(var_inp=points, faces=np.hstack(surfaces))
-        mesh = mesh.clean()
-        mesh = mesh.triangulate()
+        mesh, com = self._parse_mesh_file(mesh_filepath)
 
         mole2_volume, boundary_residue_keys, inner_residue_keys = self._read_cavity_from_xml(cavity_xml_filepath, cavity_id, cavity_type)
         boundary_residues = [stru.find_residue_with_key(key) for key in boundary_residue_keys] if boundary_residue_keys else []
