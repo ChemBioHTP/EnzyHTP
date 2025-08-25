@@ -34,7 +34,6 @@ class AlphaFillConfig(BaseConfig):
     
     PDB_DIR:str=""
     """Path to the master PDB directory."""
--
     
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for AlphaFill."""
