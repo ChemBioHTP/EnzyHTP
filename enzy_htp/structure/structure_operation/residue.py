@@ -189,5 +189,4 @@ def ligand_mcs(
     """
     """
     result = interface.rdkit.find_mcs( lig1, lig2 )
-    print( result )
     assert False
