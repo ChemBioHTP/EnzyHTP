@@ -157,7 +157,6 @@ def single_point(
         # qm_engine
         qm_engine_ctor = SINGLE_REGION_SINGLE_POINT_ENGINE[engine]
         # qm_method
-        qm_engine_ctor
         if region_methods:
             if not isinstance(region_methods[0], QMLevelOfTheory):
                 _LOGGER.error(f"Only 1 or less region specified. Have to be a QMLevelOfTheory. Got: {region_methods[0]}")
