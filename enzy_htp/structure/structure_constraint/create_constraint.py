@@ -87,7 +87,7 @@ def create_backbone_freeze(stru: Structure, params:Dict=None,) -> BackBoneFreeze
     """
     atoms = stru.backbone_atoms()
     if not atoms:
-        return atoms
+        return BackBoneFreeze([])
     result = BackBoneFreeze(atoms=atoms)
     if params is not None:
         result.update_params( params )
