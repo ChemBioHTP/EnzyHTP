@@ -2,6 +2,7 @@
 found in enzy_htp/molecular_mechanics/amber_config.py. Supported operations include mutation with tLEaP, MolDynParameterizer for MD,
 and MolDynStep for modular MD steps that can be minimization, heating, constant pressure production, or constant pressure
 equilibration.
+NOTE(@shaoqz): use pytraj as much as possible
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
@@ -12,17 +13,19 @@ import copy
 import glob
 from io import StringIO
 import os
+import pickle
 import re
 import shutil
 from pathlib import Path
 from subprocess import CalledProcessError, CompletedProcess, SubprocessError
+import time
 from typing import Generator, List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
+import numpy as np
 import pandas as pd
 from sympy import sympify
-from collections import Iterable
-from enzy_htp.structure.chain import Chain
-from enzy_htp.structure.structure_region.api import create_region_from_residues, create_region_from_selection_pattern
+from collections.abc import Iterable
+import tempfile        
 
 from .base_interface import BaseInterface
 from .handle_types import (
@@ -37,24 +40,30 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import math_helper as mh
 from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core.exception import AddPDBError, tLEaPError, AmberMDError
-from enzy_htp.core.general import get_interval_str_from_list
+from enzy_htp.core.general import get_interval_str_from_list, load_obj, save_obj
+from enzy_htp.chemical import QMLevelOfTheory
+from enzy_htp.chemical.force_field import AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp.structure.structure_io import pdb_io, prmtop_io
 from enzy_htp.structure.structure_constraint import (
     StructureConstraint,
     CartesianFreeze,
     merge_cartesian_freeze)
+from enzy_htp.structure.structure_region import create_region_from_residues
 from enzy_htp.structure import StruSelection
 from enzy_htp.structure import (
     Structure,
     Atom,
     Residue,
     Ligand,
+    Chain,
     MetalUnit,
     ModifiedResidue,
     NonCanonicalBase,
     StructureEnsemble,
-    PDBParser)
+    PDBParser,
+    StructureRegion,
+)
 from enzy_htp import config as eh_config
 
 class AmberParameter(MolDynParameter):
@@ -312,7 +321,11 @@ class AmberParameterizer(MolDynParameterizer):
 
     def _parameterize_modified_res(self, maa: ModifiedResidue, gaff_type: str) -> Tuple[str, List[str]]:
         """parameterize modified residues for AmberMD, use ncaa_param_lib_path for customized
-        parameters. Multiplicity and charge information can be set in ModifiedResidue objects."""
+        parameters. Multiplicity and charge information can be set in ModifiedResidue objects.
+        
+        Details:
+        We make the backbone atoms use Amber atom types and the protein FF to adapt the backbone rotation
+        correction. And use GAFF atom type for sidechain."""
 
         # san check
         if not gaff_type:
@@ -321,9 +334,23 @@ class AmberParameterizer(MolDynParameterizer):
                           f" Check you force_fields. (current: {self.force_fields})")
             raise ValueError
     
+        # Check if this modified residue is already supported by the force field
+        is_ff_supported = self.parent_interface.check_residue_name_ff_support(
+            res_code=maa.name,
+            force_fields=self.force_fields, 
+            work_dir=Path(self.parameterizer_temp_dir)
+        )
+        
+        if is_ff_supported:
+            _LOGGER.info(f"Modified residue {maa.name} is already supported by force field {self.force_fields}. "
+                        "No additional parameterization needed.")
+            # Return empty paths to indicate force field already supports this residue
+            return "", []
+    
         # init
         fs.safe_mkdir(self.ncaa_param_lib_path)
         target_method = f"{self.charge_method}-{gaff_type}"
+        maa_region = create_region_from_residues(residues=[maa], nterm_cap="H", cterm_cap="OH")
 
         # 0. search parm lib - same as ligand
         mol_desc_path, frcmod_path_list = search_ncaa_parm_file(maa,
@@ -335,27 +362,159 @@ class AmberParameterizer(MolDynParameterizer):
                 return mol_desc_path, frcmod_path_list
         else:
             # 1. generate ac if not found
-            mol_desc_path = f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.ac" # the search ensured no existing file named this
-            self.parent_interface.antechamber_ncaa_to_moldesc(ncaa=maa,
-                                                              out_path=mol_desc_path,
+            ac_path = f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.ac" # the search ensured no existing file named this
+            self.parent_interface.antechamber_ncaa_to_moldesc(ncaa=maa_region,
+                                                              out_path=ac_path,
                                                               gaff_type=gaff_type)
-        # 2.1 fix the wrong atom type given by antechamber
+            # 2. Correct atom types in .ac file (hybrid approach)
+            self._correct_atom_types_in_ac_file(ac_path)
 
-        # 3. run prepgen on ac & mc get prepin
-        prepin_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{maa.name}.prepin")
+            # 3. Create mc file
+            mc_path = fs.get_valid_temp_name(
+                f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.mc"
+            )
+            self.parent_interface.make_mc_file(maa_region=maa_region, out_path=mc_path)
 
-        # 4. run antechamber on prepin get mol2
-        mol2_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{maa.name}.mol2")
+            # 4. Run prepgen on ac & mc to get prepin
+            prepin_path = fs.get_valid_temp_name(
+                f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.prepin")
+            self.parent_interface.run_prepgen(in_file=ac_path,
+                                            out_file=prepin_path,
+                                            mc_file=mc_path,
+                                            residue_name=maa.name,
+                                            work_dir=self.parameterizer_temp_dir)
 
-        # 5. run parmchk2 twice on prepin get frcmod & frcmod2
+            # 5. Run antechamber on prepin to get mol2
+            mol_desc_path = fs.get_valid_temp_name(
+                f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.mol2")
+            self.parent_interface.run_antechamber(in_file=prepin_path,
+                                                out_file=mol_desc_path,
+                                                net_charge=maa.net_charge,
+                                                spin=maa.multiplicity,
+                                                charge_method=self.charge_method,
+                                                res_name=maa.name)
+
+        # 6. Run parmchk2 twice on prepin to get frcmod files
         frcmod_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{maa.name}.frcmod")
+            f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.frcmod1")
         frcmod2_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{maa.name}.frcmod2")
-        raise Exception("TODO")
-        return mol2_path, [frcmod_path, frcmod2_path] # TODO make sure whether mol2 works or do we even need it?
+            f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.frcmod2")
+        
+        # First call: with annotation and custom force field path
+        parm_dat_path = self._get_force_field_parm_dat_path()
+        
+        self.parent_interface.run_parmchk2(in_file=mol_desc_path,
+                                            out_file=frcmod_path,
+                                            gaff_type=gaff_type,
+                                            custom_force_field=parm_dat_path,
+                                            print_annotation=True)
+        
+        # Clean ATTN lines from the first frcmod file
+        self._clean_frcmod_file(frcmod_path)
+        
+        # Second call: generate parameters using GAFF library 
+        self.parent_interface.run_parmchk2(in_file=mol_desc_path,
+                                           out_file=frcmod2_path,
+                                           gaff_type=gaff_type)
+        return mol_desc_path, [frcmod_path, frcmod2_path]
+
+    def _clean_frcmod_file(self, frcmod_path: str) -> None:
+        """Remove 'ATTN' lines from a frcmod file in-place."""
+        temp_path = fs.get_valid_temp_name(f"{frcmod_path}.temp")
+        with open(frcmod_path, 'r') as infile, open(temp_path, 'w') as outfile:
+            for line in infile:
+                if not 'ATTN' in line:
+                    outfile.write(line)
+        # Replace original with cleaned version
+        os.rename(temp_path, frcmod_path)
+
+    def _correct_atom_types_in_ac_file(self, ac_file_path: str, force_field: str = None) -> None:
+        """Correct GAFF atom types to standard Amber protein atom types for backbone atoms.
+        
+        Args:
+            ac_file_path: Path to the .ac file to modify
+            force_field: Force field to use for atom type mapping. If None, will be determined from self.force_fields
+        """
+        # Auto-detect force field from parameterizer settings if not provided
+        if force_field is None:
+            force_field = self.parent_interface.get_protein_force_field(self.force_fields)
+        
+        # Use class variable for backbone atom type mappings
+        if force_field not in AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER:
+            _LOGGER.error(f"Force field {force_field} not supported for atom type correction. Supported: {list(AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER.keys())}. Feel free to submit an issue if you need it.")
+            raise ValueError(f"Unsupported force field: {force_field}")
+        
+        atom_map = AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER[force_field]
+        
+        # Read the .ac file
+        with open(ac_file_path, 'r') as f:
+            lines = f.readlines()
+        
+        # Process each line to correct backbone atom types
+        corrected_lines = []
+        for line in lines:
+            if line.startswith("ATOM"):
+                # Parse ATOM line format - .ac format has fixed-width fields
+                # ATOM      1  N   LLP   289      -5.294  57.398  -9.041 -0.934800        NT
+                # The atom type is at the end of the line after the charge
+                parts = line.split()
+                if len(parts) >= 10:
+                    atom_name = parts[2]  # 3rd field is atom name
+                    current_atom_type = parts[-1]  # Last field is atom type
+                    
+                    # Check if this is a backbone atom that needs correction
+                    if atom_name in atom_map:
+                        # Replace the atom type at the end of the line while preserving spacing
+                        # Find the position of the last field (atom type) and replace it
+                        last_space_pos = line.rfind(' ')
+                        if last_space_pos != -1:
+                            corrected_line = line[:last_space_pos+1] + atom_map[atom_name] + '\n'
+                        else:
+                            corrected_line = line  # Fallback if parsing fails
+                        _LOGGER.debug(f"Corrected atom type for {atom_name}: {current_atom_type} -> {atom_map[atom_name]}")
+                    else:
+                        corrected_line = line
+                else:
+                    corrected_line = line
+            else:
+                corrected_line = line
+            
+            corrected_lines.append(corrected_line)
+        
+        # Write the corrected .ac file
+        with open(ac_file_path, 'w') as f:
+            f.writelines(corrected_lines)
+        
+        _LOGGER.debug(f"Corrected backbone atom types in {ac_file_path}")
+
+    def _get_force_field_parm_dat_path(self) -> str:
+        """Get the parameter dat file path for the current force field configuration.
+        
+        Returns:
+            Path to the appropriate parm dat file, or None if not found
+        """
+        amberhome = os.environ.get('AMBERHOME', '')
+        if not amberhome:
+            _LOGGER.warning("AMBERHOME not set, cannot determine parameter file path")
+            return None
+        
+        # Get the protein force field using the new method
+        protein_ff = self.parent_interface.get_protein_force_field(self.force_fields)
+        
+        # Use class variable for parameter file mapping
+        if protein_ff not in self.parent_interface.PROTEIN_FORCE_FIELD_PARM_MAPPER:
+            _LOGGER.error(f"Unsupported protein force field for parm dat mapping: {protein_ff}")
+            raise ValueError(f"Cannot find parameter file for force field: {protein_ff}")
+        
+        parm_dat_file = self.parent_interface.PROTEIN_FORCE_FIELD_PARM_MAPPER[protein_ff]
+        parm_dat_path = f"{amberhome}/dat/leap/parm/{parm_dat_file}"
+        
+        # Verify the file exists
+        if not os.path.exists(parm_dat_path):
+            _LOGGER.warning(f"Parameter file not found: {parm_dat_path}")
+            return None
+        
+        return parm_dat_path
 
     def _parameterize_metalcenter(self, metal: MetalUnit,
                                   ligand_parms: Dict[str, Tuple[str, List[str]]],
@@ -404,10 +563,12 @@ class AmberParameterizer(MolDynParameterizer):
                 and not isinstance(additional_tleap_lines, str)
                 and isinstance(additional_tleap_lines[0], str)
                 ):
-                lines.extend(additional_tleap_lines)
+                pass
             else:
                 _LOGGER.error(f"`additional_tleap_line` needs to be a list of str. current: {repr(additional_tleap_lines)}")
                 raise TypeError
+        else:
+            additional_tleap_lines = []
 
         # NCAA parts
 
@@ -434,6 +595,7 @@ class AmberParameterizer(MolDynParameterizer):
                                           if_renumber=False)
         lines.extend([
             f"a = loadpdb {temp_pdb_path}",
+            ] + additional_tleap_lines + [ # insert additional lines as they sometime depend on obj "a"
             "center a",
             "addions a Na+ 0",
             "addions a Cl- 0",
@@ -457,7 +619,11 @@ class AmberParameterizer(MolDynParameterizer):
         for frcmod in frcmod_path_list:
             result.append(f"loadAmberParams {frcmod}")
         # mol desc
-        if fs.get_file_ext(mol_desc_path) in [".prepin", ".prepi"]:
+        if not mol_desc_path:
+            _LOGGER.info(
+                f"Got empty mol_desc_path for {ncaa_name}. "
+                f"This could mean the {ncaa_name} is already supported by the force field.")
+        elif fs.get_file_ext(mol_desc_path) in [".prepin", ".prepi"]:
             result.append(f"loadAmberPrep {mol_desc_path}")
         elif fs.get_file_ext(mol_desc_path) in [".mol2"]:
             result.append(f"{ncaa_name} = loadmol2 {mol_desc_path}")
@@ -499,6 +665,18 @@ class AmberMDStep(MolDynStep):
         thermostat
         constrain
         restart
+        use_qmmm
+        qm_region
+        qm_region_charge_spin
+        qm_level_of_theory
+        qm_engine
+        qm_region_pdb_path
+        qm_ele_cutoff
+        qm_ewald
+        qm_adjust_q
+        qm_adaptive_solvent_type
+        qm_num_adaptive_solvent
+        qm_num_transition_solvent
         core_type
         cluster_job_config
         if_report
@@ -520,8 +698,20 @@ class AmberMDStep(MolDynStep):
                  pressure_scaling: str,
                  constrain: List[StructureConstraint],
                  restart: bool,
+                 use_qmmm: bool,
+                 qm_region: StruSelection,
+                 qm_region_charge_spin: Tuple[int, int],
+                 qm_level_of_theory: QMLevelOfTheory,
+                 qm_engine: str,
+                 qm_region_pdb_path: str,
+                 qm_ele_cutoff: float,
+                 qm_ewald: int,
+                 qm_adjust_q: int,
+                 qm_adaptive_solvent_type: Union[str, None],
+                 qm_num_adaptive_solvent: str,
+                 qm_num_transition_solvent: str,
                  core_type: str,
-                 cluster_job_config: Dict,
+                 cluster_job_config: ClusterJobConfig,
                  if_report: bool,
                  record_period: float,
                  keep_in_file: bool,
@@ -542,6 +732,19 @@ class AmberMDStep(MolDynStep):
         self.record_period = record_period
         self.keep_in_file = keep_in_file
         self._work_dir = work_dir
+
+        self.use_qmmm = use_qmmm
+        self.qm_region = qm_region
+        self.qm_region_charge_spin = qm_region_charge_spin
+        self.qm_level_of_theory = qm_level_of_theory
+        self.qm_engine = qm_engine
+        self.qm_region_pdb_path = qm_region_pdb_path
+        self.qm_ele_cutoff = qm_ele_cutoff
+        self.qm_ewald = qm_ewald
+        self.qm_adjust_q = qm_adjust_q
+        self.qm_adaptive_solvent_type = qm_adaptive_solvent_type
+        self.qm_num_adaptive_solvent = qm_num_adaptive_solvent
+        self.qm_num_transition_solvent = qm_num_transition_solvent
 
     # region == property == 
     @property
@@ -615,6 +818,9 @@ class AmberMDStep(MolDynStep):
     @property
     def md_config_dict(self) -> Dict:
         """get md configuration related attributes in a dictionary form"""
+        available_cores = int(self.cluster_job_config.node_cores)
+        available_mem_per_core = self.cluster_job_config.mem_per_core
+
         return {
             "name" : self.name,
             "length" : self.length,
@@ -628,6 +834,20 @@ class AmberMDStep(MolDynStep):
             "if_report" : self.if_report,
             "record_period" : self.record_period,
             "mdstep_dir" : self.work_dir,
+            "use_qmmm" : self.use_qmmm,
+            "qm_region" : self.qm_region,
+            "qm_region_charge_spin" : self.qm_region_charge_spin,
+            "qm_level_of_theory" : self.qm_level_of_theory,
+            "qm_engine" : self.qm_engine,
+            "qm_region_pdb_path" : self.qm_region_pdb_path,
+            "qm_ele_cutoff" : self.qm_ele_cutoff,
+            "qm_ewald" : self.qm_ewald,
+            "qm_adjust_q" : self.qm_adjust_q,
+            "qm_adaptive_solvent_type" : self.qm_adaptive_solvent_type,
+            "qm_num_adaptive_solvent" : self.qm_num_adaptive_solvent,
+            "qm_num_transition_solvent" : self.qm_num_transition_solvent,
+            "available_cores" : available_cores,
+            "available_mem_per_core" : available_mem_per_core,
         }
     # endregion
 
@@ -665,9 +885,23 @@ class AmberMDStep(MolDynStep):
             path_rel_to=path_rel_to)
 
         # 4. assemble ClusterJob
-        cluster = self.cluster_job_config["cluster"]
-        res_keywords = self.cluster_job_config["res_keywords"]
-        env_settings = cluster.AMBER_ENV[self.core_type.upper()]
+        cluster = self.cluster_job_config.cluster
+        res_keywords = self.cluster_job_config.res_keywords
+        env_settings = {
+            "head" : cluster.AMBER_ENV[self.core_type.upper()],
+            "tail" : "",
+            }
+        # env settings for possible QM engine
+        if self.use_qmmm and self.qm_engine != "sqm":
+            qm_engine_name_mapper = {
+                "G16" : "G16",
+                "Gaussian" : "G16",
+                "gaussian" : "G16",
+            } #TODO put this maybe in general config of the interface?
+            qm_engine_name = qm_engine_name_mapper[self.qm_engine.upper()]
+            qm_engine_env = getattr(cluster, f"{qm_engine_name}_ENV")
+            env_settings["head"] += f"\n{qm_engine_env[self.core_type.upper()]['head']}"
+            env_settings["tail"] += f"\n{qm_engine_env[self.core_type.upper()]['tail']}"
         sub_script_path = fs.get_valid_temp_name(f"{self.work_dir}/submit_{self.name}.cmd")
         job = ClusterJob.config_job(
             commands = md_step_cmd,
@@ -688,7 +922,7 @@ class AmberMDStep(MolDynStep):
         }
 
         # 5. make result egg
-        result_egg = AmberMDResultEgg(
+        result_egg = AmberMDResultEgg( # TODO for a QMMM job there are more to pick up
             traj_path=traj_path,
             traj_log_path=mdout_path,
             rst_path=mdrst_path,
@@ -764,7 +998,7 @@ class AmberMDStep(MolDynStep):
         return result
 
 
-    def _make_mdin_file(self, path_rel_to: str = None,) -> str:
+    def _make_mdin_file(self, path_rel_to: str = None,) -> str: # TODO we need to also give it a Structure() so that AmberMDStep can be decoupled to the Structure() in the constraints or qm_region
         """make a temporary mdin file.
         *path* is based on self.work_dir and self.name.
         If the file exists, will change the filename to {self.name}_{index}.in
@@ -792,7 +1026,7 @@ class AmberMDStep(MolDynStep):
             will be written as the relative path to {path_rel_to}. However, the
             path stored in python variables are still absolute or relative to cwd
             so that they can be valid."""
-        num_cores = self.cluster_job_config["res_keywords"]["node_cores"]
+        num_cores = self.cluster_job_config.node_cores
         executable = self.parent_interface.get_md_executable(self.core_type, num_cores)
         mdout_path = f"{self.work_dir}/{self.name}.out"
         mdrst_path = f"{self.work_dir}/{self.name}.rst"
@@ -880,7 +1114,18 @@ class AmberMDStep(MolDynStep):
             # 1. stdout stderr
             # error types: Fall of bus, periodic box has changed too much, illegel mem
             if isinstance(stdstream_source, ClusterJob):
-                with open(stdstream_source.job_cluster_log) as f:
+                # more debug info
+                joblog = stdstream_source.job_cluster_log
+                if not joblog: # in case the job is merged
+                    merged_job = stdstream_source.mimo.get("merged_job", None)
+                    if merged_job:
+                        joblog = merged_job.job_cluster_log
+                        if not Path(joblog).exists():
+                            _LOGGER.error(f"Found merged job ({stdstream_source}) for md step ({self.name}), but no job_cluster_log found.)")
+                    else:
+                        _LOGGER.error(f"The job (never merged, {stdstream_source}) for md step ({self.name}) does not have job_cluster_log.)")
+
+                with open(joblog) as f:
                     stderr_stdout = f.read()
                     error_info_list.append(f"stdout/stderr(from job log):{os.linesep*2}{stderr_stdout}")
             elif isinstance(stdstream_source, CompletedProcess):
@@ -940,6 +1185,7 @@ class AmberMDStep(MolDynStep):
                 md_names = merged_job.mimo["md_names"] + job.mimo["md_names"]
                 work_dir = merged_job.mimo["work_dir"]
                 merged_mdin = merged_job.mimo["temp_mdin"] + job.mimo["temp_mdin"]
+                merged_contain_jobs = (merged_job.mimo.get("contain_jobs") or [merged_job]) + [job] # make sure the first job is there
                 sub_script_path = fs.get_valid_temp_name(f"{work_dir}/submit_{'_'.join(md_names)}.cmd")
                 # update merged job
                 merged_job = ClusterJob.config_job(
@@ -958,11 +1204,20 @@ class AmberMDStep(MolDynStep):
                     "md_names" : md_names,
                     "work_dir" : work_dir,
                     "temp_mdin" : merged_mdin,
+                    "contain_jobs" : merged_contain_jobs, # temp k,v
                 }
                 result.append(merged_job) # add the job back
             else:
                 result.append(merged_job)
                 result.append(job) # add unmergable
+
+        # add the merged_job in the mimo of the original job. Because the ResultEgg can only find the original job.
+        for job in result:
+            contain_jobs = job.mimo.get("contain_jobs", None)
+            if contain_jobs:
+                for subjob in contain_jobs:
+                    subjob.mimo["merged_job"] = job
+                del job.mimo["contain_jobs"]
 
         return result
 
@@ -1021,17 +1276,64 @@ class AmberInterface(BaseInterface):
     MD_TIMESTEP_SHAKE_MAPPER = {0.000002: (2, 2), 0.000001: (1, 1)}
     """The mapper for mapping timestep - (ntc, ntf) value"""
 
+    MD_QMMM_VSOLV_MAPPER = {
+        None : 0,
+        "single_point" : 1,
+        "num_of_solvent" : 2,
+        "fixed_size" : 3,
+    }
+    """The mapper that maps keywords of the method to the option int"""
+
+    SQM_METHOD_KEYWORD_MAPPER = {
+        "AM1" : "AM1",
+        "AM1-D*" : "AM1-D*",
+        "RM1" : "RM1",
+        "MNDO" : "MNDO",
+        "PM3-PDDG" : "PM3-PDDG",
+        "MNDO-PDDG" : "MNDO-PDDG",
+        "PM3-CARB1" : "PM3-CARB1",
+        "MNDO/d" : "MNDO/d",
+        "MNDOD" : "MNDO/d", # equivalent keyword
+        "AM1/d" : "AM1/d",
+        "AM1D" : "AM1/d", # equivalent keyword
+        "AM1-DH+" : "AM1-DH+",
+        "PM6" : "PM6",
+        "PM6-D" : "PM6-D",
+        "PM6-DH+" : "PM6-DH+",
+        "DFTB2" : "DFTB2",
+        "DFTB" : "DFTB2", # equivalent keyword
+        "DFTB3" : "DFTB3",
+    }
+    """map semi-emperical method name to sqm keyword. record all of them from Amber20."""
+
+    SUPPORTED_PROTEIN_FORCE_FIELDS = list(AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER.keys())
+    """List of supported protein force fields for MAA parameterization"""
+    
+    PROTEIN_FORCE_FIELD_PARM_MAPPER = {
+        "fb15": "parm99.dat",
+        "ff03.r1": "parm99.dat",
+        "ff03ua": "parm99.dat",
+        "ff14SB": "parm10.dat",
+        "ff14SBonlysc": "parm10.dat",
+        "ff15ipq": "parm15ipq_10.3.dat",
+        "ff15ipq-vac": "parm15ipq_10.3.dat",
+        "ff19SB": "parm19.dat",
+        "ff19ipq": "parm19ipq.dat",
+    }
+    """Mapper for protein force fields to their parameter dat files"""
+
     def __init__(self, parent, config: AmberConfig = None) -> None:
         """Simplistic constructor that optionally takes an AmberConfig object as its only argument.
         Calls parent class."""
         super().__init__(parent, config, default_amber_config)
 
-    # == interface general ==
+    # region == interface general ==
     def display_config(self) -> None:
         """Prints all settings for the object's AmberConfig() inteface to stdout using AmberConfig.display()."""
         self.config_.display()
+    # endregion
 
-    # == general amber app interface ==
+    # region == general amber app interface ==
 
     # -- file format --
     def get_file_format(self, fname: str) -> str:
@@ -1040,6 +1342,120 @@ class AmberInterface(BaseInterface):
         if "frcmod" in ext:
             return "frcmod"
         return self.AMBER_FILE_FORMAT_MAPPER.get(ext, ext[1:])
+
+    def get_protein_force_field(self, force_fields: List[str]) -> str:
+        """Extract the protein force field from the force fields list.
+        
+        Args:
+            force_fields: List of force fields to search.
+            
+        Returns:
+            The detected protein force field (e.g., "ff14SB", "ff19SB", "ff99SB")
+            
+        Raises:
+            ValueError: If no supported protein force field is found
+        """        
+        # Search for supported protein force fields in the list
+        # First pass: look for canonical protein force fields (non-modAA versions)
+        for ff in force_fields:
+            # Convert to uppercase for case-insensitive comparison
+            ff_upper = ff.upper()
+            
+            # Skip modAA versions in first pass to prioritize canonical versions
+            if "_MODAA" in ff_upper:
+                continue
+            
+            # Check both with and without protein.ff prefix for flexibility
+            for supported_ff in self.SUPPORTED_PROTEIN_FORCE_FIELDS:
+                supported_ff_upper = supported_ff.upper()
+                
+                # Match with protein.ff prefix (most common case)
+                if f"PROTEIN.{supported_ff_upper}" in ff_upper:
+                    return supported_ff
+                
+                # Match without prefix for flexibility (exact match only)
+                if ff_upper == supported_ff_upper:
+                    return supported_ff
+        
+        # If no protein force field found, raise error
+        _LOGGER.error(f"No supported protein force field found in {force_fields}. Supported: {self.SUPPORTED_PROTEIN_FORCE_FIELDS}")
+        raise ValueError(f"Unsupported protein force field configuration: {force_fields}")
+
+    def check_residue_name_ff_support(self, res_code: str, force_fields: List[str], work_dir: Path) -> bool:
+        """Check if a residue name is supported by the specified force fields.
+        
+        Uses tleap to verify if a residue code is recognized by loading the force fields
+        and attempting to create a sequence with that residue.
+        
+        Args:
+            res_code: 3-letter residue code to check (e.g., "ALA", "TRP", "XYZ")
+            force_fields: List of force field names to source in tleap
+            work_dir: Directory to use for temporary tleap files
+            
+        Returns:
+            True if residue is supported, False otherwise
+        """
+        # Ensure work directory exists
+        work_dir = Path(work_dir)
+        work_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create tleap input to test residue support
+        tleap_input_lines = []
+        
+        # Source all force fields
+        for ff in force_fields:
+            # Handle both "leaprc.protein.ff14SB" and "ff14SB" formats
+            if ff.lower().startswith("leaprc.protein."):
+                # Force field already has full prefix, use as is
+                leaprc_name = ff
+            elif ff.lower().startswith("protein."):
+                # Already has protein prefix, use as is
+                leaprc_name = f"leaprc.{ff}"
+            else:
+                # Add protein prefix for bare force field names
+                leaprc_name = f"leaprc.protein.{ff}"
+            tleap_input_lines.append(f"source {leaprc_name}")
+        
+        # Test the residue by creating a sequence
+        tleap_input_lines.extend([
+            f"model = sequence {{ {res_code.upper()} }}",
+            "desc model",
+            "quit"
+        ])
+        
+        tleap_input_str = "\n".join(tleap_input_lines)
+        
+        try:
+            # Use the existing run_tleap method with temporary files
+            with tempfile.NamedTemporaryFile(
+                mode='w', suffix='.out', delete=False, dir=work_dir
+                ) as out_file:
+                out_path = out_file.name
+            
+            # Run tleap and capture any errors
+            self.run_tleap(
+                tleap_in_str=tleap_input_str,
+                if_ignore_start_up=True,
+                tleap_out_path=out_path
+            )
+            
+            # If we get here without exception, check output for success patterns
+            with open(out_path, 'r') as f:
+                output = f.read()
+            
+            # Check for success indicators
+            if "Contents:" in output and "Exiting LEaP: Errors = 0" in output:
+                return True
+            else:
+                return False
+                
+        except Exception as e:
+            # tleap failed or other error - residue not supported
+            _LOGGER.debug(f"tleap failed for residue {res_code}: {e}")
+            return False
+        finally:
+            # Clean up output file
+            fs.safe_rm(out_path)
 
     def convert_traj_to_nc(self, traj_path: str, out_path: str, topology_path: str = str()) -> None:
         """Convert the given trajectory file to the Amber `.nc` format file in the out_path.
@@ -1072,7 +1488,7 @@ class AmberInterface(BaseInterface):
             raise ValueError
 
     def convert_top_to_prmtop(self, fpath: str, out_path: str) -> None:
-        """convert the given topology file to the Amber .prmtop file in the out_path"""
+        """convert the given topology file to the Amber .prmtop file in the out_path""" #NOTE(qz) use mdtraj or pytraj to really do this.
         in_format = self.get_file_format(fpath)
 
         if in_format == "prmtop":
@@ -1080,6 +1496,35 @@ class AmberInterface(BaseInterface):
         else:
             _LOGGER.error(f"found unsupported file format: {in_format} ({fpath})")
             raise ValueError
+
+    def convert_stru_to_inpcrd(self, stru: Structure, out_path: str) -> None:
+        """convert the given Structure() to the Amber .inpcrd file in the out_path
+        NOTE this could refactor to the inpcrd parser but MVP here.""" #NOTE(qz) use mdtraj or pytraj to really do this.
+        # save a temp PDB
+        fs.safe_mkdir(eh_config["system.SCRATCH_DIR"])
+        temp_pdb_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/stru_to_inpcrd.pdb")
+        temp_rst_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/stru_to_inpcrd.rst")
+        PDBParser().save_structure(temp_pdb_path, stru, same_chain_id_for_9999_solvent=True) # if the chain id overflow the coord will be messed up by cpptraj
+
+        # convert PDB to inpcrd
+        contents = [
+            f"parm {temp_pdb_path}",
+            f"trajin {temp_pdb_path}",
+            f"trajout {temp_rst_path}",
+            "run",
+            "quit"
+        ]
+        contents = "\n".join(contents)
+        self.run_cpptraj(contents)
+
+        if stru.has_pbc_box():
+            pbc_line = "".join([f"{digit:12.7f}" for digit in stru.pbc_box_shape])
+            with open(temp_rst_path, "a") as of:
+                of.write(f"{pbc_line}\n")
+        # cp to dest
+        fs.safe_mv(temp_rst_path, out_path)
+        # clean up
+        fs.clean_temp_file_n_dir([temp_pdb_path, temp_rst_path, eh_config["system.SCRATCH_DIR"]])
 
     # -- tleap --
     def run_tleap(
@@ -1122,12 +1567,13 @@ class AmberInterface(BaseInterface):
         with open(tleap_in_path, "w") as of:
             of.write(tleap_in_str)
         # run tleap command
-        cmd_args = f"-f {tleap_in_path} > {tleap_out_path}"
+        cmd_args = f"-f {tleap_in_path}"
         if if_ignore_start_up:
             cmd_args = f"-s {cmd_args}"
         if additional_search_path:
             for add_path in additional_search_path:
                 cmd_args = f"{cmd_args} -I {add_path}"
+        cmd_args = f"{cmd_args} > {tleap_out_path} 2>&1"
         try:
             self.env_manager_.run_command("tleap", cmd_args)
         except CalledProcessError as e:
@@ -1138,6 +1584,16 @@ class AmberInterface(BaseInterface):
                 for e_info in new_e.error_info_list:
                     _LOGGER.error(e_info)
                 raise new_e from e
+            else:
+                raise e
+        else:
+            # tleap can also sliently fail, so we need to check the output file
+            tleap_error = self._find_tleap_error(tleap_out_path)
+        finally:
+            fs.clean_temp_file_n_dir(temp_path_list)
+
+        if tleap_error.error_info_list:
+            raise tleap_error
 
         # clean up temp file if success
         fs.clean_temp_file_n_dir(temp_path_list)
@@ -1261,6 +1717,7 @@ class AmberInterface(BaseInterface):
     def run_parmchk2(self, in_file: str, out_file: str, gaff_type: str,
                      custom_force_field: str=None,
                      is_custom_ff_type_amber: bool=True,
+                     print_annotation: bool=False,
                      ) -> None:
         """the python wrapper of running parmchk2
         Args:
@@ -1270,7 +1727,8 @@ class AmberInterface(BaseInterface):
             custom_ff: the path of a customize ff file for search.
                        (e.g.: this allows you to use ff14SB for maa)
             is_custom_ff_type_amber: is the type of custom_ff amber
-            * TODO: support -c -a -w when needed"""
+            print_annotation: if True, add -a Y flag to print annotation information
+            * TODO: support -c -w when needed"""
         cmd_args = ["-i", in_file,
                     "-f", self.get_file_format(in_file),
                     "-o", out_file,
@@ -1279,8 +1737,118 @@ class AmberInterface(BaseInterface):
             cmd_args.extend(["-p", custom_force_field])
             if not is_custom_ff_type_amber:
                 cmd_args.extend(["-pf", "2"])
+        if print_annotation:
+            cmd_args.extend(["-a", "Y"])
 
         self.env_manager_.run_command("parmchk2", cmd_args)
+
+        fs.clean_temp_file_n_dir([
+            "ANTECHAMBER.FRCMOD",
+        ])
+
+    def run_prepgen(self, in_file: str, out_file: str, mc_file: str, residue_name: str, work_dir: str = None) -> None:
+        """the python wrapper of running prepgen
+        Args:
+            in_file: input .ac file path
+            out_file: the output .prepin file path
+            mc_file: the main chain definition file path (.mc)
+            residue_name: the name of the residue
+            work_dir: working directory to run prepgen in (default: current directory)
+        
+        Raises:
+            RuntimeError: If prepgen encounters errors (indicated by error patterns in stdout/stderr)
+        
+        NOTE prepgen in old Amber versions will have bug on parsing the path of mc_file:
+        - It cannot be too long.
+        - It will have random parsing error if the path is exactly 32 characters.
+        - The reason is in prepgen.c (src code), it defines `char mcfilename[30] = "MAINCHAIN.DAT";`
+          and when user use `-m` option, it will copy the path to this array and overflow the buffer.
+        
+        Solution:
+        - Change to work_dir to run prepgen (prepgen generates many intermediate files)
+        - If mc file path > 20 characters, copy it to work_dir with short name "temp.mc"
+        - Clean up intermediate files before changing directory back
+        """        
+        temp_paths = [
+            "ATOMTYPE.INF",
+            "NEWPDB.PDB", 
+            "PREP.INF",
+        ]
+        # Set up working directory
+        if work_dir is None:
+            work_dir = os.getcwd()
+        elif not os.path.exists(work_dir):
+            fs.safe_mkdir(work_dir)
+            temp_paths.append(work_dir) # avoid deleting an existing empty directory that other processes may use
+        
+        # Get absolute paths
+        abs_in_file = os.path.abspath(in_file)
+        abs_out_file = os.path.abspath(out_file)  
+        abs_mc_file = os.path.abspath(mc_file)
+        
+        # Handle mc file path length issue - copy to work_dir if too long
+        mc_file_to_use = abs_mc_file
+        if len(abs_mc_file) > 20:
+            temp_mc_file = fs.get_valid_temp_name(os.path.join(work_dir, "temp.mc"))
+            shutil.copy2(abs_mc_file, temp_mc_file)
+            mc_file_to_use = os.path.relpath(temp_mc_file, work_dir)
+            temp_paths.append(temp_mc_file)
+        
+        # Change to work directory
+        original_cwd = os.getcwd()
+        os.chdir(work_dir)
+        
+        result = None
+        output_text = ""
+        try:
+            cmd_args = ["-i", abs_in_file,
+                        "-o", abs_out_file,
+                        "-m", mc_file_to_use,
+                        "-rn", residue_name]
+            
+            result = self.env_manager_.run_command("prepgen", cmd_args)
+        except Exception as e:
+            # prepgen failed with exit code != 0
+            # Try to extract stdout/stderr from the exception
+            if hasattr(e, 'output') and e.output:
+                output_text += str(e.output)
+            if hasattr(e, 'stderr') and e.stderr:
+                output_text += str(e.stderr)
+            # Re-raise as RuntimeError with prepgen-specific message
+            raise RuntimeError(f"prepgen command failed: {str(e)}\nOutput: {output_text}")
+        finally:
+            # Clean up intermediate files generated by prepgen BEFORE changing directory back
+            
+            fs.clean_temp_file_n_dir(temp_paths)
+            
+            # Always restore directory
+            os.chdir(original_cwd)
+        
+        # Delegate output checking to private helper
+        self._check_prepgen_output(result, output_text, out_file)
+    
+    def _check_prepgen_output(self, result, output_text: str, out_file: str) -> None:
+        """Private helper to check prepgen stdout/stderr and output file creation."""
+        # decode stdout and stderr
+        if hasattr(result, 'stdout') and result.stdout:
+            output_text += result.stdout.decode() if isinstance(result.stdout, bytes) else str(result.stdout)
+        if hasattr(result, 'stderr') and result.stderr:
+            output_text += result.stderr.decode() if isinstance(result.stderr, bytes) else str(result.stderr)
+        # Common prepgen error patterns
+        error_patterns = [
+            "Error", "ERROR", "Fatal", "FATAL",
+            "Cannot", "cannot", "Failed", "failed",
+            "No such file", "not found", "Invalid",
+            "invalid", "Abort", "abort"
+        ]
+        for pattern in error_patterns:
+            if pattern in output_text:
+                raise RuntimeError(f"prepgen encountered an error: {pattern} found in output:\n{output_text}")
+        # Verify output file exists and is non-empty
+        if not os.path.exists(out_file):
+            raise RuntimeError(f"prepgen failed to create output file {out_file}. Output: {output_text}")
+        if os.path.getsize(out_file) == 0:
+            raise RuntimeError(f"prepgen created empty output file {out_file}. Output: {output_text}")
 
     # -- add_pdb --
     def run_add_pdb(self, in_prmtop: str, out_path: str, ref_pdb: str, guess: bool = False):
@@ -1309,7 +1877,7 @@ class AmberInterface(BaseInterface):
                     break
                 of.write(line)
         
-    # -- cpptraj --
+    # region -- cpptraj --
     def run_cpptraj(
             self,
             instr_str: str,
@@ -1355,8 +1923,9 @@ class AmberInterface(BaseInterface):
         pattern = r"INPUT TRAJECTORIES.*\n.*\(reading 1 of (\d+)\)"
         result = int(re.search(pattern, content).group(1))
         return result
+    # endregion
 
-    # -- MMPBSA.py --
+    # region -- MMPBSA.py --
     def run_mmpbsa(
         self,
         # IO data
@@ -1797,8 +2366,9 @@ class AmberInterface(BaseInterface):
             )
         
         return result_df
+    # endregion
 
-    # -- parmed --
+    # region -- parmed --
     def run_parmed(
         self,
         parmed_in_str: str,
@@ -1831,20 +2401,37 @@ class AmberInterface(BaseInterface):
         fs.clean_temp_file_n_dir([
             temp_in_file
         ])
+    # endregion
 
-    # -- index mapping --
-    def get_amber_index_mapper(self, stru: Structure) -> Dict[str, Dict[Union[Residue, Atom], Union[int, tuple]]]:
+    # region -- index mapping --
+    def get_amber_index_mapper(self, stru: Structure, cache_file_path: str = None) -> Dict[str, Dict[Union[Residue, Atom], Union[int, tuple]]]:
         """get a mapper for objects in {stru} and in Amberilzed PDB of stru
         Use tLeap to get a PDB and align indexes.
         Returns:
             {
-            "residue" : {Residue(): amber_1_index_residue_idx_1, ...},
-            "atom" : {Atom(): amber_1_index_atom_idx_1}
+            "residue" : {(residue_key): (amber_chain_name, amber_1_index_residue_idx_1), ...},
+            "atom" : {(atom_key, atom_idx): amber_1_index_atom_idx_1, ...}
             }
 
         This will work as long as the order of residues remains the same after tleap process and atom
         have unique names in each residue.
-        TODO solve this for the 1Q4T case."""
+        TODO solve this for the 1Q4T case.""" #TODO speed up when solvent presence
+        # load cache TODO refactor this into core
+        if cache_file_path is None:
+            scratch_dir = eh_config['system.SCRATCH_DIR']
+            fs.safe_mkdir(scratch_dir)
+            cache_file_path = f"{scratch_dir}/.cache_amber_index_mapper.pickle"
+        if not Path(cache_file_path).exists():
+            save_obj({}, cache_file_path)
+        with open(cache_file_path, "rb") as f:
+            while fs.is_locked(f): # wait if the file is writing by other workflow
+                time.sleep(0.1)
+            cache_stru_amber_idx_map_mapper = pickle.load(f)
+        result = cache_stru_amber_idx_map_mapper.get(stru, None)
+        if result:
+            return result
+
+        # calculate if not in cache
         # init files
         temp_dir = eh_config['system.SCRATCH_DIR']
         fs.safe_mkdir(temp_dir)
@@ -1869,23 +2456,32 @@ class AmberInterface(BaseInterface):
         ref_reskey_mapper = ref_stru.residue_mapper
         for k, res in stru.residue_mapper.items():
             amber_key = ref_mapper[k]
-            result["residue"][res] = amber_key
+            result["residue"][k] = amber_key
+            ref_res = ref_reskey_mapper[amber_key]
+            ref_res_atom_name_mapper = ref_res.atom_name_mapper
             for atom in res.atoms:
-                amber_atom_idx = ref_reskey_mapper[amber_key].find_atom_name(atom.name).idx
-                result["atom"][atom] = amber_atom_idx
+                amber_atom_idx = ref_res_atom_name_mapper[atom.name].idx
+                result["atom"][(atom.key, atom.idx)] = amber_atom_idx
         fs.clean_temp_file_n_dir([
             temp_dir,
             temp_pdb,
             temp_amber_pdb,
         ])
-        # TODO add a cache mechanism
+
+        # save cache
+        cache_stru_amber_idx_map_mapper[stru] = result
+        with open(cache_file_path, "wb") as of:
+            fs.lock(of)
+            pickle.dump(cache_stru_amber_idx_map_mapper, of)
+            fs.unlock(of)
+
         return result
 
     def get_amber_atom_index(self, atoms: List[Atom]) -> List[int]:
         """get atom index in an Amberized PDB of the Structre() containing these Atom()s"""
         stru = atoms[0].root()
         aid_mapper = self.get_amber_index_mapper(stru)
-        return [aid_mapper["atom"][at] for at in atoms]
+        return [aid_mapper["atom"][(at.key, at.idx)] for at in atoms]
 
     def rename_atoms(self, stru: Structure) -> None: # TODO(high piror) move to structure_io https://github.com/ChemBioHTP/EnzyHTP/pull/162#discussion_r1473217587
         """Renames residues and atoms to be compatible with Amber naming and functions.
@@ -1928,8 +2524,9 @@ class AmberInterface(BaseInterface):
     def get_amber_chain_index(self, chains: List[Atom]) -> List[str]:
         """"""
         raise Exception("TODO")
+    # endregion
 
-    # -- amber mask --
+    # region -- amber mask --
     # region Amber Mask I/O
     def get_amber_mask(self, target: StruSelection, reduce: bool) -> str:
         """get the Amber mask based on a StruSelection() described by the mask
@@ -1960,8 +2557,9 @@ class AmberInterface(BaseInterface):
         return mask
             
     # endregion
+    # endregion
 
-    # -- sander/pmemd --
+    # region -- sander/pmemd --
     # region - mdin/mdout file I/O -
     def read_from_mdin(self, mdin_file_path: str) -> Dict:
         """the knowledge of the mdin format as the input of sander/pmemd.
@@ -2016,14 +2614,20 @@ class AmberInterface(BaseInterface):
 
         Return: the raw data dict.
         TODO should make the raw dict a class to strictly define it."""
+        qmmm_list = []
+        qmmm_engine_list = []
+        """namelist of a specific non-sqm QM engine (e.g.: &gau for Gaussian)"""
+        vsolv_list = []
+        adqmmm_list = []
         wt_list = []
         file_redirection_dict = {}
         group_info_list = []
 
-        # imin, ntx, irest, ntc, ntf
+        # imin, ntx, irest
         imin = int(md_config_dict["minimize"])
         ntx, irest = self.MD_RESTART_MAPPER[md_config_dict["restart"]]
-        ntc, ntf = self.MD_TIMESTEP_SHAKE_MAPPER[md_config_dict["timestep"]]
+        # ifqnt
+        ifqnt = int(md_config_dict["use_qmmm"])
 
         # region == imin variant == (some keyword dont work when imin=1 or 0 each)
         imin_or_not_cntrl = {
@@ -2033,6 +2637,7 @@ class AmberInterface(BaseInterface):
         if imin == 0: # MD
             # nstlim
             timestep = md_config_dict["timestep"]
+            ntc, ntf = self.MD_TIMESTEP_SHAKE_MAPPER[md_config_dict["timestep"]]
             dt = timestep * 1000
             raw_nstlim = md_config_dict["length"] / timestep
             nstlim = mh.round_by(raw_nstlim, 0.5)
@@ -2108,6 +2713,9 @@ class AmberInterface(BaseInterface):
                 }
 
         else: # minimization
+            # SHAKE(ntc, ntf) NOTE using SHAKE significantly hinders minimization 
+            ntc = 1
+            ntf = 1
             # maxcyc, ncyc
             maxcyc = md_config_dict["length"]
             ncyc = max(mh.round_by(maxcyc * self.config()["HARDCODE_NCYC_RATIO"], 0.5), 1)
@@ -2139,7 +2747,7 @@ class AmberInterface(BaseInterface):
                         f"Dont support {cons.constraint_type} yet in AmberInterface. Supported: {self.config()['SUPPORTED_CONSTRAINT_TYPE']}")
                     raise ValueError
 
-        # ntr and cartesian restraint
+        # ntr and cartesian restraint # TODO this make AmberMDStep couple with a specific topology. We may want to decouple it in the futher by taking an input Structure().
         ntr_cntrl = {}
         if cart_freeze:
             cons = merge_cartesian_freeze(cart_freeze)
@@ -2173,6 +2781,86 @@ class AmberInterface(BaseInterface):
             file_redirection_dict.update(nmropt_file_redirection)
         # endregion
 
+        # determine &qmmm namelist
+        if ifqnt:
+            qm_region: StruSelection = md_config_dict["qm_region"]
+            qmmask = self.get_amber_mask(qm_region, reduce=True)
+            qmcharge = md_config_dict["qm_region_charge_spin"][0]
+            qmspin = md_config_dict["qm_region_charge_spin"][1]
+            qm_region_pdb_path = md_config_dict["qm_region_pdb_path"] # path will be implemented in the AmberMDStep
+            qm_writepdb = int(bool(qm_region_pdb_path))
+            qm_ewald = md_config_dict["qm_ewald"]
+            qmcut = md_config_dict["qm_ele_cutoff"]
+            adjust_q = md_config_dict["qm_adjust_q"]
+            # deal with vsolv
+            vsolv = md_config_dict["qm_adaptive_solvent_type"]
+            vsolv = self.MD_QMMM_VSOLV_MAPPER[vsolv]
+            if vsolv:
+                nearest_qm_solvent = md_config_dict["qm_num_adaptive_solvent"]
+                n_partition = md_config_dict["qm_num_transition_solvent"] + 1
+                vsolv_list.append({
+                    'type' : 'vsolv',
+                    'config' : {
+                        'nearest_qm_solvent' : nearest_qm_solvent,
+                    },
+                })
+                if vsolv > 1 and n_partition > 1:
+                    # T region exists
+                    adqmmm_list.append({
+                        'type' : 'adqmmm',
+                        'config' : {
+                            'n_partition' : n_partition,
+                        },
+                    })
+
+            # deal with sqm or external
+            qm_engine: str = md_config_dict["qm_engine"]
+            qm_lot: QMLevelOfTheory = md_config_dict["qm_level_of_theory"]
+            if qm_engine == "sqm":
+                qm_theory = self.get_sqm_keyword_from_name(qm_lot.method)
+            else:
+                external_engine = qm_engine.lower()
+                qm_theory = "'EXTERN'"
+                gau_names = gaussian_interface.config()["ALTERNATIVE_GAUSSIAN_NAMES"]
+                if external_engine in gau_names:
+                    # gaussian
+                    gau_method_kw = gaussian_interface.get_method_keyword_from_name(qm_lot.method)
+                    gau_bs_kw, gau_bs_gen_lines = gaussian_interface.get_basis_set_keyword_from_name(qm_lot.basis_set)
+                    gau_bs_kw = f"'{gau_bs_kw.strip()}'"
+                    gau_method_kw = f"'{gau_method_kw.strip()}'"
+                    available_cores = md_config_dict["available_cores"]
+                    available_mem_per_core = int(md_config_dict["available_mem_per_core"].rstrip('GB'))
+                    gau_num_threads = max(available_cores - 1, 1)
+                    gau_mem = f"'{gau_num_threads * available_mem_per_core}GB'"
+                    qmmm_engine_list.append({
+                        'type' : 'gau',
+                        'config' : {
+                            'method' : gau_method_kw,
+                            'basis' : gau_bs_kw,
+                            'num_threads' : gau_num_threads,
+                            'mem' : gau_mem,
+                        }
+                    })
+                else:
+                    _LOGGER.error(f"{external_engine} is not supported by EnzyHTP or Amber right now."
+                                  " Consider open an issue to request it if Amber do support it.")
+                    raise ValueError
+            # asemble &qmmm namelist
+            qmmm_list.append({
+                "type" : "qmmm",
+                "config" : {
+                    "qmmask" : qmmask,
+                    "qmcharge" : qmcharge,
+                    "spin" : qmspin,
+                    "qm_theory" : qm_theory,
+                    "writepdb" : qm_writepdb,
+                    "qm_ewald" : qm_ewald, 
+                    "qmcut" : qmcut,
+                    "vsolv" : vsolv,
+                    "adjust_q" : adjust_q,    
+                }
+            })
+
         # determine the &wt END
         if wt_list or file_redirection_dict:
             wt_list.append(
@@ -2189,8 +2877,10 @@ class AmberInterface(BaseInterface):
                 'cut': self.config()["HARDCODE_CUT"],
                 'ntpr': ntpr, 'ntwx': ntwx,
                 } | ntr_cntrl | nmropt_cntrl | {
-            }},
-        ] + wt_list
+                'ifqnt': ifqnt,
+                }
+            },
+        ] + qmmm_list + qmmm_engine_list + vsolv_list + adqmmm_list + wt_list
 
         # compile the raw dict using md_config_dict
         raw_dict = {
@@ -2287,7 +2977,8 @@ class AmberInterface(BaseInterface):
         for namelist in raw_dict["namelists"]:
             mdin_lines.append(f" &{namelist['type']}")
             for k, v in namelist['config'].items():
-                mdin_lines.append(f"  {k} = {v},")
+                if v != "amber_default": # support using amber_default
+                    mdin_lines.append(f"  {k} = {v},")
             mdin_lines.append(" /")
         # file redirection
         for k, v in raw_dict["file_redirection"].items():
@@ -2397,8 +3088,20 @@ class AmberInterface(BaseInterface):
             return False
 
     # def run_sander/pmemd() >>> see AmberMDStep.run() or .make_job()
+    # endregion
 
-    # == engines ==
+    # region -- sqm --
+    def get_sqm_keyword_from_name(self, name: str) -> str:
+        """convert a QM method name object to sqm method keyword"""
+        name = name.strip().upper()
+        if name not in self.SQM_METHOD_KEYWORD_MAPPER:
+            _LOGGER.warning(f"{name} not found in supported methods of SQM. (at least in Amber24)")
+        return self.SQM_METHOD_KEYWORD_MAPPER[name]
+    # endregion
+
+    # endregion
+
+    # region == engines ==
     # (engines for science APIs)
     # -- mutation/clean up --
     def tleap_clean_up_stru(
@@ -2584,14 +3287,14 @@ class AmberInterface(BaseInterface):
         return result
 
     def antechamber_ncaa_to_moldesc(self,
-                                    ncaa: NonCanonicalBase,
+                                    ncaa: Union[NonCanonicalBase, StructureRegion],
                                     out_path: Union[str, None] = None,
                                     gaff_type: str = "GAFF",
                                     charge_method: str = "AM1BCC",
                                     cluster_job_config: Dict=None,) -> str:
         """use antechamber to generate .mol2/.ac file for ligand/modified amino acid.
         Args:
-            ncaa: the target Ligand/ModifiedAminoAcid
+            ncaa: the target Ligand/ModifiedAminoAcid. Modified amino acids can be passed in as StructureRegion objects.
             out_path: the path of the output molecule description file. (use ext here to determine target format)
             gaff_type: the ff type used for NCAA. This influence the atom type in the moldesc file
             charge_method: the method for generation of atomic charges
@@ -2599,6 +3302,17 @@ class AmberInterface(BaseInterface):
         Return:
             the out_path
             """
+        # init ncaa object
+        maa_region = None
+
+        if isinstance(ncaa, StructureRegion):
+            maa_region = ncaa
+
+            if len(maa_region.involved_residues) > 1:
+                _LOGGER.error("Please provide a ncaa StructureRegion with exactly 1 involved residue")
+
+            ncaa = ncaa.involved_residues[0]
+
         # san check
         if (ncaa.multiplicity is None) or (ncaa.net_charge is None):
             _LOGGER.error(f"supplied NCAA ({ncaa.name}) does not have charge and spin."
@@ -2606,10 +3320,8 @@ class AmberInterface(BaseInterface):
                           " Structure.assign_ncaa_chargespin()")
             raise ValueError
 
-        if ncaa.is_modified():
-            atom_type = "AMBER"
-        else:
-            atom_type = gaff_type
+        # Use GAFF atom types for both modified amino acids and ligands
+        atom_type = gaff_type
 
         multiplicity = ncaa.multiplicity
         net_charge = ncaa.net_charge
@@ -2624,11 +3336,17 @@ class AmberInterface(BaseInterface):
         # 1. make ligand PDB
         temp_dir = eh_config["system.SCRATCH_DIR"]
         fs.safe_mkdir(temp_dir)
+
         temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
+
         if ncaa.is_modified():
-            # 1.1. Capping - cap C-terminal with OH and N-terminal with H
-            ncaa_region = create_region_from_residues(residues=[ncaa], nterm_cap="H", cterm_cap="OH")
-            ncaa = ncaa_region.convert_to_structure(cap_as_residue=False)
+            if maa_region:
+                ncaa = maa_region.convert_to_structure(cap_as_residue=False)
+            else:
+                # 1.1. Capping - cap C-terminal with OH and N-terminal with H  
+                ncaa_region = create_region_from_residues(residues=[ncaa], nterm_cap="H", cterm_cap="OH")  
+                ncaa = ncaa_region.convert_to_structure(cap_as_residue=False)
+
         pdb_io.PDBParser().save_structure(temp_pdb_path, ncaa)
         input_file = temp_pdb_path
 
@@ -2694,7 +3412,7 @@ class AmberInterface(BaseInterface):
 
     def build_md_step(self,
                       name: str = "default",
-                      # simulation
+                      # simulation (classical MD)
                       length: Union[float, None] = None, # ns
                       timestep: float = "default", # ns
                       minimize: bool = "default",
@@ -2703,11 +3421,25 @@ class AmberInterface(BaseInterface):
                       pressure_scaling: str = "default",
                       constrain: List[StructureConstraint] = "default",
                       restart: bool = "default",
+                      # simulation (QM/MM & QM/MM MD)
+                      use_qmmm: bool = "default",
+                      qm_region: StruSelection = None, # TODO may be also manually dispatch to an un-capped StructureRegion? Probably just use StructureRegion to obtain StruSelection and charge spin the in upper call
+                      qm_region_charge_spin: Tuple[int, int] = None, 
+                      qm_level_of_theory: QMLevelOfTheory = None,
+                      qm_engine: str = "default", # by default sqm
+                      qm_region_pdb_path: str = None, # TODO this option doesnot function for now. add it in AmberMDStep
+                      qm_ele_cutoff: float = "default",
+                      qm_ewald: int = "default",
+                      qm_adjust_q: int = "default",
+                      # simulation (QM/MM: adaptive solvent)
+                      qm_adaptive_solvent_type: Union[str, None] = "default", # turns on when not None
+                      qm_num_adaptive_solvent: str = "default",
+                      qm_num_transition_solvent: str = "default",
                       # simulation (alternative)
                       amber_md_in_file: str = None,
                       # execution
                       core_type: str = "default",
-                      cluster_job_config: Dict = "default",
+                      cluster_job_config: ClusterJobConfig = "default",
                       # output
                       if_report: bool = False,
                       record_period: float = "default", # ns
@@ -2737,12 +3469,43 @@ class AmberInterface(BaseInterface):
                 a list of StructureConstraint objects that indicates geometry constrains in the step.
             restart:
                 whether restart this md from the volecity of a previous md step.
+            use_qmmm: bool
+                whether this step is based on QM/MM (based on Amber20 Manual 10.1)
+            qm_region: StruSelection (enabled & required when use_qmmm=True)
+                a StruSelection object that specify the QM region
+            qm_region_charge_spin: Tuple[int, int] (enabled & required when use_qmmm=True)
+                the charge and multiplicity of the QM region
+            qm_level_of_theory: QMLevelOfTheory (enabled & required when use_qmmm=True)
+                the level of theory of the QM/MM
+            qm_engine: str (enabled when use_qmmm=True)
+                the QM engine
+            qm_region_pdb_path: str (enabled when use_qmmm=True)
+                the path of a PDB file of the QM region for debug purpose. None means dont save.
+            qm_ele_cutoff: float (enabled when use_qmmm=True)
+                the QM/MM electrostatic embedding cut-off distance
+            qm_ewald: int (enabled when use_qmmm=True)
+                This option specifies how long range electrostatics for the QM region should be treated
+                (See Amber20 Manual 10.1.6 for details)
+            qm_adjust_q: int (enabled when use_qmmm=True)
+                This controls how charge is conserved during a QMMM calculation involving link atoms.
+                (See Amber20 Manual 10.1.7 for details)
+            qm_adaptive_solvent_type: Union[str, None] (enabled when use_qmmm=True)
+                This turns on/off and specify the type of adaptive QM/MM solvent treatmemt
+                None turns it off and options are:
+                    - single_point # fixed number of solvent only two region so only suitable for SPE
+                    - num_of_solvent # fixed number of solvent but three regions including a T region
+                    - fixed_size # fixed size of solvent shell and three regions including a T region
+                (See Amber20 Manual 10.3 for details)
+            qm_num_adaptive_solvent: str (enabled required when use_qmmm=True and qm_adaptive_solvent_type != None)
+                The number of adaptive solvent. None means turn off adaptive solvent.
+            qm_num_transition_solvent: str (enabled when use_qmmm=True and qm_adaptive_solvent_type != None)
+                The number of solvent in the T region
             core_type:
                 the type of computing core that runs the MD. This will affect both the command
                 and the cluster_job config if cluster_job_config is not None.
                 options: [cpu, gpu]
             cluster_job_config:
-                dictionary that assign arguments for ClusterJob.config_job
+                dictionary or ClusterJobConfig that assign arguments for ClusterJob.config_job
                 For `res_keywords` it works as it updates the default dict in ARMerConfig.MD_GPU_RES or
                 ARMerConfig.MD_CPU_RES depending on the core_type.
                 NOTE that it is also used to config resources even if local run is specified.
@@ -2791,6 +3554,18 @@ class AmberInterface(BaseInterface):
             record_period_mdin = mdin_config.get("record_period", None)
             constrain_mdin = mdin_config.get("constrain", None)
             restart_mdin = mdin_config.get("restart", None)
+            use_qmmm_mdin = mdin_config("use_qmmm", None)
+            qm_region_mdin = mdin_config("qm_region", None)
+            qm_region_charge_spin_mdin = mdin_config("qm_region_charge_spin", None)
+            qm_level_of_theory_mdin = mdin_config("qm_level_of_theory", None)
+            qm_engine_mdin = mdin_config("qm_engine", None)
+            qm_region_pdb_path_mdin = mdin_config("qm_region_pdb_path", None)
+            qm_ele_cutoff_mdin = mdin_config("qm_ele_cutoff", None)
+            qm_ewald_mdin = mdin_config("qm_ewald", None)
+            qm_adjust_q_mdin = mdin_config("qm_adjust_q", None)
+            qm_adaptive_solvent_type_mdin = mdin_config("qm_adaptive_solvent_type", None)
+            qm_num_adaptive_solvent_mdin = mdin_config("qm_num_adaptive_solvent", None)
+            qm_num_transition_solvent_mdin = mdin_config("qm_num_transition_solvent", None)
 
             if length is None and length_mdin is not None:
                length = length_mdin
@@ -2810,6 +3585,31 @@ class AmberInterface(BaseInterface):
                constrain = constrain_mdin
             if restart == "default" and restart_mdin is not None:
                restart = restart_mdin
+            # QM/MM
+            if use_qmmm == "default" and use_qmmm_mdin is not None:
+                use_qmmm = use_qmmm_mdin
+            if qm_region is None and qm_region_mdin is not None:
+                qm_region = qm_region_mdin
+            if qm_region_charge_spin is None and qm_region_charge_spin_mdin is not None:
+                qm_region_charge_spin = qm_region_charge_spin_mdin
+            if qm_level_of_theory is None and qm_level_of_theory_mdin is not None:
+                qm_level_of_theory = qm_level_of_theory_mdin
+            if qm_engine == "default" and qm_engine_mdin is not None:
+                qm_engine = qm_engine_mdin
+            if qm_region_pdb_path is None and qm_region_pdb_path_mdin is not None:
+                qm_region_pdb_path = qm_region_pdb_path_mdin
+            if qm_ele_cutoff == "default" and qm_ele_cutoff_mdin is not None:
+                qm_ele_cutoff = qm_ele_cutoff_mdin
+            if qm_ewald == "default" and qm_ewald_mdin is not None:
+                qm_ewald = qm_ewald_mdin
+            if qm_adjust_q == "default" and qm_adjust_q_mdin is not None:
+                qm_adjust_q = qm_adjust_q_mdin
+            if qm_adaptive_solvent_type == "default" and qm_adaptive_solvent_type_mdin is not None:
+                qm_adaptive_solvent_type = qm_adaptive_solvent_type_mdin
+            if qm_num_adaptive_solvent == "default" and qm_num_adaptive_solvent_mdin is not None:
+                qm_num_adaptive_solvent = qm_num_adaptive_solvent_mdin
+            if qm_num_transition_solvent == "default" and qm_num_transition_solvent_mdin is not None:
+                qm_num_transition_solvent = qm_num_transition_solvent_mdin
 
         if length is None:
             _LOGGER.error("At least one of `length` or `nstlim` (through `amber_md_in_file`) needs to be "
@@ -2844,17 +3644,54 @@ class AmberInterface(BaseInterface):
             core_type = self.config()["DEFAULT_MD_CORE_TYPE"]
         if cluster_job_config == "default":
             cluster_job_config = self.config().get_default_md_cluster_job(core_type)
+            cluster_job_config = ClusterJobConfig.from_dict(cluster_job_config)
         else:
             # For res_keywords, it updates the default config
             cluster_job_config = copy.deepcopy(cluster_job_config)
-            res_keywords_update = cluster_job_config["res_keywords"]
+            if not isinstance(cluster_job_config, ClusterJobConfig):
+                cluster_job_config = ClusterJobConfig.from_dict(cluster_job_config)
+            res_keywords_update = cluster_job_config.res_keywords
             default_res_keywords = self.config().get_default_md_cluster_job_res_keywords(core_type)
-            cluster_job_config["res_keywords"] = default_res_keywords | res_keywords_update
+            cluster_job_config.res_keywords = default_res_keywords | res_keywords_update # NOTE: dont need to do this in the new framework but still left this way to minimize the change
+
         if record_period == "default":
             record_period = self.config()["DEFAULT_MD_RECORD_PERIOD_FACTOR"] * length
         if work_dir == "default":
             work_dir = self.config()["DEFAULT_MD_WORK_DIR"]
             
+        # QM/MM
+        if use_qmmm == "default":
+            use_qmmm = self.config()["DEFAULT_MD_USE_QMMM"]
+        if qm_engine == "default":
+            qm_engine = self.config()["DEFAULT_MD_QM_ENGINE"]
+        if qm_ele_cutoff == "default":
+            qm_ele_cutoff = self.config()["DEFAULT_MD_QM_ELE_CUTOFF"]
+        if qm_ewald == "default":
+            qm_ewald = self.config()["DEFAULT_MD_QM_EWALD"]
+        if qm_adjust_q == "default":
+            qm_adjust_q = self.config()["DEFAULT_MD_QM_ADJUST_Q"]
+        if qm_adaptive_solvent_type == "default":
+            qm_adaptive_solvent_type = self.config()["DEFAULT_MD_QM_ADAPTIVE_SOLVENT_TYPE"]
+        if qm_num_adaptive_solvent == "default":
+            qm_num_adaptive_solvent = self.config()["DEFAULT_MD_QM_NUM_ADAPTIVE_SOLVENT"]
+        if qm_num_transition_solvent == "default":
+            qm_num_transition_solvent = self.config()["DEFAULT_MD_QM_NUM_TRANSITION_SOLVENT"]
+        # QM/MM san check
+        if use_qmmm:
+            if qm_region is None:
+                _LOGGER.error("when use_qmmm=True, qm_region cannot be None")
+                raise TypeError
+            if qm_region_charge_spin is None:
+                _LOGGER.error("when use_qmmm=True, qm_region_charge_spin cannot be None")
+                raise TypeError
+            if qm_level_of_theory is None:
+                _LOGGER.error("when use_qmmm=True, qm_level_of_theory cannot be None")
+                raise TypeError
+            if qm_adaptive_solvent_type:
+                if not isinstance(qm_num_adaptive_solvent, int):
+                    _LOGGER.error("when use_qmmm=True and qm_adaptive_solvent_type is enabled,"
+                                  f" qm_num_adaptive_solvent is needed (current: {qm_num_adaptive_solvent})")
+                    raise TypeError
 
         return AmberMDStep(
             interface = self,
@@ -2867,6 +3704,18 @@ class AmberInterface(BaseInterface):
             pressure_scaling = pressure_scaling,
             constrain = constrain,
             restart = restart,
+            use_qmmm = use_qmmm,
+            qm_region = qm_region,
+            qm_region_charge_spin = qm_region_charge_spin,
+            qm_level_of_theory = qm_level_of_theory,
+            qm_engine = qm_engine,
+            qm_region_pdb_path = qm_region_pdb_path,
+            qm_ele_cutoff = qm_ele_cutoff,
+            qm_ewald = qm_ewald,
+            qm_adjust_q = qm_adjust_q,
+            qm_adaptive_solvent_type = qm_adaptive_solvent_type,
+            qm_num_adaptive_solvent = qm_num_adaptive_solvent,
+            qm_num_transition_solvent = qm_num_transition_solvent,
             core_type = core_type,
             cluster_job_config = cluster_job_config,
             if_report = if_report,
@@ -2983,7 +3832,8 @@ class AmberInterface(BaseInterface):
         return result
 
     def load_traj(self, prmtop_path: str, traj_path: str, ref_pdb: str = None) -> StructureEnsemble:
-        """load StructureEnsemble from Amber prmtop and nc/mdcrd files"""
+        """load StructureEnsemble from Amber prmtop and nc/mdcrd files
+        TODO(qz) make this a context manager so that the temp files are remove"""
         coord_parser_mapper = {
             ".nc" : AmberNCParser(prmtop_file=prmtop_path),
             ".mdcrd" : AmberMDCRDParser(prmtop_file=prmtop_path),
@@ -3039,8 +3889,6 @@ class AmberInterface(BaseInterface):
 
         return result
 
-    # RMSD value.
-
     def get_rmsd(
             self,
             stru_esm: StructureEnsemble,
@@ -3088,6 +3936,285 @@ class AmberInterface(BaseInterface):
             rmsd_csv_filename,
         ])
         return rmsd_value
+
+    def get_rmsf(
+            self,
+            stru_esm: StructureEnsemble,
+            stru_selection: StruSelection,
+            by_residue: bool,
+        ) -> Dict[str, float]:
+        """Calculate the RMSF values of each atoms in the stru_selection of a StructureEnsemble
+        instance. use the atomicfluct from Cpptraj referencing https://amberhub.chpc.utah.edu/atomicfluct-rmsf/.
+        RMSF is calculated based on the average structure.
+        
+        Args:
+            stru_esm: 
+                A conformational ensemble of a structure.
+            stru_selection: 
+                A StruSelection object
+            by_residue: 
+                control if return values are grouped by residues or not. If True, the mass-weighted average of atomic
+                fluctuations of each atom for each residue will be calculated.
+
+        Returns:
+            A dictionary that map a EnzyHTP get pattern (<chain_name>.<residue_index>.<atom_name>) to the RMSF value.
+            Unit: Angstrom
+            Example: {"A.1.CA" : 0.1} or {"A.2" : 1.1}
+            WARNING: the result will be impossible if your stru_selection is based on a Structure that does not have
+            chain name or have repeating residue indexes or repeating atom names with a residue!
+        """
+        tmp_dir = eh_config['system.SCRATCH_DIR']
+        tmp_nc_path=fs.get_valid_temp_name(os.path.join(tmp_dir, "tmp_amber_traj.nc"))
+        tmp_prmtop_path=fs.get_valid_temp_name(os.path.join(tmp_dir, "tmp_amber_topology.prmtop"))
+        # TODO(qz): consider make a function for converting a stru_esm to Amber files so that these line are reused
+        self.convert_top_to_prmtop(stru_esm.topology_source_file, tmp_prmtop_path)
+        self.convert_traj_to_nc(stru_esm.coordinate_list, tmp_nc_path, topology_path=tmp_prmtop_path)
+
+        rmsf_dat_filename = fs.get_valid_temp_name(os.path.join(eh_config.system.SCRATCH_DIR, "temp_rmsf.dat"))
+        amber_mask = self.get_amber_mask(stru_selection, reduce=True)
+        amber_idx_mapper = self.get_amber_index_mapper(stru_selection.atoms[0].root())
+        if by_residue:
+            rmsf_line = f"atomicfluct out {rmsf_dat_filename} {amber_mask} byres"
+            reverse_amber_idx_mapper = {v[1] : k for k, v in amber_idx_mapper["residue"].items()}
+        else:
+            rmsf_line = f"atomicfluct out {rmsf_dat_filename} {amber_mask}"
+            reverse_amber_idx_mapper = {v : k for k, v in amber_idx_mapper["atom"].items()}
+
+        contents: List[str] = [
+            f"parm {tmp_prmtop_path}",
+            f"trajin {tmp_nc_path}",
+            "autoimage",
+            f"rms {amber_mask} first mass",
+            f"average crdset AVE {amber_mask}",
+            "run",
+            "autoimage",
+            f"rms refave {amber_mask} ref AVE * mass",
+            rmsf_line,
+            "run",
+            "quit"
+        ]
+        contents = "\n".join(contents)
+        self.run_cpptraj(contents)
+
+        result_df = pd.read_csv(rmsf_dat_filename, delim_whitespace=True)
+        indexes = result_df.iloc[:, 0].values
+        rmsf_value = result_df.iloc[:, 1].values
+        result = {}
+
+        # map result values
+        for idx, rmsf in zip(indexes, rmsf_value):
+            idx = int(idx)
+            enzyhtp_key = reverse_amber_idx_mapper[idx]
+            if by_residue:
+                enzyhtp_key = ".".join(str(i) for i in enzyhtp_key)
+            else:
+                enzyhtp_key = enzyhtp_key[0]
+            result[enzyhtp_key] = rmsf
+
+        fs.clean_temp_file_n_dir([
+            tmp_nc_path,
+            tmp_prmtop_path,
+            rmsf_dat_filename,
+        ])
+        return result
+
+    def get_coord_covariance(
+            self,
+            stru_esm: StructureEnsemble,
+            stru_selection: Union[StruSelection, Tuple[StruSelection]],
+            reference_type: str, 
+            mass_weighted: bool,
+        ) -> Dict[str, float]:
+        """Calculate the atomic coordinate covariance matrix the region_pattern of a StructureEnsemble
+        instance. Covariance is calculated based on the average structure or the first structure.
+        Powered by the matrix covar/mwcovar from Cpptraj from AmberTools for now. 
+        (ref: https://amberhub.chpc.utah.edu/matrix-2/)
+        
+        Args:
+            stru_esm: 
+                A conformational ensemble of a structure.
+            stru_selection: 
+                A StruSelection object, or a tuple of two StruSelection object
+            reference_type:
+                control the reference coordinate of calculating the variance of each atom.
+                "average" - use an average structure of the ensemble
+                "first" - use the first structure of the ensemble
+            mass_weigthed:
+                control whether the atomic mass is used to weight the covariance.
+
+        Returns:
+            a 2D numpy matrix. i.e., the cartesian coordinate covariance matrix.
+                When one stru_selection is provided it is 3N*3N
+                When two stru_selection is provided it is 3N*3M (N, M are number of atoms from each selection)
+        """
+        tmp_dir = eh_config['system.SCRATCH_DIR']
+        tmp_nc_path=fs.get_valid_temp_name(os.path.join(tmp_dir, "tmp_amber_traj.nc"))
+        tmp_prmtop_path=fs.get_valid_temp_name(os.path.join(tmp_dir, "tmp_amber_topology.prmtop"))
+        # TODO(qz): consider make a function for converting a stru_esm to Amber files so that these line are reused
+        self.convert_top_to_prmtop(stru_esm.topology_source_file, tmp_prmtop_path)
+        self.convert_traj_to_nc(stru_esm.coordinate_list, tmp_nc_path, topology_path=tmp_prmtop_path)
+
+        covar_dat_filename = fs.get_valid_temp_name(os.path.join(eh_config.system.SCRATCH_DIR, "temp_coord_covar.dat"))
+        
+        if isinstance(stru_selection, tuple) and len(stru_selection) == 2:
+            amber_mask_1 = self.get_amber_mask(stru_selection[0], reduce=True)
+            amber_mask_2 = self.get_amber_mask(stru_selection[1], reduce=True)
+            delim = "'"
+            amber_mask = f"'({amber_mask_1.strip(delim)}) | ({amber_mask_2.strip(delim)})'"
+        elif isinstance(stru_selection, StruSelection):
+            amber_mask_1 = self.get_amber_mask(stru_selection, reduce=True)
+            amber_mask_2 = ""
+            amber_mask = amber_mask_1
+        else:
+            _LOGGER.error("only support StruSelection or a tuple of two StruSelection()s")
+
+        # handle command variants
+        if reference_type == "average":
+            ave_lines = [
+                f"rms {amber_mask} first mass",
+                f"average crdset AVE {amber_mask}",
+                "run",
+                "autoimage",
+                f"rms refave {amber_mask} ref AVE * mass",
+            ]
+        elif reference_type == "first":
+            ave_lines = []
+        else:
+            _LOGGER.error("reference_type can only be 'average' or 'first' now. Contact developer if you need more.")
+            raise ValueError
+
+        if mass_weighted:
+            covar_line = f"matrix out {covar_dat_filename} mwcovar {amber_mask_1} {amber_mask_2}"
+        else:
+            covar_line = f"matrix out {covar_dat_filename} covar {amber_mask_1} {amber_mask_2}"
+
+        contents: List[str] = [
+            f"parm {tmp_prmtop_path}",
+            f"trajin {tmp_nc_path}",
+            "autoimage",
+        ] + ave_lines + [
+            covar_line,
+            "run",
+            "quit"
+        ]
+        contents = "\n".join(contents)
+        self.run_cpptraj(contents)
+
+        result = np.genfromtxt(covar_dat_filename, dtype=float)
+
+        fs.clean_temp_file_n_dir([
+            tmp_nc_path,
+            tmp_prmtop_path,
+            covar_dat_filename,
+        ])
+
+        return result
+
+    # -- DSI Calculation --
+    def calculate_dsi_metrics(
+        self,
+        ensemble: StructureEnsemble,
+        domain1_residues: List[Tuple[str, int]],
+        domain2_residues: List[Tuple[str, int]]
+    ) -> np.ndarray:
+        """Calculate Domain-Domain Interaction Index (DSI) metrics using cpptraj.
+        
+        This function encapsulates all cpptraj interactions required for DSI calculation.
+        It generates and executes a cpptraj script to compute the distance between 
+        the centers of mass and the radius of gyration for each of the two domain selections.
+        
+        Args:
+            ensemble: A StructureEnsemble object containing topology and trajectory
+            domain1_residues: List of residue keys (chain_id, residue_idx) for first domain
+            domain2_residues: List of residue keys (chain_id, residue_idx) for second domain
+            
+        Returns:
+            np.ndarray: DSI values for each frame, where DSI = d(com1, com2) - (Rg1 + Rg2)
+        """
+        # Convert residue selections to Amber mask format
+        domain1_mask = self._residue_list_to_amber_mask(domain1_residues)
+        domain2_mask = self._residue_list_to_amber_mask(domain2_residues)
+        
+        # Create temporary files for Amber format
+        temp_dir = eh_config["system.SCRATCH_DIR"]
+        fs.safe_mkdir(temp_dir)
+        tmp_nc_path = fs.get_valid_temp_name(os.path.join(temp_dir, "tmp_amber_traj.nc"))
+        tmp_prmtop_path = fs.get_valid_temp_name(os.path.join(temp_dir, "tmp_amber_topology.prmtop"))
+        int_file = fs.get_valid_temp_name(f"{temp_dir}/dsi.dat")
+        
+        # Convert ensemble to Amber format (following get_coord_covariance pattern)
+        self.convert_top_to_prmtop(ensemble.topology_source_file, tmp_prmtop_path)
+        self.convert_traj_to_nc(ensemble.coordinate_list, tmp_nc_path, topology_path=tmp_prmtop_path)
+        
+        # Build cpptraj script
+        contents: List[str] = [
+            f"parm {tmp_prmtop_path}",
+            f"trajin {tmp_nc_path}",
+            f"distance d_domain1_domain2 {domain1_mask} {domain2_mask} out {int_file} geom",
+            f"radgyr Rg_domain1 {domain1_mask} out {int_file} nomax",
+            f"radgyr Rg_domain2 {domain2_mask} out {int_file} nomax",
+            "run",
+            "quit",
+        ]
+        contents = "\n".join(contents)
+        
+        # Execute cpptraj
+        self.run_cpptraj(contents)
+        
+        # Parse results
+        result = []
+        with open(int_file) as f:
+            lines = f.readlines()[1:]  # Skip header
+            for line in lines:
+                parts = line.strip().split()
+                if len(parts) >= 4:
+                    index, distance, rg1, rg2 = parts[:4]
+                    dsi_value = float(distance) - float(rg1) - float(rg2)
+                    result.append(dsi_value)
+        
+        # Clean up temporary files
+        fs.clean_temp_file_n_dir([
+            tmp_nc_path,
+            tmp_prmtop_path,
+            int_file,
+        ])
+        
+        return np.array(result)
+    
+    def _residue_list_to_amber_mask(self, residue_list: List[Tuple[str, int]], exclude_hydrogen: bool = True) -> str:
+        """Convert a list of residue keys to Amber mask format.
+        
+        Args:
+            residue_list: List of (chain_id, residue_idx) tuples
+            exclude_hydrogen: Whether to exclude hydrogen atoms from the mask
+            
+        Returns:
+            str: Amber mask string for the residues
+        """
+        if not residue_list:
+            raise ValueError("Residue list cannot be empty")
+        
+        # Check for multiple chain IDs and warn (Amber typically doesn't support different chain IDs)
+        chain_ids = set(chain_id for chain_id, _ in residue_list)
+        if len(chain_ids) > 1:
+            _LOGGER.warning(f"Multiple chain IDs found in residue list: {chain_ids}. "
+                          "Amber typically doesn't distinguish between chain IDs. "
+                          "Make sure residue numbering is globally unique.")
+        
+        # Extract just the residue indices (ignore chain IDs for Amber)
+        res_indices = [res_idx for _, res_idx in residue_list]
+        
+        # Use the existing utility to create interval string
+        interval_str = get_interval_str_from_list(res_indices)
+        
+        # Format as Amber mask
+        mask = f":{interval_str}"
+        
+        # Add hydrogen exclusion if requested
+        if exclude_hydrogen:
+            mask += "&!@H="
+            
+        return mask
 
     # -- MMPB/GBSA --
     def get_mmpbgbsa_energy(
@@ -3285,6 +4412,99 @@ class AmberInterface(BaseInterface):
         Generate the file in {temp_nc}"""
 
         self.convert_traj_to_nc(stru_esm.coordinate_list, temp_nc)
+    # endregion
+
+    def make_mc_file(self, maa_region: StructureRegion, out_path: str):
+        """make the mc file for parameterization"""
+
+        if len(maa_region.involved_residues) > 1:
+            _LOGGER.error("Please provide a maa_region with exactly 1 involved residue")
+
+        maa: ModifiedResidue = maa_region.involved_residues[0]
+        
+        if not maa.is_connected():
+            _LOGGER.warning(f"maa is not connected; use init_connectivity() first.") 
+
+        # main chain
+        mc_atoms = maa.mainchain_atoms
+        lines = [f"HEAD_NAME {mc_atoms[0].name}", f"TAIL_NAME {mc_atoms[-1].name}"]
+
+        # get rid of first and last element
+        mc_atoms.pop(0)
+        mc_atoms.pop()
+        
+        for aa in mc_atoms:
+            lines.append(f"MAIN_CHAIN {aa.name}")
+
+        # omit cap atom names
+        for cap in maa_region.caps:
+            for aa in cap.atoms:
+                lines.append(f"OMIT_NAME {aa.name}")
+
+        # find pre_head and post_tail atom types
+        for cap in maa_region.caps:
+            if cap.link_atom.name == "N":
+                if cap.socket_atom.name != "C":
+                    _LOGGER.warning("Bond is not a classical peptide bond. MC generation may not work correctly.")
+                lines.append(f"PRE_HEAD_TYPE {cap.socket_atom.element}")
+            
+        for cap in maa_region.caps:
+            if cap.link_atom.name == "C":
+                if cap.socket_atom.name != "N":
+                    _LOGGER.warning("Bond is not a classical peptide bond. MC generation may not work correctly.")
+                lines.append(f"POST_TAIL_TYPE {cap.socket_atom.element}")
+
+        # charge of maa
+        lines.append(f"CHARGE {maa.net_charge}")
+
+        fs.write_lines(out_path, lines)
+        return out_path
+
+    def make_mc_file(self, maa_region: StructureRegion, out_path: str):
+        """make the mc file for parameterization"""
+
+        if len(maa_region.involved_residues) > 1:
+            _LOGGER.error("Please provide a maa_region with exactly 1 involved residue")
+
+        maa: ModifiedResidue = maa_region.involved_residues[0]
+        
+        if not maa.is_connected():
+            _LOGGER.warning(f"maa is not connected; use init_connectivity() first.") 
+
+        # main chain
+        mc_atoms = maa.mainchain_atoms
+        lines = [f"HEAD_NAME {mc_atoms[0].name}", f"TAIL_NAME {mc_atoms[-1].name}"]
+
+        # get rid of first and last element
+        mc_atoms.pop(0)
+        mc_atoms.pop()
+        
+        for aa in mc_atoms:
+            lines.append(f"MAIN_CHAIN {aa.name}")
+
+        # omit cap atom names
+        for cap in maa_region.caps:
+            for aa in cap.atoms:
+                lines.append(f"OMIT_NAME {aa.name}")
+
+        # find pre_head and post_tail atom types
+        for cap in maa_region.caps:
+            if cap.link_atom.name == "N":
+                if cap.socket_atom.name != "C":
+                    _LOGGER.warning("Bond is not a classical peptide bond. MC generation may not work correctly.")
+                lines.append(f"PRE_HEAD_TYPE {cap.socket_atom.element}")
+            
+        for cap in maa_region.caps:
+            if cap.link_atom.name == "C":
+                if cap.socket_atom.name != "N":
+                    _LOGGER.warning("Bond is not a classical peptide bond. MC generation may not work correctly.")
+                lines.append(f"POST_TAIL_TYPE {cap.socket_atom.element}")
+
+        # charge of maa
+        lines.append(f"CHARGE {maa.net_charge}")
+
+        fs.write_lines(out_path, lines)
+        return out_path
 
 amber_interface = AmberInterface(None, eh_config._amber)
 """The singleton of AmberInterface() that handles all Amber related operations in EnzyHTP
@@ -3299,7 +4519,7 @@ class AmberRSTParser():
         prmtop_file
         parent_interface"""
     def __init__(self, prmtop_file: str, interface: BaseInterface = amber_interface):
-        self.prmtop_file = prmtop_file
+        self.prmtop_file = os.path.abspath(prmtop_file)
         self.parent_interface = interface
     
     def get_structure(self, rst_file: str) -> Structure:
@@ -3312,19 +4532,19 @@ class AmberMDCRDParser():
         prmtop_file
         parent_interface"""
     def __init__(self, prmtop_file: str, interface: AmberInterface = amber_interface):
-        self.prmtop_file = prmtop_file
+        self.prmtop_file = os.path.abspath(prmtop_file)
         self.parent_interface = interface
     
-    def get_coordinates(self, mdcrd: str, remove_solvent: bool=False) -> Generator[List[List[float]], None, None]:
-        """parse a mdcrd file to a Generator of coordinates. Intermediate files are created."""
+    def get_coordinates(self, mdcrd: str, remove_solvent: bool=False) -> Generator[Tuple[List[Tuple[float]],Tuple[float]], None, None]:
+        """parse a mdcrd file to a Generator of (coordinates, pbc_box_edges). Intermediate files are created."""
         coord = [] # coords of 1 frame
         atom_coord = [] # coord of 1 atom
         counter = 1 # collect coord every 3 count
-        end_flag_1 = 0
-        fake_end_flag = 0
+        end_flag_1 = 0 # flag for matching the frame_sep_pattern
+        fake_end_flag = 0 # flag for a line that fits the frame_sep_pattern but actually the coordinate of the last atom in this frame. (i.e.: by coincidence the last line of this frame have only 3 coordinates)
         line_feed = os.linesep
         digit_pattern = r'[ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9]' # a number
-        frame_sep_pattern = digit_pattern * 3 + line_feed
+        frame_sep_pattern = digit_pattern * 3 + line_feed # the PBC box edges line pattern
 
         # remove solvent
         if remove_solvent:
@@ -3342,35 +4562,39 @@ class AmberMDCRDParser():
                 if re.match(digit_pattern, line) == None:
                     # not data line
                     if not end_flag_1 and not fake_end_flag:
-                        # last line is not end line & 
+                        # previous line is not end line & 
                         continue
                 
                 if fake_end_flag:
-                    # this line is an end line
+                    # this line (i.e.: next line of a fake_end_line) is an end line
                     # if next line of end is the file end
                     fake_end_flag = 0
                     if line == '':
                         break
 
                 if end_flag_1:
-                    # last line is an end line
+                    # previous line is an end line
                     if re.match(frame_sep_pattern, line) != None:
-                        # this line is an end line -> last line is a fake end line
+                        # this line is an end line -> previous line is a fake end line
                         coord.append(holder)
-                        yield coord
+                        # this line contains PBC info
+                        lp = re.split(' +', line.strip())
+                        pbc_box_edges = (float(lp[0]), float(lp[1]), float(lp[2]))
+                        yield coord, pbc_box_edges
                         # empty for next loop
                         coord = []
                         end_flag_1 = 0
                         fake_end_flag = 1
                         continue
                     else:                        
-                        # last line is a real end line
-                        yield coord
+                        # previous line is a real end line
+                        pbc_box_edges = tuple(holder)
+                        yield coord, pbc_box_edges
                         # empty for next loop
                         coord = []
                         end_flag_1 = 0
                         if line == '':
-                            #the last line
+                            #the final line
                             break
                         if line == line_feed:
                             _LOGGER.warning("unexpected empty line detected. Treat as EOF. exit reading")
@@ -3380,7 +4604,7 @@ class AmberMDCRDParser():
                 else:
                     if re.match(frame_sep_pattern, line) != None:
                         # find line that mark the end of a frame // possible fake line
-                        # store the last frame and empty the holder
+                        # store the last frame in next iteration (NOTE holder is not emptied for the current design)
                         end_flag_1 = 1 
                         lp = re.split(' +', line.strip())
                         # hold the info
@@ -3414,7 +4638,7 @@ class AmberNCParser():
         prmtop_file
         parent_interface"""
     def __init__(self, prmtop_file: str, interface: BaseInterface = amber_interface):
-        self.prmtop_file = prmtop_file
+        self.prmtop_file = os.path.abspath(prmtop_file)
         self.parent_interface: AmberInterface = interface
 
         self.mdcrd: Dict = {}
@@ -3428,7 +4652,7 @@ class AmberNCParser():
             nc_file: str,
             autoimage: bool=True,
             remove_solvent: bool=False,
-        ) -> Generator[List[List[float]], None, None]:
+        ) -> Generator[Tuple[List[Tuple[float]],Tuple[float]], None, None]:
         """parse a nc file to a Generator of coordinates. Intermediate mdcrd file is created."""
         # 0. init temp path
         if self.mdcrd.get((autoimage, remove_solvent), None) is None:

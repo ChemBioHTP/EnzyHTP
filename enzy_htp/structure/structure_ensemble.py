@@ -7,13 +7,16 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-10-28
 """
 from __future__ import annotations
+import os
 from typing import List, Generator, Callable, Tuple
 from copy import deepcopy
+import weakref
 
 from .structure import Structure
 from .structure_io import StructureParserInterface
 from . import structure_operation as stru_oper
 from enzy_htp.core.general import get_itself
+from enzy_htp.core.file_system import clean_temp_file_n_dir
 from enzy_htp.core.logger import _LOGGER
 
 # amber_interface = interface.amber
@@ -39,12 +42,22 @@ class StructureEnsemble:
         topology: str, 
         top_parser: Callable[[str], Structure], 
         coordinate_list: str,
-        coord_parser: Callable[[str], Generator[List[Tuple[float]], None, None]]
+        coord_parser: Callable[[str], Generator[Tuple[List[Tuple[float]],Tuple[float]], None, None]]
     ) -> None:
         self._topology = topology
         self.top_parser = top_parser
         self.coordinate_list = coordinate_list
         self.coord_parser = coord_parser
+
+        # reinforce paths
+        self._reinforce_paths()
+
+    def _reinforce_paths(self) -> None:
+        """Reinforce the paths of the topology and coordinates."""
+        if isinstance(self._topology, str) and os.path.exists(self._topology):
+            self._topology = os.path.abspath(self._topology)
+        if isinstance(self.coordinate_list, str) and os.path.exists(self.coordinate_list):
+            self.coordinate_list = os.path.abspath(self.coordinate_list)
 
     def structures(self, remove_solvent: bool=False) -> Generator[Structure]:
         """get a Generator of all geometries in the ensemble
@@ -54,21 +67,17 @@ class StructureEnsemble:
             stru_oper.remove_solvent(stru)
             stru_oper.remove_counterions(stru)
 
-        if self.coord_parser == iter:
-            temp = list()
-            for ss in  self.coord_parser( self.coordinate_list ):
-                yield deepcopy( ss ) 
-        else:
-            for this_coord in self.coord_parser(
-                    self.coordinate_list,
-                    remove_solvent=remove_solvent
-                ):
-                result = deepcopy(stru)
-                if remove_solvent:
-                    stru_oper.remove_solvent(result)
-                    stru_oper.remove_counterions(result)
-                result.apply_geom(this_coord)
-                yield result
+        for this_coord, this_pbc_box_edges in self.coord_parser(
+                self.coordinate_list,
+                remove_solvent=remove_solvent
+            ):
+            result = deepcopy(stru)
+            if remove_solvent:
+                stru_oper.remove_solvent(result)
+                stru_oper.remove_counterions(result)
+            result.apply_geom(this_coord)
+            result.update_pbc_box_edges(this_pbc_box_edges)
+            yield result
 
     @property
     def topology(self) -> Structure:
@@ -90,11 +99,12 @@ class StructureEnsemble:
     @property
     def structure_0(self) -> Structure:
         """getter for the 1st Structure (state) in the ensemble."""
-        coord_0 = next(self.coord_parser(self.coordinate_list))
+        coord_0, pbc_box_edges = next(self.coord_parser(self.coordinate_list))
         result = deepcopy(self.topology)
         result.apply_geom(coord_0)
+        result.update_pbc_box_edges(pbc_box_edges)
         return result
-    
+
     @classmethod
     def from_single_stru(cls, stru: Structure) -> StructureEnsemble:
         """create an ensemble of 1 snapshot from a Structure instance"""
@@ -102,10 +112,13 @@ class StructureEnsemble:
             topology=stru,
             top_parser=get_itself,
             coordinate_list=[stru],
-            coord_parser=iter,
+            coord_parser=lambda stru_list: ((stru_i, stru_i.pbc_box_shape) for stru_i in stru_list),
         )
+
 
     # region == special ==
     def __iter__(self):
         return self.structures()
+
+    # NOTE: if we need len. An idea is to find the bound class of coord_parser and using another classmethod. (e.g.: for amber ones, this way allow us to access to count_num_of_frames_traj) 
     # endregion

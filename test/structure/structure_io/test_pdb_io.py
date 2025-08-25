@@ -624,6 +624,19 @@ def test_get_file_str_build_ligand():
     with open(answer_file_path) as f:
         assert sp.get_file_str(stru.ligands[0], if_renumber=False) == f.read()
 
+@pytest.mark.interface
+def test_save_structure_ligand():
+    '''
+    test for the getting pdb file from Ligand(). dispatch.
+    '''
+    pdb_file_path = f'{DATA_DIR}1Q4T_atom_res_ch_build_test.pdb'
+    answer_file_path = f'{DATA_DIR}1Q4T_ligand_0_answer.pdb'
+    result_file = f'{WORK_DIR}1Q4T_ligand_0_result.pdb'
+
+    stru: Structure = sp.get_structure(pdb_file_path)
+    sp.save_structure(result_file, stru.ligands[0], if_renumber=False)
+    assert equiv_files(result_file, answer_file_path)
+    fs.clean_temp_file_n_dir([result_file])
 
 def test_round_trip_pdb():
     """Ensuring that the Structure() class be loaded into a .pdb and saved back in a round trip without error."""

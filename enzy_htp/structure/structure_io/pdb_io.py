@@ -132,7 +132,9 @@ class PDBParser(StructureParserInterface):
                     outfile:str,
                     stru: Structure,
                     if_renumber: bool = True,
-                    if_fix_atomname: bool = True ) -> str:
+                    if_fix_atomname: bool = True,
+                    same_chain_id_for_9999_solvent: bool = False,
+                    omit_chain_id: bool = False ) -> str:
         """Inverse of PDBParser.get_structure(). Given a Structure(), save it to the given .pdb path.
 
         Args:
@@ -140,11 +142,14 @@ class PDBParser(StructureParserInterface):
             stru: The Structure() to save.
             if_renumber: Should atoms be renumbered from 1?
             if_fix_atomname: Should atoms be ranemed to PDB convention?
+            same_chain_id_for_9999_solvent: for each 9999 solvent the chain id is the same
+            omit_chain_id: If True, omit chain IDs from PDB output. Use when
+                         there are too many residues causing chain ID overflow.
 
         Returns: 
             Path to the saved Structure() as a str().
         """            
-        content:str = cls.get_file_str( stru, if_renumber, if_fix_atomname )
+        content:str = cls.get_file_str( stru, if_renumber, if_fix_atomname, same_chain_id_for_9999_solvent, omit_chain_id )
 
         fs.write_lines( outfile, content.splitlines() )
 
@@ -177,19 +182,33 @@ class PDBParser(StructureParserInterface):
 
     @classmethod
     @dispatch
-    def get_file_str(cls, stru: Chain, if_renumber: bool = True, if_fix_atomname: bool = True) -> str:  # pylint: disable=function-redefined
+    def get_file_str(
+            cls,
+            stru: Chain, 
+            if_renumber: bool = True, 
+            if_fix_atomname: bool = True, 
+            same_chain_id_for_9999_solvent: bool = False,
+            omit_chain_id: bool = False,
+        ) -> str:  # pylint: disable=function-redefined
         """
         dispatch for supporting get pdb file str with Chain only
         """
         if if_renumber:
             stru.parent.renumber_atoms()
-        result_str = cls._write_pdb_chain(stru)
+        result_str = cls._write_pdb_chain(stru)  # TODO really apply same_chain_id_for_9999_solvent when needed
         result_str += f"END{os.linesep}"
         return result_str
 
     @classmethod
     @dispatch
-    def get_file_str(cls, stru: Residue, if_renumber: bool = True, if_fix_atomname: bool = True) -> str:  # pylint: disable=function-redefined
+    def get_file_str(
+            cls,
+            stru: Residue,
+            if_renumber: bool = True,
+            if_fix_atomname: bool = True,
+            same_chain_id_for_9999_solvent: bool = False,
+            omit_chain_id: bool = False,
+            ) -> str:  # pylint: disable=function-redefined
         """
         dispatch for supporting get pdb file str with Residue only
         """
@@ -201,7 +220,14 @@ class PDBParser(StructureParserInterface):
 
     @classmethod
     @dispatch
-    def get_file_str(cls, stru: Atom) -> str:  # pylint: disable=function-redefined
+    def get_file_str(
+            cls, 
+            stru: Atom, 
+            if_renumber: bool = True, 
+            if_fix_atomname: bool = True, 
+            same_chain_id_for_9999_solvent: bool = False,
+            omit_chain_id: bool = False,
+        ) -> str:  # pylint: disable=function-redefined
         """
         dispatch for supporting get pdb file str with Atom only
         """
@@ -215,10 +241,21 @@ class PDBParser(StructureParserInterface):
             cls,
             stru: Structure,  
             if_renumber: bool = True,
-            if_fix_atomname: bool = True) -> str:
+            if_fix_atomname: bool = True,
+            same_chain_id_for_9999_solvent: bool = False,
+            omit_chain_id: bool = False,
+            ) -> str:
         """
         Convert Structure() into PDB file string. Only the simplest function is need for
         enzyme modeling.
+        
+        Args:
+            stru: The Structure object to convert.
+            if_renumber: Whether to renumber atoms starting from 1.
+            if_fix_atomname: Whether to fix atom names to PDB conventions.
+            omit_chain_id: If True, omit chain IDs from PDB lines. Use when there are
+                         too many residues causing chain ID overflow. A warning will be issued.
+        
         TODO support fixing all atom names before writing
         TODO do we need to add a mode where all ligand,metal,solvent are written into seperate 
         chains? we if encounter any need
@@ -231,10 +268,45 @@ class PDBParser(StructureParserInterface):
         stru.sort_chains()
         if if_renumber:
             stru.renumber_atoms()
+        if omit_chain_id:
+            _LOGGER.warning("Chain IDs are omitted from PDB output. This may cause issues with multi-chain structures.")
         result_str = ""
+        new_solvent_chain = []
+        new_chain_name = None
+        res_count = 0
+        reduce_number = 0
         for chain in stru:
             chain: Chain
+            res_count += chain.num_residues
+            if chain.is_solvent_chain() and same_chain_id_for_9999_solvent:
+                if not new_chain_name:
+                    new_chain_name = chain.name
+                if res_count < 10000:
+                    new_solvent_chain.extend(chain.residues)
+                    continue
+                else:
+                    # conclude a chain and reset count
+                    for res in new_solvent_chain:
+                        res: Residue
+                        res.idx -= reduce_number
+                    # reset
+                    reduce_number += (res_count - chain.num_residues)
+                    res_count = chain.num_residues
+                    holder = chain.residues
+                    # produce
+                    chain = Chain(new_chain_name, new_solvent_chain)
+                    new_chain_name = chr(ord(new_chain_name) + 1) # TODO put this in core
+                    new_solvent_chain = holder
+
+            result_str += cls._write_pdb_chain(chain, omit_chain_id=omit_chain_id)
+        if new_solvent_chain:
+            # collect remaining solvent within last 9999 cycle
+            for res in new_solvent_chain:
+                res: Residue
+                res.idx -= reduce_number
+            chain = Chain(new_chain_name, new_solvent_chain)
             result_str += cls._write_pdb_chain(chain)
+
         result_str += f"END{os.linesep}"
         return result_str
 
@@ -681,7 +753,7 @@ class PDBParser(StructureParserInterface):
     #endregion
 
     @classmethod
-    def _write_pdb_chain(cls, chain: Chain) -> str:
+    def _write_pdb_chain(cls, chain: Chain, omit_chain_id: bool = False) -> str:
         """
         make the file string for a pdb chain record
         """
@@ -689,12 +761,12 @@ class PDBParser(StructureParserInterface):
         chain.sort_residues()
         for res in chain:
             res: Residue
-            result += cls._write_pdb_residue(res)
+            result += cls._write_pdb_residue(res, omit_chain_id=omit_chain_id)
         result += f"TER{os.linesep}"
         return result
 
     @classmethod
-    def _write_pdb_residue(cls, res: Residue) -> str:
+    def _write_pdb_residue(cls, res: Residue, omit_chain_id: bool = False) -> str:
         """
         make the file string for a pdb residue record
         """
@@ -702,11 +774,11 @@ class PDBParser(StructureParserInterface):
         res.sort_atoms()
         for atom in res:
             atom: Atom
-            result += cls._write_pdb_atom(atom)
+            result += cls._write_pdb_atom(atom, omit_chain_id=omit_chain_id)
         return result
 
     @staticmethod
-    def _write_pdb_atom(atom: Atom) -> str:
+    def _write_pdb_atom(atom: Atom, omit_chain_id: bool = False) -> str:
         """
         make the file string for a pdb ATOM record
         the function intepret information from
@@ -723,7 +795,10 @@ class PDBParser(StructureParserInterface):
             a_name = " " + a_name
         r_name = f"{atom.residue.name:>3}"
 
-        c_index = atom.residue.chain.name
+        if omit_chain_id:
+            c_index = " "  # Use space for chain ID when omitted
+        else:
+            c_index = atom.residue.chain.name
         r_index = f"{atom.residue.idx:>4d}"
         x = f"{atom.coord[0]:>8.3f}"
         y = f"{atom.coord[1]:>8.3f}"

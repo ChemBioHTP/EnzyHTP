@@ -19,23 +19,42 @@ from enzy_htp.structure import StruSelection
 from enzy_htp.structure.structure_ensemble import StructureEnsemble
 from enzy_htp.structure.structure_selection import select_stru
 
-def rmsd(stru_esm: StructureEnsemble, region_pattern: str = "all and (not elem H)") -> List[float]:
+def rmsd(
+        stru_esm: StructureEnsemble, 
+        region_pattern: str = "all and (not elem H)",
+        ignore_solvent: bool = True,
+    ) -> List[float]:
     """Calculate the RMSD value of a StructureEnsemble instance with specified mask pattern.
-    
+    The RMSD is calculated relative to an average structure after aligning the entire ensemble.
+    TODO support more than just average structure.
+
     Args:
-        stru_esm (StructureEnsemble): A collection of different geometries of the same enzyme structure.
-        region_pattern (str): A pymol-formatted selection string which defines the region for calculating RMSD value.
+        stru_esm (StructureEnsemble): 
+            A collection of different geometries of the same enzyme structure.
+        region_pattern (str): 
+            A pymol-formatted selection string which defines the region for calculating RMSD value.
+        ignore_solvent:
+            control of solvent are removed before the calculation. True by default to speed up the calculation
+            if solvent is the interest of study, set this to False.
     """
-    stru_sele: StruSelection = select_stru(stru_esm.structure_0, pattern=region_pattern)
+    if ignore_solvent:
+        stru = remove_solvent(stru_esm.structure_0)
+    else:
+        stru = stru_esm.structure_0
+
+    stru_sele: StruSelection = select_stru(stru, pattern=region_pattern)
     return eh_interface.amber.get_rmsd(stru_esm=stru_esm, stru_selection=stru_sele)
 
 def rmsd_of_structure(stru_esm: StructureEnsemble, include_ligand: bool = True, ca_only: bool = True) -> List[float]:
     """Get RMSD value from MD simulation result of the whole structure. Solvents are not included.
     
     Args:
-        stru_esm (StructureEnsemble): A collection of different geometries of the same enzyme structure.
-        include_ligand (bool, optional): Indicate if ligands are included in RMSD calculation. Default True.
-        ca_only (bool, optional): Indicate if only C-alpha are included in RMSD calculation; otherwise all atoms except hydrogens are included. Default True.
+        stru_esm (StructureEnsemble): 
+            A collection of different geometries of the same enzyme structure.
+        include_ligand (bool, optional): 
+            Indicate if ligands are included in RMSD calculation. Default True.
+        ca_only (bool, optional): 
+            Indicate if only C-alpha are included in RMSD calculation; otherwise all atoms except hydrogens are included. Default True.
     """
     stru = remove_solvent(stru_esm.structure_0, in_place=False)
     region_pattern = "(not solvent) and (not inorganic)"

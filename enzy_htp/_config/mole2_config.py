@@ -28,10 +28,10 @@ class Mole2Config(BaseConfig):
     IGNORE_HETATM:bool=False 
     """Should HETATM records be considered?"""
 
-    PROBE:float=3.5
+    PROBE:float=3
     """The probe radius to use in a run in A."""
 
-    INNER:float=1.5
+    INNER:float=1.25
     """The inner radius to use in a run in A."""
 
     MESH_DENSITY:float=0.5
@@ -40,8 +40,8 @@ class Mole2Config(BaseConfig):
     MONO:str="mono"
     """Path to mono as a str()."""
 
-    MOLE2:str="~/Downloads/Mole2_plugin/MOLE25_binary/mole2.exe"
-    """Path to Mole2 .exe as a str()."""
+    MOLE2:str="/data/yang_lab/yanglab_enzyhtp_app/shared_software/Mole2_cmd/mole2.exe"
+    """Absolute Path to `mole2.exe` executive file on Vanderbilt ACCRE."""
 
 
     def required_executables(self) -> List[str]:

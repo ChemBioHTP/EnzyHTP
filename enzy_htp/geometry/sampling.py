@@ -48,6 +48,7 @@ def equi_md_sampling(stru: Structure,
                      cluster_job_config: Dict= None,
                      cpu_equi_step: bool= False,
                      cpu_equi_job_config: Dict= None,
+                     dont_freeze_bb_in_min: bool= False,
                      job_check_period: int=210, # s
                      ) -> List[StructureEnsemble]:
     """This science API performs a production run of molecular dynamics simulation with the
@@ -79,6 +80,8 @@ def equi_md_sampling(stru: Structure,
             whether use cpu for equi step
         cpu_equi_job_config: 
             the job config for the cpu equi step if specified
+        dont_freeze_bb_in_min:
+            the option allows one to remove backbone freeze during minimization
         job_check_period:
             the check period for wait_to_2d_array_end. Used when parallel_method='cluster_job'.
             (Unit: s, default: 210s)
@@ -105,6 +108,7 @@ def equi_md_sampling(stru: Structure,
         cluster_job_config = cluster_job_config,
         cpu_equi_step = cpu_equi_step,
         cpu_equi_job_config = cpu_equi_job_config,
+        dont_freeze_bb_in_min = dont_freeze_bb_in_min,
     )
 
     # 2. run simulation
@@ -212,6 +216,7 @@ def _process_equi_md_sampling_arguments(
         cluster_job_config: Dict= None,
         cpu_equi_step: bool= False,
         cpu_equi_job_config: Dict= None,
+        dont_freeze_bb_in_min: bool = False,
     ):
     """process the arguments of equi_md_sampling and deployable_equi_md_sampling
     into MolDynStep()s and MolDynParameterizer()"""
@@ -250,13 +255,19 @@ def _process_equi_md_sampling_arguments(
             assert False
 
     freeze_backbone = stru_cons.create_backbone_freeze(stru)
+    # allow lifting the constriant in min so that backbone are relaxed upon extreme mutations
+    if dont_freeze_bb_in_min:
+        min_constrain = prod_constrain
+    else:
+        min_constrain = [freeze_backbone] + prod_constrain
+
     min_step  = parent_interface.build_md_step(
         name="min_micro",
         minimize=True,
         length=20000, # cycle
         cluster_job_config=cluster_job_config,
         core_type="gpu",
-        constrain=[freeze_backbone] + prod_constrain)
+        constrain=min_constrain)
 
     heat_step = parent_interface.build_md_step(
         name="heat_nvt",

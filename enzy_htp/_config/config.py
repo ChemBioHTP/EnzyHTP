@@ -11,7 +11,6 @@ there are configuration settings for the below packages by the given <Package>Co
     + AmberMD, AmberConfig
     + BCL, BCLConfig
     + Gaussian, GaussianConfig
-    + Modeller ModellerConfig
     + MOE, MOEConfig
     + Mole2, Mole2Config
     + Multiwfn, MultiwfnConfig
@@ -44,6 +43,7 @@ from .rosetta_config import RosettaConfig, default_rosetta_config
 from .system_config import SystemConfig, default_system_config
 from .armer_config import ARMerConfig, default_armer_config
 from .xtb_config import XTBConfig, default_xtb_config
+from .propka_config import PropkaConfig, default_propka_config
 
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
@@ -86,6 +86,7 @@ class Config:
         self._system = default_system_config()
         self._armer = default_armer_config()
         self._xtb = default_xtb_config()
+        self._propka = default_propka_config()
         self._mapper = {
             "alphafill": self._alphafill,
             "amber": self._amber,
@@ -100,6 +101,7 @@ class Config:
             "system": self._system,
             "xtb": self._xtb,
             "armer": self._armer,
+            "propka": self._propka,
         }
     
     # attributes
@@ -167,6 +169,11 @@ class Config:
     def xtb(self) -> XTBConfig:
         """getter for _xtb"""
         return self._xtb
+
+    @property
+    def propka(self) -> PropkaConfig:
+        """getter for _propka"""
+        return self._propka
 
     def __getitem__(self, key: str) -> Any:
         """Getter for the settings in the Config() object. Uses the grammar: "<package>.<setting>" 

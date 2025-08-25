@@ -223,7 +223,7 @@ class StructureRegion:
             result[atom.parent].append(atom)
         return result
     
-    def involved_residue_atom_mapper(self, cap_as_residue=True) -> Dict[Residue, List[Atom]]:
+    def involved_residue_atom_mapper(self, cap_as_residue=True, is_deepcopy=True) -> Dict[Residue, List[Atom]]:
         """ Creates a mapper between involved residues and their atoms.
         Args:
             cap_as_residue: will treat caps as own residues if True. Else, add cap atoms to parent residues.
@@ -232,11 +232,14 @@ class StructureRegion:
         residue_mapper: {Union[Residue, ResidueCap], List[Atom]} = defaultdict(list)
         for res in self.involved_residues:
             for aa in res.atoms:
-                residue_mapper[aa.residue].append(aa)
+                residue_mapper[aa.residue].append(deepcopy(aa)) if is_deepcopy else residue_mapper[aa.residue].append(aa)
 
         for cap in self.caps:
             for aa in cap:
-                residue_mapper[cap].append(aa) if cap_as_residue else residue_mapper[aa.parent.link_atom.residue].append(aa) 
+                if is_deepcopy:
+                    residue_mapper[cap].append(deepcopy(aa)) if cap_as_residue else residue_mapper[aa.parent.link_atom.residue].append(deepcopy(aa)) 
+                else:
+                    residue_mapper[cap].append(aa) if cap_as_residue else residue_mapper[aa.parent.link_atom.residue].append(aa) 
 
         return residue_mapper
 
@@ -346,28 +349,43 @@ class StructureRegion:
             if not atom.parent.is_residue_cap():
                 return atom.root()
             
-    def convert_to_structure(self, cap_as_residue = True) -> Structure:
+    def convert_to_structure(self, cap_as_residue = True, is_deepcopy=True) -> Structure:
         """Converts all atoms in the region to a Structure
         Args:
             cap_as_residue: will treat caps as own residues if True. Else, add cap atoms to parent residues.
         Returns:
             The corresponding Structure of the structure region"""
 
-        residue_mapper = self.involved_residue_atom_mapper(cap_as_residue=cap_as_residue)
+        residue_mapper = self.involved_residue_atom_mapper(cap_as_residue=cap_as_residue, is_deepcopy=is_deepcopy)
+        old_to_new_res_mapper = {res: None for res in residue_mapper.keys()}
 
         residues: List[Residue] = []
 
         for res in residue_mapper:
-            new_res = deepcopy(res)
-            new_res.atoms = residue_mapper[res]
+            if not isinstance(res, ResidueCap):
+                new_res = deepcopy(res)
+                new_res.atoms = residue_mapper[res]
 
-            if isinstance(res, ResidueCap):
-                new_res.parent = res.link_residue.parent
-            else:
                 new_res.parent = res.parent
-                
-            new_res.renumber_atoms(range(1, new_res.num_atoms + 1))
-            residues.append(new_res)
+                    
+                new_res.renumber_atoms(range(1, new_res.num_atoms + 1))
+                residues.append(new_res)
+                old_to_new_res_mapper[res] = new_res
+
+        # must map all old res to new_res before linking new residue caps
+        for res in residue_mapper:
+            if isinstance(res, ResidueCap):
+                new_res = deepcopy(res)
+                new_res.atoms = residue_mapper[res]
+
+                new_res.parent = res.link_residue.parent
+                new_res.link_residue = old_to_new_res_mapper[res.link_residue]
+                if res.link_atom.name in new_res.link_residue.atom_name_list:
+                    new_res.link_atom = new_res.link_residue.find_atom_name(res.link_atom.name)
+
+                new_res.renumber_atoms(range(1, new_res.num_atoms + 1))
+                residues.append(new_res)
+
 
         chain_mapper: {Chain, List[Residue]} = defaultdict(list)
         for res in residues:

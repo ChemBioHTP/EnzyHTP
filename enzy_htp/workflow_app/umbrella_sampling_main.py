@@ -1,3 +1,8 @@
+"""the main script for umbrella_sampling
+
+Author: QZ Shao <shaoqz@icloud.com>
+Date: 2024-12-11
+"""
 from functools import partial
 import glob
 import pickle

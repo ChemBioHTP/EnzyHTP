@@ -13,6 +13,7 @@ from typing import Iterable, List, Any, Dict, Union
 from pathlib import Path
 
 from .logger import _LOGGER
+import pandas as pd
 
 # == general ==
 def safe_rm(fname: str) -> None:
@@ -147,7 +148,7 @@ def write_lines(fname: str, lines: List[str]) -> None:
     """Writes lines to specified file, checking if file exists first and warning if it does. Assumes no newlines."""
     # TODO(CJ) check if binary file and dont return if so
     if os.path.exists(fname):
-        _LOGGER.warning(f"The file '{fname}' exists and will be overwritten")
+        _LOGGER.warning(f"The file '{fname}' exists (size: {os.path.getsize(fname)}) and will be overwritten")
     fh = open(fname, "w")
     fh.write("\n".join(lines))
     fh.close()
@@ -165,6 +166,64 @@ def write_data(outfile: str, tag: Any, data: Dict) -> str:
     fh.close()
 
     return outfile
+
+def append_data_to_csv(output_directory: str, 
+        csv_filename: str = "result.csv", 
+        data: Dict[str, Any] = dict(), **kwargs):
+    """Write a row of data to a CSV (.csv) file.
+    
+    Args:
+        output_directory (str): The directory for data output (Absolute path is recommended).
+        csv_filename (str, optional): The filename of the output CSV file.
+        data (Dict[str, Any], optional): The data to be written (keys will be column names).
+    """
+    # Create the output directory if it does not exist
+    safe_mkdir(output_directory)
+    filepath = os.path.join(output_directory, csv_filename)
+
+    # Convert kwargs to DataFrame
+    data.update(kwargs)
+    data_df = pd.DataFrame([data])
+
+    # Append to the CSV file if it exists, otherwise create it with header
+    if not os.path.isfile(filepath):
+        data_df.to_csv(filepath, mode='w', header=True, index=False, encoding='utf-8')
+    else:
+        data_df.to_csv(filepath, mode='a', header=False, index=False, encoding='utf-8')
+
+def append_data_to_excel(output_directory: str, 
+        excel_filename: str = "result.xlsx", sheet_name: str = "Sheet1", 
+        data: Dict[str, Any] = dict(), **kwargs):
+    """Write a row of data to an excel (.xlsx) file.
+    
+    Args:
+        output_directory (str): The directory for data output (Absolute path is recommended).
+        excel_filename (str, optional): The filename of the output Excel file.
+        sheet_name (str, optional): The sheet name to write data.
+        data (Dict[str, Any], optional): The data to be written (keys will be column names).
+    """
+    # Create the directory if it doesn't exist.
+    safe_mkdir(output_directory)
+    filepath = os.path.join(output_directory, excel_filename)
+
+    # Convert kwargs to DataFrame
+    data.update(kwargs)
+    data_df = pd.DataFrame([data])
+    
+    # Check if the file exists
+    if not os.path.isfile(filepath):
+        # Create a new Excel writer object and write to it, because the file does not exist
+        with pd.ExcelWriter(filepath, engine="openpyxl", mode="w") as writer:
+            data_df.to_excel(writer, sheet_name=sheet_name, index=False)
+    else:
+        # Load the existing workbook
+        with pd.ExcelWriter(filepath, engine="openpyxl", mode="a", if_sheet_exists="overlay") as writer:
+            # If the sheet exists, append the data, otherwise write to a new sheet
+            if sheet_name in writer.sheets:
+                startrow = writer.sheets[sheet_name].max_row
+                data_df.to_excel(writer, sheet_name=sheet_name, startrow=startrow, header=False, index=False)
+            else:
+                data_df.to_excel(writer, sheet_name=sheet_name, index=False)
 
 
 def get_valid_temp_name(fname: str, is_symlink: bool = False, ext_set: Union[None, Iterable] = None) -> str:

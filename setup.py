@@ -33,6 +33,7 @@ SUB_MODULES=[
         'enzy_htp.structure.structure_cluster',
 >>>>>>> chrisjurich/reactive_docking
         'enzy_htp.structure.structure_translator',
+        'enzy_htp.structure.structure_cavity',
         'enzy_htp.quantum',
         'enzy_htp.electronic_structure',
         'enzy_htp.preparation',
