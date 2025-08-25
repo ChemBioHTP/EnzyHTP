@@ -143,7 +143,7 @@ def test_rosetta_options_getter_and_setter() -> None:
     assert opts['nstruct'] == 1
     assert opts['in:file:s'] == 'my_file.pdb'
 
-def test_rosetta_opttions_error_on_bad_key() -> None:
+def test_rosetta_options_error_on_bad_key() -> None:
     """Making sure the RosettaOptions getter fails when a key is not present."""
 
     opts = RosettaOptions()
