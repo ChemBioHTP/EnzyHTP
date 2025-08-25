@@ -154,7 +154,7 @@ def test_rosetta_options_error_on_bad_key() -> None:
 
     assert py_err is not None 
 
-def test_rosetta_opttions_file_write() -> None:
+def test_rosetta_options_file_write() -> None:
     """Making sure the RosettaOptions class can write to file correctly."""
     outfile = f"{DATA_DIR}/test_options.txt"
     fs.safe_rm( outfile )
