@@ -7,13 +7,16 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-10-28
 """
 from __future__ import annotations
+import os
 from typing import List, Generator, Callable, Tuple
 from copy import deepcopy
+import weakref
 
 from .structure import Structure
 from .structure_io import StructureParserInterface
 from . import structure_operation as stru_oper
 from enzy_htp.core.general import get_itself
+from enzy_htp.core.file_system import clean_temp_file_n_dir
 from enzy_htp.core.logger import _LOGGER
 
 # amber_interface = interface.amber
@@ -46,6 +49,16 @@ class StructureEnsemble:
         self.coordinate_list = coordinate_list
         self.coord_parser = coord_parser
 
+        # reinforce paths
+        self._reinforce_paths()
+
+    def _reinforce_paths(self) -> None:
+        """Reinforce the paths of the topology and coordinates."""
+        if isinstance(self._topology, str) and os.path.exists(self._topology):
+            self._topology = os.path.abspath(self._topology)
+        if isinstance(self.coordinate_list, str) and os.path.exists(self.coordinate_list):
+            self.coordinate_list = os.path.abspath(self.coordinate_list)
+
     def structures(self, remove_solvent: bool=False) -> Generator[Structure]:
         """get a Generator of all geometries in the ensemble
         as Structure()s"""
@@ -65,7 +78,6 @@ class StructureEnsemble:
             result.apply_geom(this_coord)
             result.update_pbc_box_edges(this_pbc_box_edges)
             yield result
-
 
     @property
     def topology(self) -> Structure:
@@ -100,11 +112,13 @@ class StructureEnsemble:
             topology=stru,
             top_parser=get_itself,
             coordinate_list=[stru],
-            coord_parser=lambda stru_list, **kwargs: ((stru_i, stru_i.pbc_box_shape) for stru_i in stru_list),
+            coord_parser=lambda stru_list: ((stru_i, stru_i.pbc_box_shape) for stru_i in stru_list),
         )
 
 
     # region == special ==
     def __iter__(self):
         return self.structures()
+
+    # NOTE: if we need len. An idea is to find the bound class of coord_parser and using another classmethod. (e.g.: for amber ones, this way allow us to access to count_num_of_frames_traj) 
     # endregion

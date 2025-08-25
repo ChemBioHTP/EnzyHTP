@@ -10,6 +10,9 @@ import os
 import re
 import shutil
 from subprocess import CompletedProcess
+from enzy_htp.preparation.clean import remove_solvent
+from enzy_htp.structure.structure_enchantment import connectivity
+from enzy_htp.structure.structure_region.api import create_region_from_residues
 import pytest
 import numpy as np
 from pathlib import Path
@@ -86,6 +89,15 @@ def files_equivalent(fname1: str, fname2: str) -> bool:
             return False
 
     return True
+
+@pytest.fixture
+def patch_scratch_dir(monkeypatch, tmp_path):
+    """Fixture to patch the SCRATCH_DIR to a temporary directory for the duration of a test."""
+    temp_scratch = tmp_path / "scratch"
+    temp_scratch.mkdir()
+    monkeypatch.setattr(eh_config.system, 'SCRATCH_DIR', str(temp_scratch))
+    yield str(temp_scratch)
+    # No need for explicit cleanup, tmp_path and monkeypatch handle it automatically
 # endregion Tools
 
 def test_run_tleap():
@@ -309,19 +321,43 @@ def test_amber_parameterizer_run_lv_4():
     fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
 
 
-def test_amber_parameterizer_run_lv_5(): #TODO
+def test_amber_parameterizer_run_lv_5():
     """level 5 test of the parameterizer.
     Test structure diversity:
     - 2 polypeptide chain
     - 1 substrate (CHONP)
-    - 1 modified amino acid (CHONP)"""
+    - 1 modified amino acid (CHONP)
+    
+    This is an integration test for the complete MAA parameterization workflow."""
     ai = interface.amber
+    test_ncaa_lib = f"{MM_WORK_DIR}ncaa_lib_empty_lv5"
+
+    # Use the 3FCR_protonated.pdb file that contains the LLP modified amino acid
+    test_stru = struct.PDBParser().get_structure(f"{MM_DATA_DIR}/3FCR_protonated.pdb")
+    # Assign charge/spin to all non-canonical residues in the structure
+    test_stru.assign_ncaa_chargespin({"LLP": (-2, 1), "RLP": (-2, 1)})  # RLP is another ligand in the structure
+    remove_solvent(test_stru)
+    connectivity.init_connectivity(test_stru)
+    
+    # Create parameterizer with empty library to force parameterization
     test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
-        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"
+        ncaa_param_lib_path=test_ncaa_lib,
     )
-    test_stru = struct.PDBParser().get_structure(
-        f"{MM_DATA_DIR}/3cfr-slp-pea_ah.pdb")
-    test_param_worker.run(test_stru)
+    
+    # Ensure the directory exists and is empty
+    fs.safe_mkdir(test_ncaa_lib)
+    
+    # Run the parameterizer - this should trigger _parameterize_modified_res
+    params = test_param_worker.run(test_stru)
+    
+    # Primary assertion: verify the final parameters are valid
+    assert params.is_valid(), "Generated parameters should be valid"
+    
+    # Clean up
+    fs.safe_rmdir(test_ncaa_lib)
+    fs.clean_temp_file_n_dir(params.file_list + [
+        test_param_worker.parameterizer_temp_dir,
+    ])
 
 
 def test_amber_parameterizer_run_lv_6(): #TODO
@@ -329,7 +365,8 @@ def test_amber_parameterizer_run_lv_6(): #TODO
     Test structure diversity:
     - 2 polypeptide chain
     - 1 substrate (CHONP)
-    - 1 modified amino acid (CHONP)"""
+    - 1 modified amino acid (CHONP)
+    - 1 metal center"""
     ai = interface.amber
     test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
         ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"
@@ -401,6 +438,143 @@ def test_run_parmchk2():
     assert os.path.exists(temp_frcmod_file)
     assert len(fs.lines_from_file(temp_frcmod_file)) == 23
     fs.safe_rm(temp_frcmod_file)
+
+
+def test_run_prepgen():
+    """test the run_prepgen function works well with existing files in data directory"""    
+    ai = interface.amber
+    
+    # Use existing test files in data directory
+    test_ac_file = f"{MM_DATA_DIR}/test_LLP.ac"
+    test_mc_file = f"{MM_DATA_DIR}/test_LLP.mc"
+    temp_prepin_file = f"{MM_WORK_DIR}/test_LLP.prepin"
+    
+    # Run prepgen with the existing ac and mc files
+    ai.run_prepgen(
+        in_file=test_ac_file,
+        out_file=temp_prepin_file,
+        mc_file=test_mc_file,
+        residue_name="LLP"
+    )
+   
+    # Verify files exist
+    assert os.path.exists(temp_prepin_file), "input .prepin file should exist"
+    assert os.path.getsize(temp_prepin_file) > 0, "input .prepin file should not be empty"
+    
+    # Clean up
+    fs.clean_temp_file_n_dir([temp_prepin_file])
+
+
+def test_run_prepgen_failure_cases():
+    """Test that run_prepgen properly exposes errors and handles failure cases"""
+    ai = interface.amber
+    
+    # Test with non-existent input file - this should raise an OSError or similar
+    with pytest.raises(Exception):
+        ai.run_prepgen(in_file="/nonexistent/file.ac",
+                       out_file=f"{MM_WORK_DIR}/test_fail.prepin",
+                       mc_file=f"{MM_WORK_DIR}/test_fail.mc",
+                       residue_name="TEST")
+    
+    # Test directory change failure - use a non-existent directory
+    temp_invalid_ac = "/nonexistent_dir/invalid.ac"
+    
+    # This should fail during os.path.dirname() or os.chdir() operations
+    with pytest.raises(Exception):
+        ai.run_prepgen(in_file=temp_invalid_ac,
+                       out_file=f"{MM_WORK_DIR}/test_fail.prepin", 
+                       mc_file=f"{MM_WORK_DIR}/test_fail.mc",
+                       residue_name="FAIL")
+    
+    # Test with nonsense ac file - should fail with meaningful error
+    nonsense_ac_file = f"{MM_DATA_DIR}/nonsense_test.ac"
+    test_mc_file = f"{MM_DATA_DIR}/test_LLP.mc"
+    temp_prepin_file = f"{MM_WORK_DIR}/test_nonsense.prepin"
+    
+    with pytest.raises(RuntimeError) as exc_info:
+        ai.run_prepgen(in_file=nonsense_ac_file,
+                       out_file=temp_prepin_file,
+                       mc_file=test_mc_file,
+                       residue_name="TEST")
+    
+    # Verify that the error message contains useful information
+    error_message = str(exc_info.value)
+    assert "prepgen command failed" in error_message or "prepgen encountered an error" in error_message or "prepgen failed to create output file" in error_message
+    
+    # Test that error handling preserves original working directory even on failure
+    original_cwd = os.getcwd()
+    
+    try:
+        with pytest.raises(Exception):
+            # This should fail but should restore the working directory
+            ai.run_prepgen(in_file="/nonexistent/file.ac",
+                           out_file=f"{MM_WORK_DIR}/test_fail.prepin",
+                           mc_file=f"{MM_WORK_DIR}/test_fail.mc", 
+                           residue_name="TEST")
+    except:
+        pass
+    
+    # Verify working directory was restored even after exception
+    assert os.getcwd() == original_cwd, "Working directory should be restored after exception"
+
+
+def test_correct_atom_types_in_ac_file():
+    """test the _correct_atom_types_in_ac_file function works correctly"""
+    from enzy_htp._interface.amber_interface import AmberParameterizer
+    
+    # Create a test .ac file with GAFF atom types for backbone atoms
+    test_ac_content = """CHARGE     -2.00 ( -2 )
+Formula: H20 C14 N3 O7 P1 
+ATOM      1  N   LLP   289      -5.294  57.398  -9.041 -0.934800        n4
+ATOM      2  H   LLP   289      -4.547  56.832  -8.672  0.294400        hn
+ATOM      3  CA  LLP   289      -6.507  56.533  -9.201  0.170500        c3
+ATOM      4  C   LLP   289      -6.279  55.260 -10.075  0.636100         c
+ATOM      5  O   LLP   289      -5.895  54.198  -9.546 -0.619000         o
+ATOM      6  OXT LLP   289      -6.895  55.198  -11.146 -0.719000        o2
+ATOM      7  CB  LLP   289      -7.725  57.393  -9.645 -0.093400        c3
+ATOM      8  CG  LLP   289      -8.173  58.349  -8.514 -0.112400        c3
+"""
+    
+    test_ac_file = f"{MM_WORK_DIR}/test_correct_atom_types.ac"
+    with open(test_ac_file, 'w') as f:
+        f.write(test_ac_content)
+    
+    # Create a parameterizer instance to access the private method
+    ai = interface.amber
+    parameterizer = ai.build_md_parameterizer()
+    
+    # Call the correction method
+    parameterizer._correct_atom_types_in_ac_file(test_ac_file)
+    
+    # Read the corrected file and verify backbone atom types were changed
+    with open(test_ac_file, 'r') as f:
+        corrected_content = f.read()
+    
+    # Check that backbone atoms were corrected to FF14SB types
+    assert "        N" in corrected_content  # Amide nitrogen should remain N
+    assert "        H" in corrected_content  # Amide hydrogen should remain H  
+    assert "       CX" in corrected_content  # Alpha carbon should become CX
+    assert "        C" in corrected_content  # Carbonyl carbon should remain C
+    assert "        O" in corrected_content  # Carbonyl oxygen should remain O
+    assert "       O2" in corrected_content  # Terminal oxygen should remain O2
+    
+    # Check that sidechain atoms retained GAFF types (c3 for CB, CG)
+    assert "       c3" in corrected_content  # Sidechain carbons should keep c3
+    
+    # Verify specific corrections occurred
+    lines = corrected_content.split('\n')
+    n_line = [line for line in lines if "  N   LLP" in line][0]
+    ca_line = [line for line in lines if "  CA  LLP" in line][0]
+    c_line = [line for line in lines if "  C   LLP" in line][0]
+    cb_line = [line for line in lines if "  CB  LLP" in line][0]
+    
+    assert n_line.endswith("        N")   # N should be corrected to N
+    assert ca_line.endswith("       CX")  # CA should be corrected to CX
+    assert c_line.endswith("        C")   # C should be corrected to C
+    assert cb_line.endswith("       c3")  # CB should retain GAFF c3
+    
+    # Clean up
+    fs.safe_rm(test_ac_file)
 
 
 def test_run_antechamber():
@@ -1741,10 +1915,10 @@ def test_ncaa_to_moldesc_modaa():
     file = f"{MM_DATA_DIR}/3FCR_protonated.pdb"
     stru = struct.PDBParser().get_structure(file)
     stru.assign_ncaa_chargespin({"LLP": (-2, 1)})
-    ncaa = stru.modified_residue[0]
+    maa_region = create_region_from_residues([stru.modified_residue[0]], nterm_cap="H", cterm_cap="OH")
 
     ai = interface.amber
-    out_path = ai.antechamber_ncaa_to_moldesc(ncaa=ncaa)
+    out_path = ai.antechamber_ncaa_to_moldesc(ncaa=maa_region)
 
     # assert amount of lines are equal and formula/charge is same
     assert len(fs.lines_from_file(out_path)) == len(fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac"))
@@ -1752,6 +1926,25 @@ def test_ncaa_to_moldesc_modaa():
     assert fs.lines_from_file(out_path)[1] == fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac")[1]
 
     fs.safe_rm(out_path)
+
+def test_make_mc_file():
+    file = f"{MM_DATA_DIR}/3FCR_connect.pdb"
+    stru = struct.PDBParser().get_structure(file)
+    stru.assign_ncaa_chargespin({"LLP": (-2, 1)})
+    remove_solvent(stru)
+    connectivity.init_connectivity(stru)
+
+    ai = interface.amber
+
+    maa = stru.modified_residue[0]
+    maa_region = create_region_from_residues(residues=[maa], nterm_cap="H", cterm_cap="OH")
+
+    out_path = f"{MM_WORK_DIR}/LLP.mc"
+    
+    ai.make_mc_file(maa_region, out_path)
+
+    fs.safe_rm(f"{MM_NCAA_DIR}/LLP_any.prepin")
+
 
 def test_get_atom_number_consistency_cpptraj_log():
     example_cpptraj_log = f"{MM_DATA_DIR}/cpptraj_inconsistent_atom_num.out"
@@ -1825,3 +2018,317 @@ def test_convert_stru_to_inpcrd_too_many_solvent():
     assert files_equivalent(test_out_path, answer_inpcrd_file)
 
     fs.clean_temp_file_n_dir([test_out_path])
+
+
+def test_get_protein_force_field():
+    """Test the get_protein_force_field method with various inputs"""
+    ai = interface.amber
+    
+    # Test normal cases with protein.ff prefix
+    assert ai.get_protein_force_field(["protein.ff14SB"]) == "ff14SB"
+    assert ai.get_protein_force_field(["protein.ff19SB"]) == "ff19SB"
+    assert ai.get_protein_force_field(["protein.fb15"]) == "fb15"
+    
+    # Test with multiple force fields
+    assert ai.get_protein_force_field(["water.tip3p", "protein.ff14SB", "gaff2"]) == "ff14SB"
+    
+    # Test case insensitive matching - now should work
+    assert ai.get_protein_force_field(["protein.ff14sb"]) == "ff14SB"
+    assert ai.get_protein_force_field(["PROTEIN.FF19SB"]) == "ff19SB"
+    assert ai.get_protein_force_field(["protein.FB15"]) == "fb15"
+    
+    # Test flexibility without protein.ff prefix - now should work  
+    assert ai.get_protein_force_field(["ff14SB"]) == "ff14SB"
+    assert ai.get_protein_force_field(["ff19sb"]) == "ff19SB"
+    assert ai.get_protein_force_field(["fb15"]) == "fb15"
+    
+    # Test mixed case with multiple entries
+    assert ai.get_protein_force_field(["water.tip3p", "ff14sb", "gaff2"]) == "ff14SB"
+    
+    # Test error cases
+    with pytest.raises(ValueError):
+        ai.get_protein_force_field(["water.tip3p", "gaff2"])  # No protein force field
+    
+    with pytest.raises(ValueError):
+        ai.get_protein_force_field(["protein.ff99SB"])  # Unsupported force field
+    
+    with pytest.raises(ValueError):
+        ai.get_protein_force_field([])  # Empty list
+    
+    with pytest.raises(ValueError):
+        ai.get_protein_force_field(["ff99SB"])  # Unsupported force field without prefix
+
+
+def test_get_protein_force_field_modaa_combinations():
+    """Test get_protein_force_field with combinations like ff19SB + ff19SB_modAA"""
+    ai = interface.amber
+    
+    # Test ff19SB + ff19SB_modAA combination - should return ff19SB
+    assert ai.get_protein_force_field(["protein.ff19SB", "protein.ff19SB_modAA"]) == "ff19SB"
+    
+    # Test ff14SB + ff14SB_modAA combination - should return ff14SB  
+    assert ai.get_protein_force_field(["protein.ff14SB", "protein.ff14SB_modAA"]) == "ff14SB"
+    
+    # Test order doesn't matter
+    assert ai.get_protein_force_field(["protein.ff19SB_modAA", "protein.ff19SB"]) == "ff19SB"
+    
+    # Test with other force fields mixed in
+    assert ai.get_protein_force_field(["water.tip3p", "protein.ff19SB_modAA", "protein.ff19SB", "gaff2"]) == "ff19SB"
+
+
+def test_check_residue_name_ff_support():
+    """Test check_residue_name_ff_support function for detecting force field support"""
+    ai = interface.amber
+    temp_dir = Path(MM_WORK_DIR) / "test_residue_support"
+    temp_dir.mkdir(exist_ok=True)
+    
+    # Test supported standard amino acid
+    assert ai.check_residue_name_ff_support("ALA", ["protein.ff14SB"], temp_dir) == True
+    assert ai.check_residue_name_ff_support("TRP", ["protein.ff19SB"], temp_dir) == True
+    
+    # Test unsupported residue code
+    assert ai.check_residue_name_ff_support("XYZ", ["protein.ff14SB"], temp_dir) == False
+    assert ai.check_residue_name_ff_support("ABC", ["protein.ff19SB"], temp_dir) == False
+    
+    # Test with multiple force fields 
+    assert ai.check_residue_name_ff_support("ALA", ["protein.ff14SB", "protein.ff19SB"], temp_dir) == True
+    
+    # Test case sensitivity
+    assert ai.check_residue_name_ff_support("ala", ["protein.ff14SB"], temp_dir) == True  # Should still work
+    
+    # Clean up
+    shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_ncaa_parm_lib_search():
+    """Test the parm lib search functionality with correct file naming convention"""
+    from enzy_htp._interface.ncaa_library import search_ncaa_parm_file
+    import enzy_htp.structure as struct
+    from enzy_htp.preparation.clean import remove_solvent
+    from enzy_htp.structure.structure_enchantment import connectivity
+    
+    # Create a test library directory with properly named files
+    test_lib_dir = f"{MM_WORK_DIR}/test_parm_lib_search"
+    fs.safe_mkdir(test_lib_dir)
+    
+    # Create mock parameter files with correct naming convention
+    # LLP with AM1BCC-GAFF2 method
+    llp_mol2_content = """@<TRIPOS>MOLECULE
+LLP
+20 19 1 0 0
+SMALL
+bcc
+
+
+@<TRIPOS>ATOM
+      1 N           -5.2940    57.3980    -9.0410 N.am    1 LLP    -0.9348
+      2 H           -4.5470    56.8320    -8.6720 H       1 LLP     0.2944
+      3 CA          -6.5070    56.5330    -9.2010 C.3     1 LLP     0.1705
+"""
+    
+    llp_frcmod_content = """remark goes here
+MASS
+
+BOND
+
+ANGLE
+
+DIHE
+
+IMPROPER
+
+NONBON
+"""
+    
+    llp_frcmod2_content = """remark for second frcmod
+MASS
+
+BOND
+
+ANGLE
+
+DIHE
+
+IMPROPER
+
+NONBON
+"""
+    
+    # Write the files with correct naming convention  
+    llp_mol2_path = f"{test_lib_dir}/LLP_AM1BCC-GAFF2.mol2"
+    llp_frcmod_path = f"{test_lib_dir}/LLP_AM1BCC-GAFF2.frcmod"
+    llp_frcmod2_path = f"{test_lib_dir}/LLP_AM1BCC-GAFF2.frcmod2"
+    
+    with open(llp_mol2_path, 'w') as f:
+        f.write(llp_mol2_content)
+    with open(llp_frcmod_path, 'w') as f:
+        f.write(llp_frcmod_content)
+    with open(llp_frcmod2_path, 'w') as f:
+        f.write(llp_frcmod2_content)
+    
+    # Also create files for RLP (the other ligand in the test structure)
+    rlp_mol2_path = f"{test_lib_dir}/RLP_AM1BCC-GAFF2.mol2"
+    rlp_frcmod_path = f"{test_lib_dir}/RLP_AM1BCC-GAFF2.frcmod"
+    
+    with open(rlp_mol2_path, 'w') as f:
+        f.write(llp_mol2_content.replace("LLP", "RLP"))
+    with open(rlp_frcmod_path, 'w') as f:
+        f.write(llp_frcmod_content)
+    
+    # Load structure to get ModifiedResidue objects for testing
+    test_stru = struct.PDBParser().get_structure(f"{MM_DATA_DIR}/3FCR_protonated.pdb")
+    test_stru.assign_ncaa_chargespin({"LLP": (-2, 1), "RLP": (-2, 1)})
+    remove_solvent(test_stru)
+    connectivity.init_connectivity(test_stru)
+    
+    # Get the LLP modified residue
+    llp_maa = None
+    for maa in test_stru.modified_residue:
+        if maa.name == "LLP":
+            llp_maa = maa
+            break
+    
+    assert llp_maa is not None, "LLP modified residue not found in test structure"
+    
+    # Test the search function
+    target_method = "AM1BCC-GAFF2"
+    mol_desc_path, frcmod_path_list = search_ncaa_parm_file(
+        llp_maa, target_method, test_lib_dir
+    )
+    
+    # Verify the search results
+    assert mol_desc_path is not None, "Should find mol2 file for LLP"
+    assert mol_desc_path == llp_mol2_path, f"Expected {llp_mol2_path}, got {mol_desc_path}"
+    
+    assert len(frcmod_path_list) >= 1, "Should find at least one frcmod file"
+    assert llp_frcmod_path in frcmod_path_list, "Should find the frcmod file"
+    
+    # Test that files are properly named with target_method
+    assert "AM1BCC-GAFF2" in mol_desc_path
+    for frcmod_path in frcmod_path_list:
+        assert "AM1BCC-GAFF2" in frcmod_path
+    
+    # Test search for non-existent method
+    mol_desc_path_none, frcmod_path_list_none = search_ncaa_parm_file(
+        llp_maa, "RESP-GAFF", test_lib_dir
+    )
+    assert mol_desc_path_none is None, "Should not find files for non-existent method"
+    assert len(frcmod_path_list_none) == 0, "Should not find frcmod files for non-existent method"
+    
+    # Clean up
+    fs.safe_rmdir(test_lib_dir)
+
+
+def test_clean_frcmod_file_removes_attn(tmp_path, monkeypatch):
+    """Test that _clean_frcmod_file removes lines starting with 'ATTN'."""
+    # Prepare sample frcmod file with lines to remove and keep
+    frcmod = tmp_path / "sample.frcmod"
+    sample_lines = [
+        "ATTN this line should be removed",
+        "PARAM a b c",
+        "  ATTN also remove",
+        "OTHER xyz"
+    ]
+    frcmod.write_text("\n".join(sample_lines))
+
+    # Monkeypatch fs.get_valid_temp_name to return temp path directly
+    monkeypatch.setattr(fs, "get_valid_temp_name", lambda x: str(x) + ".temp")
+
+    # Write a fake temp file name generator that matches expected behavior
+    # Create the temp file path (the original + .temp suffix)
+    temp_path = str(frcmod) + ".temp"
+
+    # Instantiate AmberParameterizer with dummy parameters
+    param = AmberParameterizer(
+        interface=None,
+        force_fields=[], charge_method="",
+        resp_engine="", resp_lvl_of_theory="",
+        ncaa_param_lib_path=str(tmp_path),
+        force_renew_ncaa_parameter=False,
+        ncaa_net_charge_engine="", ncaa_net_charge_ph=0.0,
+        solvate_box_type="", solvate_box_size=0.0,
+        gb_radii=0, parameterizer_temp_dir=str(tmp_path),
+        additional_tleap_lines=[], keep_tleap_in=False
+    )
+
+    # Run the cleanup method
+    param._clean_frcmod_file(str(frcmod))
+
+    # Read back content and verify ATTN lines are removed
+    remaining = frcmod.read_text().splitlines()
+    assert remaining == ["PARAM a b c", "OTHER xyz"]
+
+
+def test_calculate_dsi_metrics_input_validation():
+    """Test that calculate_dsi_metrics validates inputs correctly."""
+    # Test with empty residue lists
+    with pytest.raises(ValueError, match="Residue list cannot be empty"):
+        interface.amber._residue_list_to_amber_mask([])
+
+
+def test_residue_list_to_amber_mask():
+    """Test conversion of residue lists to Amber mask format."""
+    # Test single residue
+    residues = [("A", 10)]
+    mask = interface.amber._residue_list_to_amber_mask(residues)
+    assert mask == ":10&!@H="
+    
+    # Test multiple residues in same chain
+    residues = [("A", 10), ("A", 11), ("A", 12)]
+    mask = interface.amber._residue_list_to_amber_mask(residues)
+    assert mask == ":10-12&!@H="
+    
+    # Test non-continuous residues
+    residues = [("A", 10), ("A", 15), ("A", 20)]
+    mask = interface.amber._residue_list_to_amber_mask(residues)
+    assert mask == ":10,15,20&!@H="
+    
+    # Test multiple chains (should warn and combine residue numbers)
+    residues = [("A", 10), ("B", 20)]
+    mask = interface.amber._residue_list_to_amber_mask(residues)
+    assert mask == ":10,20&!@H="
+    
+    # Test complex case with multiple chains and ranges
+    residues = [("A", 10), ("A", 11), ("A", 12), ("B", 20), ("B", 25)]
+    mask = interface.amber._residue_list_to_amber_mask(residues)
+    assert mask == ":10-12,20,25&!@H="
+    
+    # Test without hydrogen exclusion
+    residues = [("A", 10), ("A", 11)]
+    mask = interface.amber._residue_list_to_amber_mask(residues, exclude_hydrogen=False)
+    assert mask == ":10-11"
+
+
+def test_calculate_dsi_metrics(patch_scratch_dir):
+    """Test calculate_dsi_metrics function using test data files."""
+    # Use existing test data files from the test_get_coord_covariance pattern
+    prmtop_path = os.path.join(MM_DATA_DIR, "test_rmsd.prmtop")
+    traj_path = os.path.join(MM_DATA_DIR, "test_rmsd.mdcrd")
+    ref_pdb = os.path.join(MM_DATA_DIR, "test_rmsd_chainid.pdb")
+
+    # Load trajectory ensemble
+    structure_ensemble = interface.amber.load_traj(
+        prmtop_path=prmtop_path,
+        traj_path=traj_path,
+        ref_pdb=ref_pdb,
+    )
+    
+    # Define two domains for DSI calculation
+    domain1_residues = [("A", 1), ("A", 5)]  # First 5 residues
+    domain2_residues = [("A", 10), ("A", 15)]  # Residues 10-15
+    
+    # Calculate DSI
+    result = interface.amber.calculate_dsi_metrics(
+        structure_ensemble, domain1_residues, domain2_residues
+    )
+    
+    # Basic validation - ensure we get a reasonable result
+    assert isinstance(result, np.ndarray)
+    assert len(result) > 0  # Should have at least one frame
+    assert all(isinstance(x, (int, float)) for x in result)  # All values should be numeric
+    
+    # DSI values should be reasonable (not NaN or infinite)
+    assert not np.any(np.isnan(result))
+    assert not np.any(np.isinf(result))
+
+

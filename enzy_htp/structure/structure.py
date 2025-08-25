@@ -1078,10 +1078,35 @@ class Structure(DoubleLinkedNode):
             f"<Structure object at {hex(id(self))}>",
         ]
         out_line.append("Structure(")
-        out_line.append(f"chains: (sorted, original {list(self.chain_mapper.keys())})")
-        for ch in sorted(self._chains, key=lambda x: x.name):
+        all_chain_keys = list(self.chain_mapper.keys())
+        if len(all_chain_keys) > 50:
+            display_keys = all_chain_keys[:50]
+            display_keys.append(f"... (omit {len(all_chain_keys) - 50} chains)")
+            out_line.append(f"chains: (sorted, original {display_keys})")
+        else:
+            out_line.append(f"chains: (sorted, original {all_chain_keys})")
+        
+        sorted_chains = sorted(self._chains, key=lambda x: x.name)
+        solvent_chains = [ch for ch in sorted_chains if ch.is_solvent_chain()]
+        other_chains = [ch for ch in sorted_chains if not ch.is_solvent_chain()]
+
+        for ch in other_chains:
             ch: Chain
             out_line.append(f"    {ch.name}({ch.chain_type}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms}")
+
+        if len(solvent_chains) > 2:
+            # Show first solvent chain
+            ch = solvent_chains[0]
+            out_line.append(f"    {ch.name}({ch.chain_type}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms}")
+            out_line.append(f"    ... (omit {len(solvent_chains)-2} solvent chains)")
+            # Show last solvent chain
+            ch = solvent_chains[-1]
+            out_line.append(f"    {ch.name}({ch.chain_type}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms}")
+        else:
+            for ch in solvent_chains:
+                ch: Chain
+                out_line.append(f"    {ch.name}({ch.chain_type}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms}")
+
         out_line.append(")")
         return os.linesep.join(out_line)
 

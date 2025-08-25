@@ -73,7 +73,7 @@ class Mole2Interface(BaseInterface):
             ignore_hetam: TOOD(CJ)
 
         Returns:
-            A str() with the filename of the .xml containing the mole2 input.
+            input_filepath (str): The path to the .xml file containing the mole2 input.
         """
         content:List[str] = [
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>", 
@@ -99,11 +99,11 @@ class Mole2Interface(BaseInterface):
             "</Tunnels>",
         ])
 
-        outfile: str = path.join(work_dir, "mole2_input.xml")
+        input_filepath: str = path.join(work_dir, "mole2_input.xml")
 
-        fs.write_lines(outfile, content)
+        fs.write_lines(input_filepath, content)
 
-        return outfile
+        return input_filepath
 
     def _read_cavity_from_xml(self, cavities_xml_filepath: str, cavity_id: int, cavity_type: Literal["Cavity", "Void"] = "Cavity") -> Tuple[float, list, list]:
         """Given a .xml file from a mole2 run, parses the cavity information and returns the boundary
@@ -115,6 +115,8 @@ class Mole2Interface(BaseInterface):
             
         Returns:
             A tuple containing (volume, boundary_residue_keys, inner_residue_keys).
+        
+        NOTE: if chain index overflows in the PDB file used for generating this xml, there will be residues with chain id like "i:1"
         """
         if (not cavities_xml_filepath or not cavity_id):
             return None, None, None
@@ -144,6 +146,95 @@ class Mole2Interface(BaseInterface):
         
         return mole2_volume, boundary_residue_keys, inner_residue_keys
 
+    def _parse_mesh_file(self, mesh_filepath: str) -> Tuple[pv.PolyData, np.ndarray]:
+        """Parse mesh file from Mole2 .mesh and return PyVista mesh and center-of-mass."""
+        
+        # Sanity checks for file existence and readability
+        if not path.exists(mesh_filepath):
+            raise FileNotFoundError(f"Mesh file not found: {mesh_filepath}")
+        
+        if not path.isfile(mesh_filepath):
+            raise ValueError(f"Path is not a file: {mesh_filepath}")
+            
+        lines:List[str] = fs.lines_from_file(mesh_filepath) # Read cavity_X.mesh file lines.
+        
+        # Check if file is empty
+        if not lines:
+            raise ValueError(f"Mesh file is empty: {mesh_filepath}")
+        
+        # Check if first line can be parsed as integer (number of points)
+        try:
+            num_lines = int(lines.pop(0))
+        except (ValueError, IndexError) as exc:
+            raise ValueError(f"Invalid mesh file format - first line should be number of points: {mesh_filepath}") from exc
+        
+        # Check if we have enough lines for the declared number of points
+        if len(lines) < num_lines:
+            raise ValueError(f"Mesh file has insufficient data - declared {num_lines} points but only {len(lines)} lines available: {mesh_filepath}")
+        
+        points = []
+        
+        # Parse point coordinates with error handling
+        for i, ll in enumerate(lines[:num_lines]):        # Read point coordinates by number.
+            try:
+                point_coords = np.array(ll.split()).astype(float)
+                if len(point_coords) != 3:
+                    raise ValueError(f"Point {i+1} should have 3 coordinates, got {len(point_coords)}")
+                points.append(point_coords)
+            except (ValueError, TypeError) as exc:
+                raise ValueError(f"Invalid point coordinates at line {i+1}: '{ll}' in file {mesh_filepath}") from exc
+        
+        points = np.array(points)           # Convert to numpy array
+        
+        lines = lines[num_lines:]       # The remaining rows are surface data.
+        
+        # Check if we have surface data
+        if not lines:
+            raise ValueError(f"Mesh file missing surface data: {mesh_filepath}")
+        
+        # Parse number of polygons with error handling
+        try:
+            num_pgons = int(lines.pop(0))   # Surface number.
+        except (ValueError, IndexError) as exc:
+            raise ValueError(f"Invalid surface data format - cannot parse number of polygons: {mesh_filepath}") from exc
+        
+        # Parse connectivity data with error handling
+        try:
+            cnct = list(map(int,lines))     # Convert face data to integer list
+        except ValueError as exc:
+            raise ValueError(f"Invalid connectivity data - non-integer values found: {mesh_filepath}") from exc
+        
+        cnct.reverse()                  # Reverse for later processing
+
+        surfaces = []
+        original_cnct_len = len(cnct)
+        while cnct:
+            n = cnct.pop()              # Get number of vertices in surface.
+            surfaces.append([n-1] + [cnct.pop() for _ in range(n)][:-1])    # Store [number of vertices + vertex index]
+            continue
+    
+        # Check if we have valid surfaces
+        if not surfaces:
+            raise ValueError(f"No valid surfaces found in mesh file: {mesh_filepath}")
+    
+        com = 0.0
+        verts = list()
+        for ss in surfaces:
+            for idx in ss[1:-1]:            # Get the vertex index of the face (skip the first element: the vertex number).
+                verts.append(points[idx])   # Collect vertex coordinates.
+        
+        # Check if we have vertices for center-of-mass calculation
+        if not verts:
+            raise ValueError(f"No vertices found for center-of-mass calculation: {mesh_filepath}")
+        
+        verts = np.array(verts)
+        com = np.mean(verts,axis=0)     # Calculate the geometric center of the cavity.
+
+        mesh = pv.PolyData(var_inp=points, faces=np.hstack(surfaces))
+        mesh = mesh.clean()
+        mesh = mesh.triangulate()
+        return mesh, com
+
     def _parse_cavity(self, stru: Structure, mesh_filepath: str, probe: float, inner: float, 
             mesh_density: float, cavity_id: int = None, 
             cavity_xml_filepath: str = None, cavity_type: Literal["Cavity", "Void"] = "Cavity") -> Cavity:
@@ -160,40 +251,7 @@ class Mole2Interface(BaseInterface):
         Returns:
             A newly constructed Mole2Cavity.
         """
-        
-        lines:List[str] = fs.lines_from_file(mesh_filepath) # Read cavity_X.mesh file lines.
-        points = []
-        num_lines = int(lines.pop(0))       # The first line is the number of points.
-        
-        for ll in lines[:num_lines]:        # Read point coordinates by number.
-            points.append(np.array(ll.split()).astype(float))
-        points = np.array(points)           # Convert to numpy array
-        
-        lines = lines[num_lines:]       # The remaining rows are surface data.
-        num_pgons = int(lines.pop(0))   # Surface number.
-        
-        cnct = list(map(int,lines))     # Convert face data to integer list
-        cnct.reverse()                  # Reverse for later processing
-
-        surfaces = []
-        while cnct:
-            n = cnct.pop()              # Get number of vertices in surface.
-            surfaces.append([n-1] + [cnct.pop() for _ in range(n)][:-1])    # Store [number of vertices + vertex index]
-            continue
-    
-        com = 0.0
-        verts = list()
-        for ss in surfaces:
-            for idx in ss[1:-1]:            # Get the vertex index of the face (skip the first element: the vertex number).
-                verts.append(points[idx])   # Collect vertex coordinates.
-        
-        verts = np.array(verts)
-        com = np.mean(verts,axis=0)     # Calculate the geometric center of the cavity.
-
-        # print(f"Surface elements: {len(surfaces)}, Surface count: {num_pgons}")
-        mesh = pv.PolyData(var_inp=points, faces=np.hstack(surfaces))
-        mesh = mesh.clean()
-        mesh = mesh.triangulate()
+        mesh, com = self._parse_mesh_file(mesh_filepath)
 
         mole2_volume, boundary_residue_keys, inner_residue_keys = self._read_cavity_from_xml(cavity_xml_filepath, cavity_id, cavity_type)
         boundary_residues = [stru.find_residue_with_key(key) for key in boundary_residue_keys] if boundary_residue_keys else []
@@ -205,13 +263,13 @@ class Mole2Interface(BaseInterface):
             inner=inner,
             mesh_density=mesh_density,
             software_report_volume=mole2_volume,
-            boundary_residues=boundary_residues,
-            inner_residues=inner_residues,
+            boundary_residues=[x for x in boundary_residues if x is not None],
+            inner_residues=[x for x in inner_residues if x is not None],
             cavity_type=cavity_type
         )
 
     def identify_cavities(self, stru: Structure, 
-            non_active_parts: List[Tuple[str, int]] = None, 
+            non_active_residues: List[Residue] = list(), 
             probe: float = None, 
             inner: float = None, 
             mesh_density: float = None,
@@ -225,8 +283,7 @@ class Mole2Interface(BaseInterface):
 
         Args:
             stru (Structure): The structure instance to detect cavities from.
-            non_active_parts (List[Tuple[str, int]], optional): Residues that should be skipped. 
-                Should be in format List[Tuple] where Tuple has format (chain id, residue number).
+            non_active_residues (List[Residue], optional): Residues that should be skipped.
             probe (float, optional): Probe radius to use in A. Defaults to Mole2Config.PROBE if not supplied.
             inner (float, optional): Inner radius to use in A. Defaults to Mole2Config.INNER if not supplied.
             mesh_density (float, optional): Mesh density to use in A. Defaults to Mole2Config.MESH_DENSITY if not supplied.
@@ -252,22 +309,24 @@ class Mole2Interface(BaseInterface):
         if ignore_hetatm is None:
             ignore_hetatm = self.config_.IGNORE_HETATM
 
-        fs.safe_mkdir(work_dir)
-        fs.safe_rmdir(f"{work_dir}/mesh/")
-        
-        pdb_filepath = fs.get_valid_temp_name(path.join(work_dir, "stru_cavity_temp.pdb"), ext_set=["pdb"])
-        sp.save_structure(outfile=pdb_filepath, stru=stru)
+        non_active_parts = [resi.key() for resi in non_active_residues]
 
-        input_xml_file: str = self._write_xml_input(pdb_filepath, work_dir, non_active_parts, probe, inner, mesh_density, ignore_hetatm)
+        fs.safe_mkdir(work_dir)
+        fs.safe_rmdir(f"{work_dir}/mesh/") # this may cause a problem when run in parallel and system.SCRATCH_DIR is used. Current fix is to specify work_dir when run in parallel.
+        
+        temp_pdb_filepath = fs.get_valid_temp_name(path.join(work_dir, "stru_cavity_temp.pdb"), ext_set=["pdb"])
+        sp.save_structure(outfile=temp_pdb_filepath, stru=stru)
+
+        input_xml_filepath: str = self._write_xml_input(temp_pdb_filepath, work_dir, non_active_parts, probe, inner, mesh_density, ignore_hetatm)
 
         if use_mono:
-            self.env_manager_.run_command(self.config_.MONO, [self.config_.MOLE2, input_xml_file])
+            self.env_manager_.run_command(self.config_.MONO, [self.config_.MOLE2, input_xml_filepath])
         else:
-            self.env_manager_.run_command(self.config_.MOLE2, [input_xml_file])
+            self.env_manager_.run_command(self.config_.MOLE2, [input_xml_filepath])
         
-        cavity_mesh_files: List[str] = list(Path(f"{work_dir}/mesh/").glob("cavity_*.mesh"))
-        void_mesh_files: List[str] = list(Path(f"{work_dir}/mesh/").glob("void_*.mesh"))
-        cavities_xml_file = Path(work_dir).joinpath("xml", "cavities.xml")
+        cavity_mesh_files: List[str] = [str(filepath.resolve()) for filepath in Path(f"{work_dir}/mesh/").glob("cavity_*.mesh")]
+        void_mesh_files: List[str] = [str(filepath.resolve()) for filepath in Path(f"{work_dir}/mesh/").glob("void_*.mesh")]
+        cavities_xml_file = str(Path(work_dir).joinpath("xml", "cavities.xml"))
         _LOGGER.info(f"Found {len(cavity_mesh_files)} cavities and {len(void_mesh_files)} void cavities using probe radius of {probe:.3f} A and inner radius of {inner:.3f} A")
         
         result: List[Cavity] = list()
@@ -282,6 +341,15 @@ class Mole2Interface(BaseInterface):
                     cavity_id=(i+1), cavity_xml_filepath=cavities_xml_file, cavity_type="Void")
             )
 
-        fs.clean_temp_file_n_dir(work_dir)
+        fs.clean_temp_file_n_dir(
+            list(Path(f"{work_dir}/mesh").glob("*.mesh")) + list(Path(f"{work_dir}/xml").glob("*.xml")) +[
+                path.join(work_dir, "mesh"), 
+                path.join(work_dir, "xml"), 
+                cavities_xml_file, 
+                input_xml_filepath, 
+                temp_pdb_filepath,
+                work_dir,
+            ]
+        )
         
         return result

@@ -7,7 +7,6 @@
 # pandas
 # # pymol
 # colorlog
-# # modeller
 # pyvista
 # rdkit
 # editdistance

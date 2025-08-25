@@ -329,6 +329,7 @@ class AmberConfig(BaseConfig):
             "add_pdb",
             "ante-MMPBSA.py",
             "parmed",
+            "prepgen",
             self.HARDCODE_MMMPBSA_MPI_ENGINE,
         ]
 

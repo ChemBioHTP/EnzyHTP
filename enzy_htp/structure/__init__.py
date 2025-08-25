@@ -16,7 +16,7 @@ from .atom import Atom
 from .ligand import Ligand
 from .residue import Residue
 from .solvent import Solvent, residue_to_solvent
-from .metal_atom import MetalUnit, residue_to_metal, get_metal
+from .metal_atom import MetalUnit, residue_to_metal
 from .modified_residue import ModifiedResidue, residue_to_modified_residue
 from .noncanonical_base import NonCanonicalBase
 from .chain import Chain
@@ -38,7 +38,9 @@ from .structure_constraint import (
     DistanceConstraint,
     AngleConstraint,
     DihedralConstraint,
+    ResiduePairConstraint,
     structure_constraints_from_xml,
+    create_residue_pair_constraint,
     create_cartesian_freeze,
     create_backbone_freeze,
     create_distance_constraint,
@@ -49,4 +51,3 @@ from .structure_constraint import (
 )
 
 from .structure_selection_class import StruSelection
-from .ligand_ensemble import LigandEnsemble

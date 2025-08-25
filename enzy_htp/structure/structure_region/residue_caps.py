@@ -22,10 +22,11 @@ Date: 2024-01-31
 from __future__ import annotations
 from abc import abstractmethod, ABC
 from copy import deepcopy
+import copy
 import numpy as np
 import numpy.typing as npt
 from scipy.spatial.transform import Rotation as R
-from typing import List, Tuple, Dict
+from typing import Any, List, Tuple, Dict, Union
 
 from ..structure import Structure, Residue, Atom, Chain
 
@@ -225,6 +226,69 @@ class ResidueCap(Residue, ABC):
     def __str__(self) -> str:
         """str() rep of the ResidueCap() that shows its chemical type as well as what Atom()'s it is linked to."""
         return f"{self.cap_type}Cap(link_atom={self.link_atom.name},link_residue={self.link_residue.key_str})"
+
+    def __deepcopy__(self, memo: Union[Dict[int, Any], None] = None, _nil=[]):
+        """
+        Support deepcopy of ResidueCap that donot copy any parent, link_residue/atom, or socket_atom.
+
+        Returns:
+            a deepcopy of a Residue with parent = link_residue = link_atom = socket_atom = None.
+
+        NOTE: if there are not constructor in the class. All children with have no parent.
+        """
+        # in case this is the first copied item
+        if memo is None:
+            memo = {}
+        
+        # treat copying action on parent
+        if self.parent is not None:
+            # not the root.
+            parent_id = id(self.parent)
+            #print(f"parent_id: {parent_id}")
+            y = memo.get(parent_id, _nil)
+            if y is _nil:
+                # parent not in memo -> this is the first copied DoublyLinkNode: set parent to None in memo
+                memo[id(self.parent)] = None
+            # parent in memo -> this is part of the recursive copying initiated from the parent: default
+
+        # treat copying action on link_atom
+        if self.link_atom is not None:
+            # not the root.
+            link_atom_id = id(self.link_atom)
+            y = memo.get(link_atom_id, _nil)
+            if y is _nil:
+                memo[id(self.link_atom)] = None
+            # link_atom in memo -> this is part of the recursive copying initiated from the parent: default
+
+        # treat copying action on link_residue
+        if self.link_residue is not None:
+            # not the root.
+            link_residue_id = id(self.link_residue)
+            y = memo.get(link_residue_id, _nil)
+            if y is _nil:
+                memo[id(self.link_residue)] = None
+            # link_residue in memo -> this is part of the recursive copying initiated from the parent: default
+
+        # treat copying action on socket_atom
+        if self.socket_atom is not None:
+            # not the root.
+            socket_atom_id = id(self.socket_atom)
+            y = memo.get(socket_atom_id, _nil)
+            if y is _nil:
+                memo[id(self.socket_atom)] = None
+            # socket_atom in memo -> this is part of the recursive copying initiated from the parent: default
+
+        # mask current method to use original deepcopy
+        self.__deepcopy__ = None
+
+        new_self = copy.deepcopy(self, memo)
+
+        # recover current method for future use
+        # test shows this will rebind the method to correct instance when its called again
+        delattr(self, "__deepcopy__")
+        delattr(new_self, "__deepcopy__")
+
+        return new_self
 
 
 class HCap(ResidueCap):
