@@ -29,7 +29,8 @@ from enzy_htp.core import _LOGGER
 import enzy_htp.chemical as chem
 from enzy_htp.structure import PDBParser, Structure, Ligand, Mol2Parser, Chain, Atom
 from enzy_htp.structure.structure_constraint import StructureConstraint
-from enzy_htp._interface import Mole2Cavity
+#from enzy_htp._interface import Mole2Cavity
+from enzy_htp.analysis.cavity import identify_stru_cavities
 
 from enzy_htp.structure.structure_operation import (
     atom_name_similarity
@@ -206,11 +207,12 @@ def seed_with_constraints(ligand:Ligand,
 
     relevant_constraints: List[str] = list()
 
-    cavities:List[Mole2Cavity] = interface.mole2.identify_cavities(stru, work_dir=work_dir)
+    #cavities:List[Mole2Cavity] = interface.mole2.identify_cavities(stru, work_dir=work_dir)
+    cavities=identify_stru_cavities(stru, work_dir=work_dir)
 
     seed_locations:List = list()
     for cc in cavities:
-        vert_matrix = np.array(cc.points())
+        vert_matrix = np.array(cc.points)
         (x_min, y_min, z_min) = np.min(vert_matrix,axis=0)
         (x_max, y_max, z_max) = np.max(vert_matrix,axis=0)
         contained_points = list()
@@ -224,7 +226,7 @@ def seed_with_constraints(ligand:Ligand,
                 for z in z_vals:
                     candidates.append(np.array([x, y, z]))
         candidates = np.array(candidates)
-        for included, cp in zip(cc.contains_points(candidates), candidates):
+        for included, cp in zip(cc.contains_array(candidates), candidates):
             if included:
                 seed_locations.append(cp)
 
