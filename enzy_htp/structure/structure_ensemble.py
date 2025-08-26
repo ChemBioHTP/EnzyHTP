@@ -106,13 +106,13 @@ class StructureEnsemble:
         return result
 
     @classmethod
-    def from_single_stru(cls, stru: Structure) -> StructureEnsemble:
+    def from_single_stru(cls, stru: Structure, remove_solvent=True) -> StructureEnsemble:
         """create an ensemble of 1 snapshot from a Structure instance"""
         return cls(
             topology=stru,
             top_parser=get_itself,
             coordinate_list=[stru],
-            coord_parser=lambda stru_list: ((stru_i, stru_i.pbc_box_shape) for stru_i in stru_list),
+            coord_parser=lambda stru_list,**_: ((stru_i, stru_i.pbc_box_shape) for stru_i in stru_list),
         )
 
 

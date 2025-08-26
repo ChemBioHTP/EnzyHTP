@@ -14,3 +14,11 @@ from .clean import remove_solvent, remove_hydrogens
 from .reactive_docking import dock_reactants
 from .align_ligand import align_ligand
 from .remedy import add_missing_residues, identify_missing_residues
+
+from .seed_ligand import (
+    seed_with_coordinates,
+    seed_with_transplants,
+    seed_with_analog,
+    seed_with_constraints,
+    seed_with_pdb_structure
+)
