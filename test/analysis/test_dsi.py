@@ -9,7 +9,7 @@ import numpy as np
 from unittest.mock import MagicMock, patch
 
 from enzy_htp.analysis.dsi import dsi, _expand_residue_ranges
-from enzy_htp.structure import StructureEnsemble
+from enzy_htp.structure import StructureEnsemble, PDBParser
 from enzy_htp import interface
 from enzy_htp import config as eh_config
 
@@ -202,3 +202,41 @@ def test_dsi_real_data(patch_scratch_dir):
     # but can be negative if domains overlap significantly
     assert all(x > -50 for x in result)  # Reasonable lower bound
     assert all(x < 200 for x in result)   # Reasonable upper bound
+
+def test_dsi_real_data_single_stru(patch_scratch_dir):
+    """Test DSI calculation with real trajectory data."""
+    sp = PDBParser()
+    # Use the same test data as other analysis tests
+    ref_pdb = os.path.join(DATA_DIR, "test_spi_chainid.pdb")
+    
+    # Load trajectory ensemble
+    structure_ensemble = StructureEnsemble(
+        topology = ref_pdb,
+        top_parser = sp.get_structure,
+        coordinate_list = ref_pdb,
+        coord_parser = sp.get_structure,
+    )
+    
+    # Define two domains for DSI calculation
+    # Domain 1: residues 1-10 (N-terminal region)
+    # Domain 2: residues 100-110 (middle region)
+    domain1_residues = [("A", 1), ("A", 10)]
+    domain2_residues = [("A", 100), ("A", 110)]
+    
+    # Calculate DSI using the analysis API
+    result = dsi(structure_ensemble, domain1_residues, domain2_residues)
+
+    # Validate results
+    assert isinstance(result, np.ndarray)
+    assert len(result) == 1  # Should have exactly one frame
+    assert all(isinstance(x, (int, float)) for x in result)  # All values should be numeric
+    
+    # DSI values should be reasonable (not NaN or infinite)
+    assert not np.any(np.isnan(result))
+    assert not np.any(np.isinf(result))
+    
+    # DSI values should generally be positive (distance minus radii of gyration)
+    # but can be negative if domains overlap significantly
+    assert all(x > -50 for x in result)  # Reasonable lower bound
+    assert all(x < 200 for x in result)   # Reasonable upper bound
+

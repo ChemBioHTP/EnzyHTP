@@ -1469,7 +1469,7 @@ class AmberInterface(BaseInterface):
 
         if in_format == "nc":
             fs.safe_cp(traj_path, out_path)
-        elif in_format == "mdcrd":
+        elif in_format in ["mdcrd", "pdb"]:
             if (not topology_path or not fs.is_path_exist(topology_path)):
                 _LOGGER.error(f"Topology filepath ({topology_path if len(topology_path) else 'N/A'}) doesn't exist.")
                 raise FileNotFoundError
@@ -1488,10 +1488,11 @@ class AmberInterface(BaseInterface):
             raise ValueError
 
     def convert_top_to_prmtop(self, fpath: str, out_path: str) -> None:
-        """convert the given topology file to the Amber .prmtop file in the out_path""" #NOTE(qz) use mdtraj or pytraj to really do this.
+        """convert the given topology file to the Amber .prmtop file in the out_path
+        (any format Amber already support will be kept as is) """ #NOTE(qz) use mdtraj or pytraj to really do this.
         in_format = self.get_file_format(fpath)
 
-        if in_format == "prmtop":
+        if in_format in ["prmtop", "pdb"]:
             fs.safe_cp(fpath, out_path)
         else:
             _LOGGER.error(f"found unsupported file format: {in_format} ({fpath})")
