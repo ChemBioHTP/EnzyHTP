@@ -180,7 +180,8 @@ class AlphafoldInterface(BaseInterface):
                     max_template_date=max_template_date,
                     model_preset=model_preset,
                     db_preset=db_preset,
-                    additional_options=additional_options
+                    additional_options=additional_options,
+                    non_armer_core_type=non_armer_core_type
                 )
 
             # Parse results into Structure objects
@@ -214,6 +215,7 @@ class AlphafoldInterface(BaseInterface):
         model_preset: Optional[str] = "alphafold2_ptm",
         db_preset: str = "reduced_dbs",
         additional_options: Optional[List[str]] = None,
+        non_armer_core_type: str = "gpu",
     ) -> Dict[str, str]:
         """Execute AlphaFold2 prediction locally.
         
@@ -229,6 +231,7 @@ class AlphafoldInterface(BaseInterface):
             model_preset: Model preset configuration
             db_preset: Database preset
             additional_options: Additional command-line options
+            non_armer_core_type: Type of computing core ('gpu' or 'cpu') for local execution
             
         Returns:
             Dict mapping sequence IDs to output PDB file paths
@@ -243,18 +246,18 @@ class AlphafoldInterface(BaseInterface):
             cmd = self._build_colabfold_container_command(
                 fasta_path, out_dir, num_models, num_recycles, 
                 num_relax, relax_max_iteration, use_templates, 
-                model_preset, additional_options
+                model_preset, additional_options, non_armer_core_type
             )
         elif config.INSTALL_TYPE == "alphafold2_native_container":
             cmd = self._build_alphafold2_native_container_command(
                 fasta_path, out_dir, max_template_date, 
-                model_preset, db_preset, additional_options
+                model_preset, db_preset, additional_options, non_armer_core_type
             )
         elif config.INSTALL_TYPE == "alphafold2_native_python":
             cmd = self._build_alphafold2_native_python_command(
                 fasta_path, out_dir, num_models, num_recycles,
                 num_relax, relax_max_iteration, use_templates,
-                model_preset, additional_options
+                model_preset, additional_options, non_armer_core_type
             )
         else:
             _LOGGER.error(f"Unsupported install type: {config.INSTALL_TYPE}")
@@ -336,29 +339,6 @@ class AlphafoldInterface(BaseInterface):
                 output_path=out_dir / f"job_{i//seq_per_job}.fasta"
             )
             
-            # Build command for this job
-            config = self.config_
-            
-            if config.INSTALL_TYPE == "colabfold_container":
-                cmd = self._build_colabfold_container_command(
-                    job_fasta_path, out_dir, num_models, num_recycles, 
-                    num_relax, relax_max_iteration, use_templates, 
-                    model_preset, additional_options
-                )
-            elif config.INSTALL_TYPE == "alphafold2_native_container":
-                cmd = self._build_alphafold2_native_container_command(
-                    job_fasta_path, out_dir, max_template_date, 
-                    model_preset, db_preset, additional_options
-                )
-            elif config.INSTALL_TYPE == "alphafold2_native_python":
-                cmd = self._build_alphafold2_native_python_command(
-                    job_fasta_path, out_dir, num_models, num_recycles,
-                    num_relax, relax_max_iteration, use_templates,
-                    model_preset, additional_options
-                )
-            else:
-                raise ValueError(f"Unsupported install type: {config.INSTALL_TYPE}")
-            
             # Create ClusterJob
             if isinstance(cluster_job_config, dict):
                 job_config = ClusterJobConfig.from_dict(cluster_job_config)
@@ -369,6 +349,29 @@ class AlphafoldInterface(BaseInterface):
             if not job_config.has_cluster():
                 raise ValueError("cluster_job_config must specify a cluster for job execution")
             core_type = job_config.core_type if job_config.core_type else "gpu"
+            
+            # Build command for this job
+            config = self.config_
+            
+            if config.INSTALL_TYPE == "colabfold_container":
+                cmd = self._build_colabfold_container_command(
+                    job_fasta_path, out_dir, num_models, num_recycles, 
+                    num_relax, relax_max_iteration, use_templates, 
+                    model_preset, additional_options, core_type
+                )
+            elif config.INSTALL_TYPE == "alphafold2_native_container":
+                cmd = self._build_alphafold2_native_container_command(
+                    job_fasta_path, out_dir, max_template_date, 
+                    model_preset, db_preset, additional_options, core_type
+                )
+            elif config.INSTALL_TYPE == "alphafold2_native_python":
+                cmd = self._build_alphafold2_native_python_command(
+                    job_fasta_path, out_dir, num_models, num_recycles,
+                    num_relax, relax_max_iteration, use_templates,
+                    model_preset, additional_options, core_type
+                )
+            else:
+                raise ValueError(f"Unsupported install type: {config.INSTALL_TYPE}")
             
             # Handle default res_keywords similar to amber_interface
             res_keywords_update = job_config.res_keywords if job_config.has_res_keywords() else {}
@@ -415,9 +418,14 @@ class AlphafoldInterface(BaseInterface):
         relax_max_iteration: int,
         use_templates: bool,
         model_preset: str,
-        additional_options: Optional[List[str]]
+        additional_options: Optional[List[str]],
+        core_type: str = "gpu"
     ) -> List[str]:
-        """Build command for ColabFold container execution."""
+        """Build command for ColabFold container execution.
+        
+        Args:
+            non_armer_core_type: Computing core type ('gpu' or 'cpu')
+        """
         config = self.config_
         
         # Expand user paths
@@ -425,8 +433,8 @@ class AlphafoldInterface(BaseInterface):
         
         cmd = [config.CONTAINER_TYPE, "run"]
         
-        # Add GPU support if available
-        if config.CONTAINER_TYPE in ["docker", "apptainer", "singularity"]:
+        # Add GPU support if available and core type is GPU
+        if core_type == "gpu" and config.CONTAINER_TYPE in ["docker", "apptainer", "singularity"]:
             cmd.append("--nv")
         
         # Add bind mounts
@@ -477,9 +485,14 @@ class AlphafoldInterface(BaseInterface):
         max_template_date: Optional[str],
         model_preset: str,
         db_preset: str,
-        additional_options: Optional[List[str]]
+        additional_options: Optional[List[str]],
+        core_type: str = "gpu"
     ) -> List[str]:
-        """Build command for native AlphaFold2 execution."""
+        """Build command for native AlphaFold2 execution.
+        
+        Args:
+            non_armer_core_type: Computing core type ('gpu' or 'cpu')
+        """
         config = self.config_
         
         cmd = ["python", config.EXECUTABLE_PATH]
@@ -502,7 +515,7 @@ class AlphafoldInterface(BaseInterface):
         if hasattr(config, 'TEMPLATE_MMCIF_DIR') and config.TEMPLATE_MMCIF_DIR:
             cmd.extend(["--template_mmcif_dir", config.TEMPLATE_MMCIF_DIR])
         
-        if hasattr(config, 'USE_GPU_RELAX') and config.USE_GPU_RELAX:
+        if hasattr(config, 'USE_GPU_RELAX') and config.USE_GPU_RELAX and core_type == "gpu":
             cmd.append("--use_gpu_relax")
         
         if additional_options:
@@ -520,9 +533,14 @@ class AlphafoldInterface(BaseInterface):
         relax_max_iteration: int,
         use_templates: bool,
         model_preset: str,
-        additional_options: Optional[List[str]]
+        additional_options: Optional[List[str]],
+        core_type: str = "gpu"
     ) -> List[str]:
-        """Build command for AlphaFold2 native Python execution."""
+        """Build command for AlphaFold2 native Python execution.
+        
+        Args:
+            non_armer_core_type: Computing core type ('gpu' or 'cpu')
+        """
         config = self.config_
         
         cmd = ["python", config.EXECUTABLE_PATH]
@@ -565,7 +583,7 @@ class AlphafoldInterface(BaseInterface):
             cmd.extend(["--uniprot_database_path", config.UNIPROT_DATABASE_PATH])
         
         # Add GPU relax option
-        if hasattr(config, 'USE_GPU_RELAX') and config.USE_GPU_RELAX:
+        if hasattr(config, 'USE_GPU_RELAX') and config.USE_GPU_RELAX and core_type == "gpu":
             cmd.append("--use_gpu_relax")
         
         if additional_options:

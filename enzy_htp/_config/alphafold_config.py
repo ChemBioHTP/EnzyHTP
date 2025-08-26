@@ -95,7 +95,7 @@ class AlphafoldConfig(BaseConfig):
             'partition': '<fillthis>',
             'account': '<fillthis>',
             'mem_per_core': '24G',
-            'walltime': '24:00:00',
+            'walltime': '16:00:00',
         },
         "cpu": {
             'core_type': 'cpu',
@@ -105,7 +105,7 @@ class AlphafoldConfig(BaseConfig):
             'partition': '<fillthis>',
             'account': '<fillthis>',
             'mem_per_core': '2G',
-            'walltime': '24:00:00',
+            'walltime': '16:00:00',
         }
     }
     """Default res_keywords for AlphaFold2 cluster jobs."""
