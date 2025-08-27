@@ -56,12 +56,13 @@ When you provide feedback, follow these guidelines:
 
 ## 4. Review Workflow
 
-1.  Start by stating the purpose of the PR.
-2.  Use `git diff` to analyze the changes.
-3.  Go through the checklist above for each changed file.
-4.  Run the relevant tests to ensure that the changes are working as expected and do not break existing functionality.
-5.  Summarize your findings in a clear and concise manner.
-6.  If there are issues, provide specific feedback and suggestions for improvement. (Use `gh api` to put comments to files and lines)
+1.  Use `gh pr status` to find out the PR status associated with the current branch.
+2.  Start by stating the purpose of the PR.
+3.  Use `git diff` to analyze the changes.
+4.  Go through the checklist above for each changed file.
+5.  Run the relevant tests to ensure that the changes are working as expected and do not break existing functionality.
+6.  Summarize your findings in a clear and concise manner.
+7.  If there are issues, provide specific feedback and suggestions for improvement. (Use `gh api` to put comments to files and lines)
     This is an exmpale for adding a multi-line comment:
     `gh api repos/ChemBioHTP/EnzyHTP/pulls/184/comments -f 'body=test' -f 'commit_id=5e71224a3ac256e576ecb9b4f03c338b8701725a' -f 'path=.gemini/pr-review.md' -F 'start_line=1' -F 'line=10'`
     The format is
