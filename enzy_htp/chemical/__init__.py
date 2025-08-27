@@ -24,8 +24,6 @@ from .residue import (
     non_polar,
 )
 
-from .enzyme_commission import parse_ec_number
-
 from .level_of_theory import (
     LevelOfTheory,
     QMLevelOfTheory,
@@ -33,4 +31,7 @@ from .level_of_theory import (
 )
 
 from .physics import electric_field_strength
-from .seq_res import SeqRes
+from .seq_res import (
+    SeqRes,
+    same_aa_sequence
+)

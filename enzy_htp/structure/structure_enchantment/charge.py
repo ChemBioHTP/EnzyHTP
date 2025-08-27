@@ -320,7 +320,7 @@ def _init_charge_metal(met: MetalUnit, method: str, ncaa_lib: str) -> None:
         just use formal charge of the metal from user assignment"""
     if method == "skip":
         return
-    raise Exception("TODO")
+    
     support_method_list = ["formal_charge"]
     if method == "isolate":
         met.atom.connect = []

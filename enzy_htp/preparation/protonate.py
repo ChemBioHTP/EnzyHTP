@@ -10,7 +10,6 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-05
 """
-# TODO(CJ): add more documentation
 from pathlib import Path
 from typing import Union, Tuple, Dict
 from biopandas.pdb import PandasPdb
@@ -29,8 +28,7 @@ from enzy_htp.structure.structure_enchantment import init_connectivity
 
 from pdb2pqr.main import main_driver as run_pdb2pqr
 from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
-import openbabel.pybel as pybel
-from .pdb_line import read_pdb_lines
+#import openbabel.pybel as pybel
 
 
 def protonate_stru(stru: Structure,
@@ -172,9 +170,25 @@ def pdb2pqr_protonate_pdb(pdb_path: str, pqr_path: str, ph: float = 7.0, ffout: 
     Runs PDB2PQR on a specified pdb file and saves it to the specified pqr path. This preparation step
     makes use of [PDB2PQR](https://www.poissonboltzmann.org/) via the pdb2pqr python [package](https://pdb2pqr.readthedocs.io/en/latest/).
     Adds in missing atoms and finds the protonation state of the pdb file.
+
+    Args:
+        pdb_path: File to the input, pre-protonation Structure.
+        pqr_path: File to the output, protonated Structure.
+        ph: The pH to perform the protonation at. Optional. Default is 7.0
+        ffout: The force field naming convention to use. Optional. Default is AMBER.
+
+    Returns:
+        Nothing.
+
+    Raises:
+        ValueError if the supplied ffout is not supported.
     """
-    # TODO(CJ): check if ffout is valid.
-    # TODO(CJ): maybe improve the documentation here?
+    ALLOWED_FF="AMBER,CHARMM,PARSE,TYL06,PEOEPB,SWANSON".split(',')
+    if ffout not in ALLOWED_FF:
+        err_str=f"The force field {ffout} is not supported"
+        _LOGGER.error(err_str)
+        raise TypeError(err_str)
+
     core.check_valid_ph(ph)
     pdb2pqr_parser = build_pdb2pqr_parser()
     args = pdb2pqr_parser.parse_args([
@@ -372,23 +386,3 @@ def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -
 
 
 LIGAND_PROTONATION_METHODS = {"pybel": protonate_ligand_with_pybel}
-
-
-# below TODO
-def _ob_pdb_charge(pdb_path: str) -> int:
-    # TODO(CJ): add tests for this function
-    """
-    extract net charge from openbabel exported pdb file
-    """
-    pdb_ls = read_pdb_lines(pdb_path)
-    net_charge = 0
-    for pdb_l in pdb_ls:
-        if pdb_l.is_HETATM() or pdb_l.is_ATOM():
-            raw: str = pdb_l.get_charge()
-            raw = raw.strip()
-            if not len(raw):
-                continue
-            charge = pdb_l.charge[::-1]
-            core._LOGGER.info(f"Found formal charge: {pdb_l.atom_name} {charge}")  # TODO make this more intuitive/make sense
-            net_charge += int(charge)
-    return net_charge

@@ -8,7 +8,6 @@ Functions included are:
     + distance_constraint_from_xml()
     + angle_constraint_from_xml()
     + dihedral_constraint_from_xml()
-    + residue_pair_constraint_from_xml()
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2024-01-01
@@ -32,12 +31,10 @@ from .api import (
     DistanceConstraint,
     AngleConstraint, 
     DihedralConstraint,
-    ResiduePairConstraint,
     )
 
 
 from .create_constraint import (
-    create_residue_pair_constraint,
     create_cartesian_freeze,
     create_backbone_freeze,
     create_distance_constraint,
@@ -67,9 +64,7 @@ def structure_constraints_from_xml(topology: Structure, file:str) -> List[Struct
 
     result = list()
     for rr in root:
-        if rr.tag == 'ResiduePairConstraint':
-            result.append(residue_pair_constraint_from_xml(topology, rr))
-        elif rr.tag == 'CartesianFreeze':
+        if rr.tag == 'CartesianFreeze':
             result.append(cartesian_freeze_from_xml(topology, rr))
         elif rr.tag == 'DistanceConstraint':
             result.append(distance_constraint_from_xml(topology, rr))
@@ -121,80 +116,6 @@ def check_valid_child_constraint(elem:ET.Element) -> None:
         _LOGGER.error(f"Invalid Child Constraint tag! {msg}")
         raise TypeError(f"Invalid Child Constraint tag! {msg}")
 
-
-def residue_pair_constraint_from_xml(topology:Structure, elem: ET.Element) -> ResiduePairConstraint:
-    """
-
-    Args:
-        topology:
-        elem:
-    
-    Returns:
-
-    """
-   
-    r1_key = None
-    r2_key = None
-    r1_atoms = None
-    r2_atoms = None
-    distanceAB = None
-    angle_A = None
-    angle_B = None
-    torsion_A = None
-    torsion_B = None
-    torsionAB = None
-
-    for child in elem:
-        data = child.attrib
-        if child.tag == 'Residue1':
-            check_valid_residue_elem(data)
-            r1_key = (data['chain'], int(data['idx']))
-            r1_atoms = tuple(data['atoms'].split(','))
-
-        if child.tag == 'Residue2':
-            check_valid_residue_elem(data)
-            r2_key = (data['chain'], int(data['idx']))
-            r2_atoms = tuple(data['atoms'].split(','))
-
-        if child.tag == 'distanceAB':
-            check_valid_child_constraint(data)
-            distanceAB = deepcopy(data)
-
-        if child.tag == 'angle_A':
-            check_valid_child_constraint(data)
-            angle_A = deepcopy(data)
-
-        if child.tag == 'angle_B':
-            check_valid_child_constraint(data)
-            angle_B = deepcopy(data)
-
-        if child.tag == 'torsion_A':
-            check_valid_child_constraint(data)
-            torsion_A = deepcopy(data)
-        
-        if child.tag == 'torsion_B':
-            check_valid_child_constraint(data)
-            torsion_B = deepcopy(data)
-
-        if child.tag == 'torsionAB':
-            check_valid_child_constraint(data)
-            torsionAB = deepcopy(data)
-
-
-    return create_residue_pair_constraint( 
-        topology,
-        r1_key,
-        r2_key,
-        r1_atoms,
-        r2_atoms,
-        distanceAB, 
-        angle_A,
-        angle_B,
-        torsion_A,
-        torsion_B,
-        torsionAB
-    )        
-  
 
 def energy_params_from_element(elem:ET.Element) -> Dict:
     """Parses energy parameters for various packages from the supplied Element. For a given

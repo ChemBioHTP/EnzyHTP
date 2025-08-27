@@ -10,3 +10,10 @@ Date: 2022-07-12
 
 from .interface import Interface
 from .pymol_interface import OpenPyMolSession
+from .rosetta_interface import ( 
+    RosettaOptions,
+    RosettaScriptsElement,
+    RosettaScriptsProtocol,
+    RosettaScriptsEngine,
+    RosettaScriptsEgg
+)

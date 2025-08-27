@@ -140,7 +140,6 @@ def single_point(
     else:
         _LOGGER.error(f"only accept Structure() or StructureEnsemble(). Got: {stru}")
         raise TypeError
-
     # dispatch: region, region_methods, method -> qm_engine
     if regions is None:
         regions = []
@@ -236,13 +235,38 @@ def optimize(stru: Union[Structure, StructureEnsemble],
         capping_method: str = "res_ter_cap",
         embedding_method: str= "mechanical", # TODO probably not a good default choice
         parallel_method: str="cluster_job",
+        nterm_cap:str=None,
+        cterm_cap:str=None,
         cluster_job_config: Dict= None,
         job_check_period: int= 210, # s
         job_array_size: int= 20,
         work_dir: str="./QM_OPT",
         keep_in_file: bool=False,
         ) -> List[ElectronicStructure]:
-    """TODO(CJ): this documentation needs to be udpated"""
+    """Perform a QM-based optimization on a Structure or StructureEnsemble. Optimization can be performed in many ways, with the QM package, level
+    of theory, region, and so on. Can be run with ARMer.
+        
+        stru: The Structure or StructureEnsemnle to optimize.
+        engine: Specific QM engine to use.
+        method: If a single region, the QM method to use.
+        regions: Different regions to apply different levels of theory to.
+        region_methods: If multiple regions are employed, respective differing levels of theory.
+        constraints: List[StructureContraint] to be applied during optimization.
+        capping_method: How should the boundary portions of regions be corvered?
+        embedding_method: What embedding method should be used? 
+        parallel_method: How the optimization(s) will be parallelized.
+        nterm_cap: The atom cap to be applied on the n-terminal side of boundary residues.
+        cterm_cap: The atom cap to be applied on the n-terminal side of boundary residues.
+        cluster_job_config: Configuration for ARMer jobs when that method is employed.
+        job_check_period: How often should ARMer check if jobs are done? Time in seconds.
+        job_array_size: Size of job arrays when ARMer is in use.
+        work_dir: Directory where the temporary files and calculation should be performed.
+        keep_in_file: Should the output be kept in file?
+    
+    Returns:
+        A List[ElectronicStructure] objects containing the results of the QM optimizations.
+
+    """
     if isinstance(stru, Structure):
         stru_esm = StructureEnsemble.from_single_stru(stru)
     elif isinstance(stru, StructureEnsemble):
@@ -286,7 +310,10 @@ def optimize(stru: Union[Structure, StructureEnsemble],
             qm_region = create_region_from_selection_pattern(
                 stru_esm.topology,
                 regions[0],
-                capping_method)
+                capping_method,
+                nterm_cap=nterm_cap,
+                cterm_cap=cterm_cap,
+                )
             init_charge(qm_region)
         
         qm_engine: QMOptimizationEngine = qm_engine_ctor(
@@ -298,7 +325,6 @@ def optimize(stru: Union[Structure, StructureEnsemble],
                                             work_dir=work_dir,
                                             keep_in_file=keep_in_file,
                                         )
-                                        #TODO(CJ): these keywords that are part of the ctor should be in the ABC __init__ class
 
     else:
         # multiscale
@@ -405,7 +431,7 @@ def _serial_qm(
     This method runs QMs in a serial manner locally."""
     result = []
     # 1. run jobs
-    for stru in stru_esm:
+    for stru in stru_esm.structures():
         output = qm_engine.run(stru)
         result.append(output) 
     

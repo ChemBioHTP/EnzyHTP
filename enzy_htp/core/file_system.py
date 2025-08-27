@@ -134,7 +134,6 @@ def lines_from_file(fname: str) -> List[str]:
 
 def content_from_file(fname: str) -> str:
     """Extracts and returns the content from supplied filename. Returns empty str() if file does not exist."""
-    #TODO(CJ): make unit tests for this
     if not os.path.exists(fname):
         _LOGGER.error(f"The file {fname} does not exist.")
         return str()
@@ -146,7 +145,6 @@ def content_from_file(fname: str) -> str:
 
 def write_lines(fname: str, lines: List[str]) -> None:
     """Writes lines to specified file, checking if file exists first and warning if it does. Assumes no newlines."""
-    # TODO(CJ) check if binary file and dont return if so
     if os.path.exists(fname):
         _LOGGER.warning(f"The file '{fname}' exists (size: {os.path.getsize(fname)}) and will be overwritten")
     fh = open(fname, "w")
@@ -155,7 +153,16 @@ def write_lines(fname: str, lines: List[str]) -> None:
 
 
 def write_data(outfile: str, tag: Any, data: Dict) -> str:
-    #TODO(CJ): add the doc-string and also unittests
+    """Legacy method from EnzyHTP 1. Writes data from supplied dict to a plaintext file.
+
+    Args:
+        outfile: File where the data will be written.
+        tag: Tag section that will be written in the file
+        data: The Dict with data that will be written to the outfile.
+
+    Returns:
+        Path to the outfile
+    """
     tag: str = repr(tag)
     fh = open(outfile, 'a')
     fh.write("===TAG===\n")

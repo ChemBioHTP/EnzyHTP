@@ -21,7 +21,7 @@ class PyMolConfig(BaseConfig):
     """Class that holds default values for running PyMol within enzy_htp."""
 
     WGET: str = "wget"
-    """ """
+    """Executable used to get the PDB and ligand code structure files from the RCSB."""
 
     PYMOL_TO_ATOM_MAPPER: Dict[str, str] = {
         "1HB": "HB1",
@@ -67,25 +67,24 @@ class PyMolConfig(BaseConfig):
     used in session.cmd.feedback() ref: https://pymolwiki.org/index.php/Feedback"""
 
     STRUCTURE_STEM: str = "https://files.rcsb.org/download/"
-    """ """
+    """URL stem used for downloading PDB structure entries."""
 
     LIGAND_STEM: str = "https://files.rcsb.org/ligands/download/"
-    """ """
-
-    def display(self) -> None:
-        """TODO"""
-        pass
+    """URL stem used for downloading Ligand entries."""
+    
+    IO_EXTENSIONS=".pdb .mol2 .cif".split()
+    """Supported input/output file formats."""
 
     def required_env_vars(self) -> List[str]:
-        """ """
+        """Whyat environment variables are required for this interface?"""
         return list()
 
     def required_executables(self) -> List[str]:
-        """ """
+        """What executables are required for this interface?"""
         return [self.WGET]
 
     def required_py_modules(self) -> List[str]:
-        """ """
+        """What python modules are required for this interface?"""
         return ["pymol2"]
     
     def get_canonical_atom_name(self, res: str, atom: str) -> str:

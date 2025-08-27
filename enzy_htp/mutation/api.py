@@ -448,7 +448,7 @@ def mutate_stru_with_rosetta(stru: Structure, mutant: List[Mutation], in_place: 
         if len(target) != 3:
             target = chem.convert_to_canonical_three_letter(target)
 
-        #TODO(CJ): remap the residue index here
+        #TODO(CJ): update this with the more current code for Rosetta
         elements.extend([
             {
                 'parent': 'RESIDUE_SELECTORS',
@@ -470,11 +470,7 @@ def mutate_stru_with_rosetta(stru: Structure, mutant: List[Mutation], in_place: 
             },
         ])
 
-    #stru_cpy = copy.deepcopy(stru)
-
     if_retain_order = True
-    #TODO(CJ): need to remap the residue names at some point
-    #TODO(CJ): use the scratch_dir
     parser = PDBParser()
     stru_content: str = parser.get_file_str(stru)
     temp_file: str = '__mut_temp.pdb'
@@ -512,7 +508,6 @@ def mutate_stru_with_rosetta(stru: Structure, mutant: List[Mutation], in_place: 
         fs.safe_rm(expected_mutant)
         stru_oper.update_residues(stru_cpy, rosetta_stru)
         return stru_cpy
-    #TODO(CJ): do it this way
     stru_oper.update_residues(stru_cpy, pymol_mutant_stru)
 
     if in_place:

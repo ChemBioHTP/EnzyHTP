@@ -108,4 +108,4 @@ RESIDUE_ADDER_MAPPER:Dict[str, Callable] = {
     # 'modeller':interface.modeller.add_missing_residues, # deprocated
     'rosetta':interface.rosetta.add_missing_residues
 }
-"""TODO(CJ)"""
+"""Connects different, named protocols for adding missing residues with respective function handles."""

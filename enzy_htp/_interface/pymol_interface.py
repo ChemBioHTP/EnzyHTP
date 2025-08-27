@@ -16,10 +16,10 @@ import pymol2
 import numpy as np
 import pandas as pd
 
-#TODO(CJ): add something to remove "PyMOL not running. Entering library mode (experimental" message on pymol running
 from enzy_htp import config as eh_config
 from enzy_htp.core import env_manager as em
 from enzy_htp.core import file_system as fs
+from enzy_htp.core import math_helper as mh 
 from enzy_htp.core import _LOGGER, check_var_type
 from enzy_htp._config.pymol_config import PyMolConfig, default_pymol_config
 from enzy_htp.structure import Structure, PDBParser, Ligand, Residue
@@ -67,19 +67,20 @@ class PyMolInterface(BaseInterface):
         """Method that converts a supplied file to a different format. Requires a pymol2 session from PyMolInterface.new_session().
         Either a new filename or new file  extension an be supplied. If neither or both are supplied, then the function will exist. 
         Note that the function does not check for valid file types and will catch any errors that are thrown if an invalid file_1 or
-        output file combination is supplied. Returns the new outfile.
+        output file combination is supplied. Returns the new outfile or List of outfiles if multiple states are present and the split_states
+        option is set to True.
 
         Args:
             session : A pymol2.PyMOL() session to use
             file_1 : The name of the original file as a str().
             file_2 : The name of the output file as a str(). Optional.
             new_ext : The new extension to use. Optional.
+            split_states: Should individual states be split and written to separate files? Optional, default is False.
 
         Returns:
-            The name of the new file as a str().
+            The name of the new file as a str() or a List[str] if multiple states are present and split_states is True.
         """
         self.check_pymol2_installed()
-        #TODO(CJ): update split states. update return policy
 
         fs.check_file_exists(file_1)
 
@@ -140,7 +141,6 @@ class PyMolInterface(BaseInterface):
         Returns:
             Whether the file type is supported.
         """
-        #TODO(CJ): need to check which file formats are actually supported
         extension: str = Path(fname).suffix
         return extension in self.config().IO_EXTENSIONS
 
@@ -445,7 +445,6 @@ class PyMolInterface(BaseInterface):
         """Executes a series of commands through the PyMOL/PyMOL2 python module in use. Takes input as a list of Tuple()'s
         where the first item in each tuple is a string specifying the function to use and the rest of the items are the
         arguments for that function.
-        TODO(CJ): add examples
     
         Args:
             session : A pymol2.PyMOL() session to use.
@@ -475,7 +474,6 @@ class PyMolInterface(BaseInterface):
             try:
                 fxn = getattr(session.cmd, cmd_name)
                 if cmd_name == 'alter' and len(cmd_set) == 3:
-                    #TODO(CJ): add some more checking here
                     result.append(session.cmd.alter(
                         cmd_set[1], cmd_set[2]
                     ))
@@ -558,7 +556,7 @@ class PyMolInterface(BaseInterface):
         lines = list(filter(lambda ll: ll[0] != '>', lines))
         return ''.join(lines)
 
-    def remove_ligand_bonding(self, session: pymol2.PyMOL, clash_cutoff:float=2.0) -> None: #TODO(CJ): bad name here
+    def remove_ligand_bonding(self, session: pymol2.PyMOL, clash_cutoff:float=2.0) -> None: 
         """Given a session with some already present molecule, remove the bonding in between residues presumably due
         to clashes. Essentially loops through all atoms and unbonds if they are within the specified clash_cutoff.
 
@@ -571,10 +569,6 @@ class PyMolInterface(BaseInterface):
         """
 
         self.general_cmd(session, [('set', 'retain_order', 1)])       #NOTE(CJ): this solves so many problems
-        #TODO(CJ): need to add 
-        def dist( p1, p2 ):
-            return np.sqrt(np.sum((p1-p2)**2))
-        #TODO(CJ): documentation
         df: pd.DataFrame = self.collect(session, 'memory', "chain resi resn name x y z".split(), "not polymer.protein")
         df['point'] = df.apply(lambda row: np.array([row.x, row.y, row.z]) ,axis = 1)
         non_aa = set(list(zip(df.chain, df.resi, df.resn)))
@@ -586,87 +580,20 @@ class PyMolInterface(BaseInterface):
         args = list()
         for i, row in df.iterrows():
             for i2, row2 in df2.iterrows():
-                if dist(row.point, row2.point) <= clash_cutoff:
+                if mh.get_distance(row.point, row2.point) <= clash_cutoff:
                     args.append(('unbond',
                         f"chain {row.chain} and resi {row.resi} and resn {row.resn}",
                         f"chain {row2.chain} and resi {row2.resi} and resn {row2.resn}",
                     ))
         self.general_cmd(session, args)
 
-
-    def create_cluster(self, session, fname: str, sele_str: str, outfile: str = None, cap_strategy: str = 'H', work_dir: str = None) -> str:
-        """TODO(CJ)"""
-
-        if work_dir is None:
-            work_dir = eh_config['system.WORK_DIR']
-
-        fs.check_file_exists(fname)
-
-        if outfile is None:
-            temp_path = Path(fname)
-            outfile: str = f"{work_dir}/{temp_path.stem}_cluster{temp_path.suffix}"
-
-        #TODO(CJ): add file check for fname
-        obj_name: str = '__eh_cluster'
-        self.general_cmd(session, [('delete', 'all'), ('load', fname), ('select', sele_str), ('create', obj_name, sele_str),
-                                   ('delete', Path(fname).stem)])
-
-        self._remove_ligand_bonding(session)
-
-        df: pd.DataFrame = self.collect(session, 'memory', "chain resi resn name".split())
-
-        args = list()
-        for i, row in df.iterrows():
-            if row['name'] not in "N C".split():
-                continue
-
-            if not row.resn in chem.THREE_LETTER_AA_MAPPER:
-                continue
-
-            args.extend([('valence', 'guess', f"chain {row.chain} and resi {row.resi} and resn {row.resn} and name {row['name']}"),
-                         ('h_add', f"chain {row.chain} and resi {row.resi} and resn {row.resn} and name {row['name']}")])
-
-        args.append(("save", outfile, obj_name))
-
-        self.general_cmd(session, args)
-
-        if cap_strategy == 'H':
-            return outfile
-
-        if cap_strategy == 'CH3':
-
-            args = []
-            orig = set(zip(df.chain, df.resi, df.resn, df['name']))
-            updated: pd.DataFrame = self.collect(session, 'memory', "chain resi resn name".split())
-            new = set(zip(updated.chain, updated.resi, updated.resn, updated['name']))
-
-            for (cname, res_num, res_name, aname) in filter(lambda x: x not in orig, new):
-                if aname == 'H01':
-                    new_name = 'C21'
-                elif aname == 'H02':
-                    new_name = 'C22'
-                else:
-                    #TODO(CJ): better error message
-                    self.general_cmd(session, [('save', '_____mess_up.pdb')])
-                    assert False, (cname, res_num, res_name, aname)
-                args.extend([
-                    ('alter', f"chain {cname} and resi {res_num} and resn {res_name} and name {aname}", "elem='C'"),
-                    ('alter', f"chain {cname} and resi {res_num} and resn {res_name} and name {aname}", f"name='{new_name}'"),
-                ])
-
-            self.general_cmd(session, args)
-            args = [('valence', 'guess', 'name C21 or name C22'), ('h_add', 'name C21'), ('h_add', 'name C22'), ("save", outfile, obj_name)]
-            self.general_cmd(session, args)
-
-        return outfile
-
-
     def center_of_mass(self, session, sele:str='all', no_hydrogens:bool=True):
-        """TODO(CJ)
+        """Calculates the center of mass of a given selection in a given session.
+        
         Args:
-            session:
-            sele:
-            no_hydrogens:
+            session: A pymol2 Session to use.
+            sele: The selection over which the center of mass should be calculated.
+            no_hydrogens: Should hydrogens be skipped in the calculation? Optional, True by default.
 
         Returns:
             The specified center of mass.
@@ -678,14 +605,18 @@ class PyMolInterface(BaseInterface):
         return np.mean(np.array([df.x.to_numpy(), df.y.to_numpy(), df.z.to_numpy()]),axis=1)
 
     def fetch(self, code: str, out_dir: str = None) -> str:
-        """Given a 
+        """Given a PDB entry or residue name code, get the respective structure file. The outfile will be 
+        in a .cif format.
 
         Args:
-            code:
-            out_dir
+            code: The three or four letter code to be fetched as a str.
+            out_dir: The output directory for the file. Optional. Saves to current directory if not supplied.
 
         Returns:
-            The path to the
+            The path to the saved file.
+    
+        Raises:
+            ValueError if the supplied code is not a valid length.
         """
         outfile = f"{code.upper()}.cif"
         if len(code) == 3:
@@ -693,71 +624,15 @@ class PyMolInterface(BaseInterface):
         elif len(code) == 4:
             url: str = f"{self.config_.STRUCTURE_STEM}/{outfile}"
         else:
-            assert False
+            err_msg=f"The code {code} is invalid. Must have length of 3 or 4"
+            _LOGGER.error(err_msg)
+            raise ValueError(err_msg)
 
         self.env_manager_.run_command(self.config_.WGET, [url])
 
         if out_dir is not None:
             outfile = fs.safe_mv(outfile, f"{out_dir}/")
-        #TODO(CJ): check if the file is downloaded
         return outfile
-
-
-    
-
-    def get_residue_list(self, session, stru, sele_str:str='all', work_dir:str=None) -> List[Tuple[str,int]]:
-        #TODO(CJ): add this documentation + type hinting
-        if work_dir is None:
-            work_dir = './'
-
-        temp_file:str = f"{work_dir}/__temp_pymol.pdb"
-
-        _parser = PDBParser()
-        _parser.save_structure(temp_file, stru)
-
-        df = self.collect(session, temp_file, "chain resi".split(), sele=sele_str)
-        
-        fs.safe_rm( temp_file )
-        result = list()
-        result_set = set()
-
-        for i, row in df.iterrows():
-            new = (row['chain'], int(row['resi']))
-            if new not in result_set:
-                result.append( new )
-                result_set.add( new )
-
-        return result 
-
-    
-    def get_atom_mask(self, session, stru:Structure, sele_str:str=None, work_dir:str=None) -> List[bool]:
-        #TODO(CJ): this stuff
-
-        
-        if work_dir is None:
-            work_dir = './'
-
-        temp_file:str = f"{work_dir}/__temp_pymol.pdb"
-        _parser = PDBParser()
-        _parser.save_structure(temp_file, stru)
-
-        session = self.new_session()
-
-        df:pd.DataFrame = self.collect(session, temp_file, "chain resi name".split(), sele=sele_str)
-        
-        fs.safe_rm( temp_file )
-
-        sele_set = set()
-
-        for i, row in df.iterrows():
-            sele_set.add(f"{row['chain']}.{row['resi']}.{row['name']}")
-
-        mask:List[bool] = list()
-
-        for atom in stru.atoms:
-            mask.append( atom.key in sele_set )            
-
-        return mask
 
     def get_sasa_relative(self, session, sele) -> Dict:
         """wrapper of pms.cmd.get_sasa_relative"""
@@ -861,6 +736,88 @@ class PyMolInterface(BaseInterface):
         
         resi_mapper = stru.residue_mapper
         result = [resi_mapper[(ch, int(idx))] for ch, idx in result]
+
+    def get_ligand_area(self, stru:Structure, ligand:Ligand) -> float:
+        """Finds the total solvent accessible surface area (SASA) for a given ligand in a given structure.
+
+        Args:
+            stru: The structure in question.
+            ligand: The ligand in question.
+
+        Returns:
+            The SASA in angstroms as a float.
+
+        Details:
+            Checks that the supplied ligand is a child of the structure and errors if this is not the case.
+
+        """
+        assert ligand.parent.parent == stru
+        (lig_chain, lig_idx) = ligand.key()
+        with OpenPyMolSession(self) as pms:
+            self.load_enzy_htp_stru( pms, stru )
+            results:List[Any] = self.general_cmd(pms,[
+                ('set', 'dot_solvent', 1),
+                ('create', 'ligand', f'chain {lig_chain} and resi {lig_idx} and not solvent'),
+                ('get_area', 'ligand'),
+            ])
+        return results[-1]            
+
+    def rmsd_matrix(self, 
+            structures:List[Structure], 
+            align_sele:str,
+            measure_sele:str
+            ) -> List[List[float]]:
+        """Creates an NxN matrix of RMSDs for a list of N Structures. Only calculates it for protein portions
+        of the supplied selections. Supplied selections are assumed to be in pymol format.
+
+        Args:
+            structures: List of structures that will be used to calculate the RMSD matrix.
+            align_sele: Selection that the proteins will be aligned to.
+            measure_sele: Selection on which the RMSD will be calculated
+
+        Returns:
+            An NxN matrix of Structure-Structure RMSDs.
+        """
+        result = np.zeros((len(structures), len(structures)))
+
+        session = self.new_session()
+        obj_names:List[str] = list()
+        for sidx,ss in enumerate(structures):
+            obj_names.append(
+                self.load_enzy_htp_stru(session, ss)[0]
+            )
+            structures[sidx].data["cluster_idx"] = sidx
+
+        args = list()
+        template = obj_names[0]
+        for on in obj_names[1:]:
+            args.append((
+                'align',
+                f"{template} and polymer.protein",
+                f"{on} and polymer.protein",
+                ))                
+        
+        self.general_cmd( session, args )
+        
+        n_obj = len(obj_names )
+        args = list()
+        for oi1 in range( n_obj ):
+            for oi2 in range( oi1+1, n_obj):
+                assert oi1 != oi2
+                o1 = obj_names[oi1]
+                o2 = obj_names[oi2]
+
+                rmsd = self.general_cmd(session, [(
+                    'rms_cur', 
+                    f"{o1} and {measure_sele}",
+                    f"{o2} and {measure_sele}",
+                    "1",
+                    "-1"
+                )])[-1]
+            
+        
+                result[oi1, oi2] = rmsd
+                result[oi2, oi1] = rmsd
 
         return result
 

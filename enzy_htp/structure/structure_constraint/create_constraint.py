@@ -1,7 +1,6 @@
 """Sub-module containing the constructor functions for various types of StructureConstraint. All of the available
 functions are listed below:
 
-    + create_residue_pair_constraints()
     + create_cartesian_freeze()
     + create_backbone_freeze()
     + create_distance_constraint()
@@ -40,111 +39,11 @@ from .api import (
     DistanceConstraint,
     AngleConstraint,
     DihedralConstraint,
-    ResiduePairConstraint,
     BackBoneFreeze,
     GroupDistanceConstraint,
     )
 
-
 # region == constructors ==
-def create_residue_pair_constraint(
-                topology:Structure,
-                r1_key:Tuple[str,int],
-                r2_key:Tuple[str,int],
-                r1_atoms:Tuple[str,str,str],
-                r2_atoms:Tuple[str,str,str],
-                distanceAB:Dict[str,float]=None,
-                angle_A:Dict[str,float]=None,
-                angle_B:Dict[str,float]=None,
-                torsion_A:Dict[str,float]=None,
-                torsion_B:Dict[str,float]=None,
-                torsionAB:Dict[str,float]=None) -> ResiduePairConstraint:
-    """Converts specified information into a ResiduePairConstraint which is essentially the EnzDes constraint
-    from Rosetta. It automates the process of StructureConstraint generation by recording multiple Atom()'s
-    for two different Residue()'s and creating named StructureConstraints (i.e. distanceAB, angle_A, ...). While
-    the topology, r1_key, r2_key, r1_atoms and r2_atoms are required, the remaining arguments are not and they define
-    the constraints that are actually used. The remaining arguments are all None by default, but are added to the 
-    parent ResiduePairConstraint when specified. If not None, each key word must correspond to dict() which can only have
-    the keys "target_value", "penalty", and "tolerance".
-    
-    Args:
-        topology: The Structure() to apply the ResiduePairConstraint to.
-        r1_key: A key of the form (chain_name, residue_idx) for Residue() 1.
-        r2_key: A key of the form (chain_name, residue_idx) for Residue() 2.
-        r1_atoms: A Tuple[str,str,str] with form (atom_name1, atom_name2, atom_name3) for Residue() 1.
-        r2_atoms: A Tuple[str,str,str] with form (atom_name1, atom_name2, atom_name3) for Residue() 2.
-        distanceAB: Optional. A Dict[str,float] defining DistanceConstraint between Residue1.Atom1 and Residue2.Atom1.
-        angle_A: Optional. A Dict[str,float] defining AngleConstraint between Residue1.Atom2, Residue1.Atom1 and Residue2.Atom1.
-        angle_B: Optional. A Dict[str,float] defining AngleConstraint between Residue1.Atom1, Residue2.Atom1 and Residue2.Atom2.
-        torsion_A: Optional. A Dict[str,float] defining DihedralConstraint between Residue1.Atom3, Residue1.Atom2, Residue1.Atom1, and Residue2.Atom1.
-        torsion_B: Optional. A Dict[str,float] defining DihedralConstraint between Residue1.Atom1, Residue2.Atom1, Residue2.Atom2, and Residue2.Atom3.
-        torsionAB: Optional. A Dict[str,float] defining DihedralConstraint between Residue1.Atom2, Residue1.Atom1, Residue2.Atom1, and Residue2.Atom2.
-
-    Returns:
-        A ResiduePairConstraint object.
-    """
-    #TODO(CJ): a bunch of checks
-    r1_key_str = ".".join(map(str,r1_key))
-    r2_key_str = ".".join(map(str,r2_key))
-
-    residue1:Residue = topology.get(r1_key_str)
-    residue2:Residue = topology.get(r2_key_str)
-
-    temp = list()
-    for r1 in r1_atoms:
-        r1_key = r1_key_str + '.' + r1        
-        temp.append(topology.get(r1_key) )
-
-    r1_atoms = temp
-
-    temp = list()
-    for r2 in r2_atoms:
-        r2_key = r2_key_str + '.' + r2        
-        temp.append(topology.get(r2_key) )
-
-    r2_atoms = temp
-
-    csts = [distanceAB, angle_A, angle_B, torsion_A, torsion_B, torsionAB]
-    for cidx, cst in enumerate(csts):
-        if cst is None:
-            continue
-
-        for kw in 'target_value penalty tolerance'.split():
-            assert kw in cst #TODO(CJ): put some kind of error code here
-
-        for cst_kk in cst.keys():
-            cst[cst_kk] = float(cst[cst_kk])
-
-        ctor:StructureConstraint = None
-        atom_list:List[Atom] = None
-        target_value:float = float(cst.pop('target_value'))
-        if cidx == 0:
-            atom_list = [r1_atoms[0], r2_atoms[0]]
-            ctor = DistanceConstraint
-        elif cidx <= 2:
-            if cidx == 1:
-                atom_list = [r1_atoms[1], r1_atoms[0], r2_atoms[0]]
-            else:
-                atom_list = [r1_atoms[0], r2_atoms[0], r2_atoms[1]]
-            ctor = AngleConstraint
-        elif cidx <= 5:
-            if cidx == 3:
-                atom_list = [r1_atoms[2], r1_atoms[1], r1_atoms[0], r2_atoms[0]]
-            elif cidx == 4:
-                atom_list = [r1_atoms[0], r2_atoms[0], r2_atoms[1], r2_atoms[2]]
-            else:
-                atom_list = [r1_atoms[1], r1_atoms[0], r2_atoms[0], r2_atoms[1]]
-            ctor = DihedralConstraint
-        
-        csts[cidx] = ctor( atom_list, target_value )
-
-    return ResiduePairConstraint(
-                                residue1,
-                                residue2,
-                                r1_atoms,
-                                r2_atoms,
-                                *csts
-                                )
 
 def create_cartesian_freeze(
         atoms: Union[List[Atom], str],
@@ -187,6 +86,8 @@ def create_backbone_freeze(stru: Structure, params:Dict=None,) -> BackBoneFreeze
         A BackBoneFreeze StructureConstraint for the supplied Structure.
     """
     atoms = stru.backbone_atoms()
+    if not atoms:
+        return BackBoneFreeze([])
     result = BackBoneFreeze(atoms=atoms)
     if params is not None:
         result.update_params( params )

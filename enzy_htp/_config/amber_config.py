@@ -365,8 +365,7 @@ class AmberConfig(BaseConfig):
             setattr(self, key, value)
 
         if not self.valid_box_type():
-            # TODO(CJ): make a custom error for this part
-            raise TypeError()
+            raise TypeError("An invalid box type was supplied to the AmberConfig object.")
 
 def default_amber_config() -> AmberConfig:
     """Creates a deep-copied default version of the AmberConfig() class."""

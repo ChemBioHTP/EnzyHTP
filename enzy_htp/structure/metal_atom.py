@@ -179,57 +179,9 @@ class MetalUnit(NonCanonicalBase):
         """
         pass
 
-    # def build_oniom(self, layer, chrg=None, cnt_info: list = None):  # @nu
-    #     """
-    #     build a metal line for oniom.
-    #     Gaussian use *ff96* which the atom type is corresponding to all_amino94.lib and ion94.lib in Amber distribution
-    #     For metals that do not exist in ion94.lib. Custom a type and get parms from TIP3P lib.
-    #     ---------
-    #     chrg    : charge of current metal atom
-    #     layer   : layer where atom in
-    #     cnt_info: (low atom only) when current atom was a boundary atom. Provide [cnt_atom_ele, cnt_atom_label, cnt_atom_id]
-    #     """
-    #     cnt_flag = ""
-    #     if layer not in ["h", "l"]:
-    #         raise Exception("build_oniom: please use: 'h' or 'l' for layer")
-    #     if layer == "h":
-    #         fz_flag = "0"
-    #         ly_flag = "H"
-    #     if layer == "l":
-    #         fz_flag = "-1"
-    #         ly_flag = "L"
-    #         if cnt_info != None:
-    #             cnt_flag = (" " + cnt_info[0] + "-" + cnt_info[1] + " " + str(cnt_info[2]))
-
-    #     # label
-    #     if self.resi_name in G16_label_map.keys():
-    #         G16_label = G16_label_map[self.resi_name][self.name]
-    #     else:
-    #         if Config.debug >= 1:
-    #             print("Metal: " + self.name + " not in build-in atom type of ff96.")
-    #             print("Use parameters and atom types from TIP3P (frcmod.ionsjc_tip3p & frcmod.ions234lm_126_tip3p)")
-    #         G16_label = self.resi_name.strip("+-") + "0"
-    #         self.parm = tip3p_metal_map[self.resi_name][self.name]
-    #         self.parm[0] = G16_label
-
-    #     # chrg
-    #     if chrg == None:
-    #         try:
-    #             chrg = self.charge  # from prmtop
-    #         except NameError:
-    #             raise Exception("You need to at least provide a charge or use get_atom_charge to get one from prmtop file.")
-
-    #     atom_label = "{:<16}".format(" " + self.ele + "-" + G16_label + "-" + str(round(chrg, 6)))
-    #     fz_flag = "{:>2}".format(fz_flag)
-    #     x = "{:<14.8f}".format(self.coord[0])
-    #     y = "{:<14.8f}".format(self.coord[1])
-    #     z = "{:<14.8f}".format(self.coord[2])
-
-    #     line = (atom_label + " " + fz_flag + "   " + x + " " + y + " " + z + " " + ly_flag + cnt_flag + line_feed)
-
-    #     return line
-
-    #endregion
+    @property
+    def bonds(self) -> List:
+        return list()
 
 
 def residue_to_metal(residue: Residue) -> MetalUnit:
@@ -238,3 +190,16 @@ def residue_to_metal(residue: Residue) -> MetalUnit:
         _LOGGER.error(f"Found more than 1 atom in a metal residue unit: {residue.idx} {residue.name}")
         sys.exit(1)
     return MetalUnit(residue.idx, residue.name, residue.atoms, residue.parent)
+
+def get_metal(metal_name:str, charge:int=None) -> MetalUnit:
+    """Given the name of a metal and the charge, reate a MetalUnit object."""
+    return MetalUnit(
+            1,
+            metal_name,
+            atoms=[Atom(
+                name=metal_name,
+                coord=(0.0, 0.0, 0.0),
+                charge=charge,
+                idx=1
+                )]
+            )

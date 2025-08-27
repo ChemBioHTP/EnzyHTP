@@ -37,7 +37,10 @@ class SeqRes:
     def is_canonical(self) -> bool:
         """Is this residue one of the 20 canonical amino acids?"""
         return self.name in THREE_LETTER_AA_MAPPER
-        
+
+    def same_aa(self, other: SeqRes) -> bool:
+        """Do these two SeqRes objects have the same amino acid?"""
+        return self.one_letter() == other.one_letter()
 
     def __gt__(self, other: SeqRes) -> bool:
         return self.key > other.key
@@ -45,3 +48,24 @@ class SeqRes:
 
     def __lt__(self, other:SeqRes) -> bool:
         return self.key < other.key
+
+
+def same_aa_sequence( list_a:List[SeqRes], list_b:List[SeqRes]) -> bool:
+    """Do the two List[SeqRes] have the same amino acid sequence? Fail if not the same length
+    or if the two have different amino acid identities.
+
+    Args:
+        list_a: First List[SeqRes] to compare.
+        list_b: First List[SeqRes] to compare.
+    
+    Returns:
+        Whether the two List[SeqRes] have the same amino acid sequence.
+    """
+    if len(list_a) != len(list_b):
+        return False
+
+    for la, lb in zip(list_a, list_b):
+        if not la.same_aa( lb ):
+            return False
+
+    return True

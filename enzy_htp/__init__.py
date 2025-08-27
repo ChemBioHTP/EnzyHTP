@@ -24,7 +24,7 @@ from .core import (
     write_data,
 )
 
-from .chemical import ResidueType, parse_ec_number
+from .chemical import ResidueType
 
 from ._config import config
 
@@ -37,7 +37,8 @@ from .structure import (
     MetalUnit,
     Solvent,
     PDBParser,
-    Mol2Parser
+    Mol2Parser,
+    get_metal
 )
 
 from .mutation_class import Mutation
@@ -54,7 +55,6 @@ for full class defintion."""
 config.__doc__="""Singleton interface for the config settings for all software packages and the system settings in enzy_htp. Can be accessed
 by end users and should be used to customize system settings for each environment they are working in."""
 
-from .preparation import PDBLine, read_pdb_lines, dock_reactants, generate_conformers #TODO(CJ): get rid of system charge
 
 from .mutation import assign_mutant, mutate_stru
 
@@ -70,3 +70,5 @@ from .analysis import (
     bond_dipole,
     spi_metric,
 )
+
+from .preparation import dock_reactants

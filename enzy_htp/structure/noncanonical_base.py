@@ -46,7 +46,7 @@ class NonCanonicalBase(Residue):
             err_msg = (f"NCAA does not have charge."  
                       " ALWAYS check and explicit assign it using"  
                       " Structure.assign_ncaa_chargespin()")
-            _LOGGER.error()  
+            _LOGGER.error(err_msg)  
             raise AttributeError(err_msg)
         
         return self._net_charge

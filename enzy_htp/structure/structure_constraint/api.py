@@ -149,7 +149,11 @@ class StructureConstraint(ABC):
         return np.array(
             [aa.idx for aa in self.atoms]
         )
-    
+   
+    def update_target_to_current(self) -> None:
+        """Force the constraint to make the current value the new target."""
+        self.target_value=self.current_geometry()
+
     @property
     def atom_names(self) -> Set[str]:
         """get all unique atom names of self.atoms"""
@@ -257,8 +261,9 @@ class StructureConstraint(ABC):
         """
 
         if key not in self.params_:
-            _LOGGER.error(f"The attribute '{key}' is not in the constrained geometry params. Exiting...")
-            exit( 1 )
+            err_msg:str=f"The attribute '{key}' is not in the constrained geometry params."
+            _LOGGER.error(err_msg)
+            raise KeyError(err_msg)
         
         return self.params_[key]        
 
@@ -275,10 +280,23 @@ class StructureConstraint(ABC):
         """
         self.params_[key] = value 
     # endregion
-
-    #TODO(CJ): add function that checks if topology and constraints are compatible
-    #TODO(CJ): will need to make a version of this that actually works for the ResiduePairConstraint
     
+    def is_constraining(self, residue: Residue) -> bool:
+        """Is this StructureConstraint trying to enforce a constraint on the supplied Residue()?"""
+        for atom in self.atoms:
+            for r_atom in residue.atoms:
+                if atom==r_atom:
+                    return True
+
+        return False
+
+
+    def is_compatible(self, other:Structure) -> bool: 
+        """Can this constraint be successfully applied to constrain the supplied Structure object?"""
+        for atom in self.atoms:
+            if not other.has_atom(atom.key):
+                return False
+        return True 
 
 class CartesianFreeze(StructureConstraint):
     """Specialization of StructureConstraint() for Atoms() that are frozen in Cartesian space. Many
@@ -484,157 +502,6 @@ class DihedralConstraint(StructureConstraint):
     def current_geometry(self) -> float:
         """Measurement for the current dihedral between the 4 atoms in the constraint."""
         return self.atoms[0].dihedral_with(self.atoms[1], self.atoms[2], self.atoms[3])
-
-
-class ResiduePairConstraint(StructureConstraint): # TODO unified the design of self.params
-    """Specialization of StructureConstraint() representing 
-
-    Attributes:
-        
-    """
-    def __init__(self, 
-        residue1:Residue,
-        residue2:Residue,
-        residue1_atoms:List[Atom],
-        residue2_atoms:List[Atom],
-        distanceAB:DistanceConstraint=None,
-        angle_A:AngleConstraint=None,
-        angle_B:AngleConstraint=None,
-        torsion_A:DihedralConstraint=None,
-        torsion_B:DihedralConstraint=None,
-        torsionAB:DihedralConstraint=None
-        ):
-        
-        self.residue1_ = residue1
-        self.residue2_ = residue2
-        self.residue1_atoms_ = residue1_atoms
-        self.residue2_atoms_ = residue2_atoms
-        self.distanceAB_ = distanceAB
-        self.angle_A_ = angle_A 
-        self.angle_B_ = angle_B
-        self.torsion_A_ = torsion_A
-        self.torsion_B_ = torsion_B
-        self.torsionAB_ = torsionAB
-
-        atoms = set()
-        for (cst_name,cst) in self.child_constraints:
-            if cst is None:
-                continue
-            atoms.update( cst.atoms)
-        
-        self.atoms_ = list(atoms)
-        self.correct_num_atoms()
-
-    @property
-    def constraint_type(self) -> str:
-        """hard coded constraint type"""
-        return "residue_pair_constraint"
-
-
-    def clone(self) -> "ResiduePairConstraint":
-        """TODO(CJ)"""
-        return ResiduePairConstraint.__init__(
-                self.residue1_, 
-                self.residue2_,
-                self.residue1_atoms_,
-                self.residue2_atoms_,
-                self.distanceAB_,
-                self.angle_A_,
-                self.angle_B_,
-                self.torsion_A_,
-                self.torsion_B_,
-                self.torsionAB_
-                )
-        
-
-    def change_topology(self, new_topology: Structure) -> None: # TODO this should be change geometry
-        """Same as StructureConstraint.change_topology() (?) but with extra steps because of the composite 
-        nature of the class. First, the residue and residue atoms are mapped over. Next, the child constraints
-        are mapped over. Last, the atoms are mapped over."""
-        
-        self.residue1_ = new_topology.get(self.residue1_.key_str)
-        self.residue2_ = new_topology.get(self.residue2_.key_str)
-        self.residue1_atoms_ = [new_topology.get(aa.key) for aa in self.residue1_atoms_]
-        self.residue2_atoms_ = [new_topology.get(aa.key) for aa in self.residue2_atoms_]
-
-        for (cst_name, cst) in self.child_constraints:
-            if cst is not None:
-                cst.change_topology(new_topology)
-
-        atoms = set()
-        for (cst_name,cst) in self.child_constraints:
-            if cst is None:
-                continue
-            atoms.update( cst.atoms)
-        
-        self.atoms_ = list(atoms)
-        self.correct_num_atoms()
-
-        #TODO(CJ): should probably assemble atoms and call the correct_num_atoms?
-    def is_residue_pair_constraint(self) -> bool:
-        """Always True for this class."""
-        return True 
-
-    def correct_num_atoms(self) -> bool:
-        """This type of composite residue needs 6 total atoms."""
-        return len(self.atoms) == 6 
-
-    def current_geometry(self) -> Dict[str, float]:
-        """Current geometry for all of the child constraints. Packages the results in a dict() of 
-        (key, value) format (cst_name, value), where cst_name is a str with Rosetta EnzDes format.
-        These include: distanceAB, angle_A, angle_B, torsion_A, torsion_B, torsion_AB.
-        """
-    
-        result:Dict[str,float] = dict()
-        
-        result['distanceAB'] = self.distanceAB_.current_geometry()
-        result['angle_A'] = self.angle_A_.current_geometry()
-        result['angle_B'] = self.angle_B_.current_geometry()
-        result['torsion_A'] = self.torsion_A_.current_geometry()
-        result['torsion_B'] = self.torsion_B_.current_geometry()
-        result['torsion_AB'] = self.torsion_AB_.current_geometry()
-
-        return result
-
-
-    def clone_current(self) -> "ResiduePairConstraint":
-        """TODO(CJ)"""
-        assert False
-
-    @property
-    def residue1_atoms(self):
-        """Getter for the 3 Atom() objects in residue 1."""
-        return self.residue1_atoms_
-
-    @property
-    def residue2_atoms(self):
-        """Getter for the 3 Atom() objects in residue 2."""
-        return self.residue2_atoms_
-
-    @property
-    def residue1(self) -> Residue:
-        """Getter for residue 1."""
-        return self.residue1_
-
-    @property
-    def residue2(self) -> Residue:
-        """Getter for residue 2."""
-        return self.residue2_
-
-    @property
-    def child_constraints(self) -> List[StructureConstraint]:
-        """Gets the child contraints that are not None.TODO(CJ) 
-
-        """
-        return list(filter(
-            lambda pr: pr[-1] is not None,
-            [('distanceAB', self.distanceAB_),
-                ('angle_A', self.angle_A_),
-                ('angle_B', self.angle_B_),
-                ('torsion_A', self.torsion_A_),
-                ('torsion_B', self.torsion_B_),
-                ('torsionAB', self.torsionAB_)]
-        ))
 
 
 class BackBoneFreeze(CartesianFreeze):

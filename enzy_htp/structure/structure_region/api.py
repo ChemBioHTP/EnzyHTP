@@ -64,7 +64,6 @@ def create_region_from_selection_pattern(
         _LOGGER.error(f"capping method ({capping_method}) not supported. Supported: {CAPPING_METHOD_MAPPER.keys()}")
         raise ValueError
     capping_func = CAPPING_METHOD_MAPPER[capping_method]
-    #TODO(CJ): add the ole logic in here about return_copy
     capping_func(raw_region, **kwargs)
 
     return raw_region
@@ -108,7 +107,6 @@ def create_region_from_residues(
         _LOGGER.error(f"capping method ({capping_method}) not supported. Supported: {CAPPING_METHOD_MAPPER.keys()}")
         raise ValueError
     capping_func = CAPPING_METHOD_MAPPER[capping_method]
-    #TODO(CJ): add the ole logic in here about return_copy
     capping_func(raw_region, **kwargs)
 
     return raw_region

@@ -4,7 +4,7 @@ relaxation (minimization), scoring, ligand parameterization, and the ability to 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-03-28
 """
-from __future__ import annotations
+from __future__ import annotations 
 import copy
 import os
 import re
@@ -15,7 +15,7 @@ from subprocess import CompletedProcess, SubprocessError
 from plum import dispatch
 from xml.dom import minidom
 import xml.etree.cElementTree as ET
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from typing import Any, Dict, List, Tuple, Set, Union, Iterable
 from dataclasses import dataclass
 
@@ -23,13 +23,21 @@ import numpy as np
 import pandas as pd
 
 
+from enzy_htp.core.general import HiddenPrints
 import enzy_htp.chemical as chem
 from enzy_htp import config as eh_config
 from enzy_htp.mutation_class.mutation import Mutation
-from enzy_htp.structure import Structure, PDBParser, Mol2Parser, Ligand, Chain
+from enzy_htp.structure import (
+    Structure, 
+    StructureEnsemble,
+    PDBParser,
+    Mol2Parser,
+    Ligand,
+    Chain
+)
 from enzy_htp.structure.structure_operation import remove_non_peptide
 from enzy_htp.structure import translate_structure
-from enzy_htp.structure.structure_constraint import StructureConstraint, ResiduePairConstraint
+from enzy_htp.structure.structure_constraint import StructureConstraint
 from enzy_htp._config.rosetta_config import RosettaConfig, default_rosetta_config
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
@@ -38,7 +46,1113 @@ from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.core.exception import RosettaError
 
 from .base_interface import BaseInterface
-from .handle_types import ddGFoldEngine, ddGResultEgg
+from .handle_types import ddGFoldEngine, ddGResultEgg, ModelingEngine, ModelingResultEgg
+
+class RosettaOptions:
+    """Holds options for running generic functions in the Rosetta molecular modelling suite. Serves
+    as a dict() and supports [] operator usage so that options can be set and then subsequently accessed
+    or written to a file. Allows namespace nesting with the ':' character.
+
+    Attributes:
+        data_: The dict() holding various settings.
+        script_vars_: A dict() with a special case of (key, value) pairs that defines script variables for a RosettaScripts run.
+        extra_res_fa_: A list() holding the paths to Rosetta .params files.
+    """
+    
+    def __init__(self):
+        """Simplistic constructor that initializes the data_ and script_vars_ dict()'s as well as the extra_res_fa_ variable"""
+        self.data_ = dict()
+        self.script_vars_ = dict()
+        self.extra_res_fa_ = list()
+
+    def add_extra_res_fa(self, params_file:str) -> None:
+        """Special function that adds a new param file path to the extra_res_fa_ list"""
+        self.extra_res_fa_.append(params_file)
+
+    @property
+    def extra_res_fa(self) -> List[str]:
+        """Getter for the extra_res_fa .params files"""
+        return self.extra_res_fa_
+
+    def convert_script_vars_(self) -> None:
+        """Private method which converts the script variables to a 'parser:script_vars' variable."""
+
+        if not self.script_vars:
+            return
+
+        result = list()
+
+        for key_name, value in self.script_vars.items():
+            temp_value:str = self.convert_value_(value)
+            if temp_value[0] == "'":
+                temp_value = temp_value[1:]
+            
+            if temp_value[-1] == "'":
+                temp_value = temp_value[:-1]
+
+            result.extend([f"{key_name}={temp_value} ", "\\\n\t\t\t"])
+        
+        result.pop(-1)
+
+        self['parser:script_vars'] = ''.join(result)
+
+    def add_script_variable(self, key:str, value:Any) -> None:
+        """Updates the script variables, adding a new (key, value) pair."""
+        self.script_vars_[key] = value 
+
+    def get_script_variable(self, key:str) -> Any:
+        """Returns whatever value is stored for a given script variable key."""
+        return self.script_vars_[key]
+
+    @property
+    def script_vars(self) -> Dict:  
+        """Getter for the dict() of script variables in this options object."""
+        return self.script_vars_
+
+    def __setitem__(self, key:str, value:Any) -> None:
+        """Allows bracket operator setting for the options, with support for namespace
+        nesting with the ':' character.
+
+        Args:
+            key: Name of the key/variable name as a str().
+            value: Value of the variable. Must be able to be converted to a str().
+
+        Returns:
+            Nothing.
+        """
+        tks:List[str] = key.split(':')
+        ptr = self.data_
+        n_tks = len(tks)
+        for tidx, tt in enumerate(tks):
+            if tidx == n_tks - 1 :
+                break
+            new_ptr = ptr.get(tt, None)
+            if not new_ptr:
+                ptr[tt] = dict()
+                new_ptr = ptr[tt]
+
+            ptr = new_ptr
+
+        ptr[tks[-1]] = value
+
+    def has(self, key:str) -> bool:
+        """Does the RosettaOptions class have the supplied option? Supplied key is checked against main option dict() only."""
+        result = None
+        try:
+            with HiddenPrints() as hp:
+                result = self[key]
+        except:
+            pass
+
+        return result is not None
+
+
+    def __getitem__(self, key:str) -> Any:
+        """Allows bracket operating getting for the options, with support for namespace
+        nesting with the ':' character. Raises error if unsupported key.
+
+        Args:
+            key: Name of the variable to be accessed as a str().
+
+        Returns:
+            The value associated with the key.
+        """
+
+        tks:List[str] = key.split(':')
+        ptr = self.data_
+        tks = list(reversed(tks))
+        tt = tks.pop()
+        while tks:
+            ptr = ptr.get(tt)
+            if ptr is None:
+                err_msg:str = f"No stored variable '{key}'. Encountered problem with namespace '{tt}'."
+                _LOGGER.error(err_msg)
+                raise TypeError( err_msg )
+                                
+            tt = tks.pop()
+        
+        result = ptr.get(tt)
+        if result is None:
+            err_msg:str = f"No stored variable '{key}'. Encountered problem with namespace '{tt}'."
+            _LOGGER.error(err_msg)
+            raise TypeError( err_msg )
+
+        return result
+
+
+    def convert_value_(self, value:Any) -> str:
+        """Helper method that converts an arbitrary value to a str() supported by Rosetta.
+
+        Args:
+            value: The Any-type value to convert.
+
+        Returns:
+            The supplied type converted to a str().
+        """
+        
+        if isinstance(value, list):
+            return ' '.join(map(lambda vv: self.convert_value_(vv), value))
+
+        if isinstance(value, bool):
+            if value == True:
+                return 'true'
+            else:
+                return 'false'
+
+        if isinstance(value, str):
+            return f"'{value}'"
+
+        return f"{value}"
+
+
+    def to_file(self, fname:str) -> str:
+        """Writes the options to a file that can be parsed at the commandline.
+
+        Args: 
+            fname: The filename as a str() to write the options to.
+
+        Returns:
+            The name of the written options filepath.
+        """
+        self.convert_script_vars_()
+        depth:int = 0
+        lines:List[str] = list()
+        
+        if self.extra_res_fa:
+            tks = ['-extra_res_fa'] 
+            
+            for idx, erf in enumerate(self.extra_res_fa):
+                prefix = ''
+                if idx:
+                    prefix = '\t\t\t'
+                tks.append( f"{prefix}'{erf}'")
+                tks.append( "\\\n" )
+            tks.pop(-1)
+            lines.append(' '.join(tks))
+
+        self.traverse_options_(self.data_, lines, depth)
+        fs.write_lines(fname, lines)
+        return fname
+
+    def traverse_options_(self, data:Dict, lines:List[str], depth:int) -> None:
+        """Helper method that traverses the options in the dict() and converts
+        them into lines that can be written to a file.
+
+        Args:
+            data: The data Dict() with (key, value) pairs to convert to lines.
+            lines: The lines to add the (key, value) pairs.
+            depth: What is the starting indent to use here?
+        
+        Returns:
+            Nothing.
+        """
+        insert:str = ' '*4*depth
+        for key_name, value in data.items():
+            if isinstance(value, dict):
+                lines.append(f"{insert}-{key_name}")
+                self.traverse_options_(value,  lines, depth+1)
+            else:
+                if key_name == 'script_vars':
+                    lines.append(f"{insert}-{key_name} {value}")
+                else:
+                    lines.append(f"{insert}-{key_name} {self.convert_value_(value)}")
+
+class RosettaScriptsElement:
+    """Represents a single Tag or element in a RosettaScripts. Each instance has a "tag" value 
+    and essentially serves as dict() with key-value pairs, as well as children.
+
+    Attributes:
+        tag_: The str name of the RosettaScriptsElement.
+        attrib: A dict() of key-value pairs that will be added to the RosettaScripts XML script.
+        children_: Child RosettaScriptsElements that will be included and indented in the XML script
+    """
+
+    def __init__(self, tag:str, **kwargs):
+        """Constructor that takes tag name, as well as kwarg values. These kwarg values are stored in the .attrib dict(), 
+        unless the key is 'children', where instead the .children_ attribute is populated with the respective RosettaScriptsElements."""
+        self.tag_ = tag
+        self.attrib = dict()
+        self.children_ = list()
+
+        children_temp = kwargs.pop('children', None)
+
+        if children_temp:
+            self.children_ = children_temp
+
+            for cidx, cc in enumerate( self.children_ ):
+                if not isinstance( cc, RosettaScriptsElement ):
+                    if len(cc) > 1:
+                        self.children_[cidx] = RosettaScriptsElement(
+                            cc[0], **cc[1]
+                        )
+                    else:
+                        self.children_[cidx] = RosettaScriptsElement(
+                            cc[0]
+                        )
+
+
+        for k, v in kwargs.items():
+            self.attrib[k] = v
+
+    @property
+    def children(self) -> List["RosettaScriptsElement"]:
+        """Getter for the children RosettaScriptsElements that belong to the current instance."""
+        return self.children_
+
+    @property
+    def tag(self) -> str:
+        """Getter for the str tag of the instance."""
+        return self.tag_
+
+    def has_children(self) -> bool:
+        """Does this element have child elements?"""
+        return len(self.children_) 
+
+    def add_child(self, child: "RosettaScriptsElement") -> None:
+        """Adds a new child RosettaScriptsElement directly to the .children_ attribute"""
+        self.children_.append( child )
+
+    def to_lines(self, offset:int = 2) -> List[str]:
+        """Converts the contents of the RosettaScriptsElement to XML lines that can be saved directly into the
+        RosettaScripts protocol.
+        
+        Args:
+            offset: The int() number of tabs that the lines should be offset from left justification.
+
+        Returns:
+            The List[str] of the completed XML lines.
+        """
+
+        prefix:str=' '*offset*4
+        content:List[str] = []
+
+        opening_line:str = f"{prefix}<{self.tag}"
+
+        for att_name, att_value in self.attrib.items():
+
+            opening_line += f" {att_name}=\"{att_value}\""
+
+        if self.has_children():
+            opening_line += ">"
+            content.append( opening_line )
+            for child in self.children_:
+                content.extend( child.to_lines( offset + 1 ) )
+
+            content.append( f"{prefix}</{self.tag}>" )
+
+        else:
+            opening_line += "/>"
+            content.append( opening_line )
+
+
+        return content 
+
+class RosettaScriptsProtocol:
+    """The protocol object which roughly represents the XML file that will be fed to RosettaScripts on the commandline. RosettaScriptsElement objects
+    can be added and removed, then the XML file can be output and run.
+
+    Attributes:
+        sections: A dict() with (key, value) pairs of RosettaScripts sections and List[RosettaScriptsElement]:
+        section_names: The allowed section names as they appear in the finalized XML script. 
+    """
+
+    def __init__(self):
+        """Simple constructor that creates the .sections and .section_names attribues."""
+        self.sections = defaultdict(list)
+        self.section_names = "SCORINGGRIDS RESIDUE_SELECTORS SCOREFXNS  PACKER_PALETTES TASKOPERATIONS MOVE_MAP_FACTORIES SIMPLE_METRICS CONSTRAINT_GENERATORS FILTERS MOVERS PROTOCOLS OUTPUT".split()
+    
+    def add_element(self, section:str, element:RosettaScriptsElement) -> None:
+        """Generalized method to add a RosettaScriptsElement to a RosettaScriptsProtocol. 
+
+        Args:
+            section: The section that the RosettaScriptsElement should be added to.
+            element: The RosettaScriptsElement that will be added to the Protoco.
+
+        Returns:
+            Nothing.
+        """
+
+        if section not in self.section_names:
+            err_str=f"The supplied section name '{section}' is not allowed. Supported section names are {', '.join(self.section_names)}"
+            _LOGGER.error(err_str)
+            raise TypeError(err_str)
+
+        self.sections[section].append( element )
+
+        return self
+
+    def add_element(self, section: str, element: RosettaScriptsElement) -> None:
+        """Adds a RosettaScriptsElement to the specified section of the protocol.
+
+        Args:
+            section (str): The section to which the RosettaScriptsElement should be added.
+            element (RosettaScriptsElement): The element to be added.
+
+        Raises:
+            TypeError: If the provided section name is not allowed, an error will be logged and an exception is raised.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol after the element has been added.
+        """
+        if section not in self.section_names:
+            err_str = f"The supplied section name '{section}' is not allowed. Supported section names are {', '.join(self.section_names)}"
+            _LOGGER.error(err_str)
+            raise TypeError(err_str)
+
+        self.sections[section].append(element)
+        return self
+
+    @dispatch
+    def add_scorefunction(self, scorefxn: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a scoring function element to the 'SCOREFXNS' section.
+
+        Args:
+            scorefxn (RosettaScriptsElement): The RosettaScriptsElement representing the scoring function.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added scoring function.
+        """
+        return self.add_element("SCOREFXNS", scorefxn)
+
+    @dispatch
+    def add_scorefunction(self, sf_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a scoring function using a name and additional parameters.
+
+        Args:
+            sf_name (str): The name of the scoring function.
+            **kwargs: Additional parameters to configure the scoring function.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added scoring function.
+        """
+        return self.add_element("SCOREFXNS",
+            RosettaScriptsElement(sf_name, **kwargs)
+        )
+
+    @dispatch
+    def add_residue_selector(self, res_selector: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a residue selector element to the 'RESIDUE_SELECTORS' section.
+
+        Args:
+            res_selector (RosettaScriptsElement): The RosettaScriptsElement representing the residue selector.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added residue selector.
+        """
+        return self.add_element("RESIDUE_SELECTORS", res_selector)
+
+    @dispatch
+    def add_residue_selector(self, rs_type: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a residue selector using a type name and additional parameters.
+
+        Args:
+            rs_type (str): The type of residue selector.
+            **kwargs: Additional parameters to configure the residue selector.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added residue selector.
+        """
+        return self.add_residue_selector(
+            RosettaScriptsElement(rs_type, **kwargs)
+        )
+
+    @dispatch
+    def add_mover(self, mover: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a mover element to the 'MOVERS' section.
+
+        Args:
+            mover (RosettaScriptsElement): The RosettaScriptsElement representing the mover.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added mover.
+        """
+        return self.add_element("MOVERS", mover)
+
+    @dispatch
+    def add_mover(self, m_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a mover using a name and additional parameters.
+
+        Args:
+            m_name (str): The name of the mover.
+            **kwargs: Additional parameters to configure the mover.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added mover.
+        """
+        return self.add_element("MOVERS",
+            RosettaScriptsElement(m_name, **kwargs)
+        )
+
+    @dispatch
+    def add_filter(self, r_filter: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a filter element to the 'FILTERS' section.
+
+        Args:
+            r_filter (RosettaScriptsElement): The RosettaScriptsElement representing the filter.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added filter.
+        """
+        return self.add_element("FILTERS", r_filter)
+
+    @dispatch
+    def add_filter(self, rf_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a filter using a name and additional parameters.
+
+        Args:
+            rf_name (str): The name of the filter.
+            **kwargs: Additional parameters to configure the filter.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added filter.
+        """
+        return self.add_element("FILTERS",
+            RosettaScriptsElement(rf_name, **kwargs)
+        )
+
+    @dispatch
+    def add_simple_metric(self, simple_metric: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a simple metric element to the 'SIMPLE_METRICS' section.
+
+        Args:
+            simple_metric (RosettaScriptsElement): The RosettaScriptsElement representing the simple metric.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added simple metric.
+        """
+        return self.add_element("SIMPLE_METRICS", simple_metric)
+
+    @dispatch
+    def add_simple_metric(self, sm_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a simple metric using a name and additional parameters.
+
+        Args:
+            sm_name (str): The name of the simple metric.
+            **kwargs: Additional parameters to configure the simple metric.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added simple metric.
+        """
+        return self.add_element("SIMPLE_METRICS",
+            RosettaScriptsElement(sm_name, **kwargs)
+        )
+
+    @dispatch
+    def add_protocol(self, protocol: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a protocol element to the 'PROTOCOLS' section.
+
+        Args:
+            protocol (RosettaScriptsElement): The RosettaScriptsElement representing the protocol.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added protocol.
+        """
+        return self.add_element("PROTOCOLS", protocol)
+
+    @dispatch
+    def add_protocol(self, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a protocol using default parameters.
+
+        Args:
+            **kwargs: Additional parameters to configure the protocol.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added protocol.
+        """
+        return self.add_protocol(
+            RosettaScriptsElement('Add', **kwargs)
+        )
+
+    @dispatch
+    def add_constraint_generator(self, cst_gen: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a constraint generator element to the 'CONSTRAINT_GENERATORS' section.
+
+        Args:
+            cst_gen (RosettaScriptsElement): The RosettaScriptsElement representing the constraint generator.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added constraint generator.
+        """
+        return self.add_element('CONSTRAINT_GENERATORS', cst_gen)
+
+    @dispatch
+    def add_constraint_generator(self, cg_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a constraint generator using a name and additional parameters.
+
+        Args:
+            cg_name (str): The name of the constraint generator.
+            **kwargs: Additional parameters to configure the constraint generator.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added constraint generator.
+        """
+        return self.add_element('CONSTRAINT_GENERATORS',
+            RosettaScriptsElement(cg_name, **kwargs)
+        )
+
+    @dispatch
+    def add_scoring_grid(self, scoring_grid: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a scoring grid element to the 'SCORINGGRIDS' section.
+
+        Args:
+            scoring_grid (RosettaScriptsElement): The RosettaScriptsElement representing the scoring grid.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added scoring grid.
+        """
+        return self.add_element("SCORINGGRIDS", scoring_grid)
+
+    def add_element(self, section: str, element: RosettaScriptsElement) -> None:
+        """Adds a RosettaScriptsElement to the specified section of the protocol.
+
+        Args:
+            section (str): The section to which the RosettaScriptsElement should be added.
+            element (RosettaScriptsElement): The element to be added.
+
+        Raises:
+            TypeError: If the provided section name is not allowed, an error will be logged and an exception is raised.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol after the element has been added.
+        """
+        if section not in self.section_names:
+            err_str = f"The supplied section name '{section}' is not allowed. Supported section names are {', '.join(self.section_names)}"
+            _LOGGER.error(err_str)
+            raise TypeError(err_str)
+
+        self.sections[section].append(element)
+        return self
+
+    @dispatch
+    def add_scorefunction(self, scorefxn: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a scoring function element to the 'SCOREFXNS' section.
+
+        Args:
+            scorefxn (RosettaScriptsElement): The RosettaScriptsElement representing the scoring function.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added scoring function.
+        """
+        return self.add_element("SCOREFXNS", scorefxn)
+
+    @dispatch
+    def add_scorefunction(self, sf_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a scoring function using a name and additional parameters.
+
+        Args:
+            sf_name (str): The name of the scoring function.
+            **kwargs: Additional parameters to configure the scoring function.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added scoring function.
+        """
+        return self.add_element("SCOREFXNS",
+            RosettaScriptsElement(sf_name, **kwargs)
+        )
+
+    @dispatch
+    def add_residue_selector(self, res_selector: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a residue selector element to the 'RESIDUE_SELECTORS' section.
+
+        Args:
+            res_selector (RosettaScriptsElement): The RosettaScriptsElement representing the residue selector.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added residue selector.
+        """
+        return self.add_element("RESIDUE_SELECTORS", res_selector)
+
+    @dispatch
+    def add_residue_selector(self, rs_type: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a residue selector using a type name and additional parameters.
+
+        Args:
+            rs_type (str): The type of residue selector.
+            **kwargs: Additional parameters to configure the residue selector.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added residue selector.
+        """
+        return self.add_residue_selector(
+            RosettaScriptsElement(rs_type, **kwargs)
+        )
+
+    @dispatch
+    def add_mover(self, mover: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a mover element to the 'MOVERS' section.
+
+        Args:
+            mover (RosettaScriptsElement): The RosettaScriptsElement representing the mover.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added mover.
+        """
+        return self.add_element("MOVERS", mover)
+
+    @dispatch
+    def add_mover(self, m_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a mover using a name and additional parameters.
+
+        Args:
+            m_name (str): The name of the mover.
+            **kwargs: Additional parameters to configure the mover.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added mover.
+        """
+        return self.add_element("MOVERS",
+            RosettaScriptsElement(m_name, **kwargs)
+        )
+
+    @dispatch
+    def add_filter(self, r_filter: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a filter element to the 'FILTERS' section.
+
+        Args:
+            r_filter (RosettaScriptsElement): The RosettaScriptsElement representing the filter.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added filter.
+        """
+        return self.add_element("FILTERS", r_filter)
+
+    @dispatch
+    def add_filter(self, rf_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a filter using a name and additional parameters.
+
+        Args:
+            rf_name (str): The name of the filter.
+            **kwargs: Additional parameters to configure the filter.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added filter.
+        """
+        return self.add_element("FILTERS",
+            RosettaScriptsElement(rf_name, **kwargs)
+        )
+
+    @dispatch
+    def add_simple_metric(self, simple_metric: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a simple metric element to the 'SIMPLE_METRICS' section.
+
+        Args:
+            simple_metric (RosettaScriptsElement): The RosettaScriptsElement representing the simple metric.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added simple metric.
+        """
+        return self.add_element("SIMPLE_METRICS", simple_metric)
+
+    @dispatch
+    def add_simple_metric(self, sm_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a simple metric using a name and additional parameters.
+
+        Args:
+            sm_name (str): The name of the simple metric.
+            **kwargs: Additional parameters to configure the simple metric.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added simple metric.
+        """
+        return self.add_element("SIMPLE_METRICS",
+            RosettaScriptsElement(sm_name, **kwargs)
+        )
+
+    @dispatch
+    def add_protocol(self, protocol: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a protocol element to the 'PROTOCOLS' section.
+
+        Args:
+            protocol (RosettaScriptsElement): The RosettaScriptsElement representing the protocol.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added protocol.
+        """
+        return self.add_element("PROTOCOLS", protocol)
+
+    @dispatch
+    def add_protocol(self, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a protocol using default parameters.
+
+        Args:
+            **kwargs: Additional parameters to configure the protocol.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added protocol.
+        """
+        return self.add_protocol(
+            RosettaScriptsElement('Add', **kwargs)
+        )
+
+    @dispatch
+    def add_constraint_generator(self, cst_gen: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a constraint generator element to the 'CONSTRAINT_GENERATORS' section.
+
+        Args:
+            cst_gen (RosettaScriptsElement): The RosettaScriptsElement representing the constraint generator.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added constraint generator.
+        """
+        return self.add_element('CONSTRAINT_GENERATORS', cst_gen)
+
+    @dispatch
+    def add_constraint_generator(self, cg_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a constraint generator using a name and additional parameters.
+
+        Args:
+            cg_name (str): The name of the constraint generator.
+            **kwargs: Additional parameters to configure the constraint generator.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added constraint generator.
+        """
+        return self.add_element('CONSTRAINT_GENERATORS',
+            RosettaScriptsElement(cg_name, **kwargs)
+        )
+
+    @dispatch
+    def add_scoring_grid(self, scoring_grid: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a scoring grid element to the 'SCORINGGRIDS' section.
+
+        Args:
+            scoring_grid (RosettaScriptsElement): The RosettaScriptsElement representing the scoring grid.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added scoring grid.
+        """
+        return self.add_element("SCORINGGRIDS", scoring_grid)
+
+    @dispatch
+    def add_scoring_grid(self, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a scoring grid element to the 'SCORINGGRIDS' section using specified parameters.
+
+        This method is designed to handle the creation of a scoring grid element with the provided keyword arguments,
+        which will be passed to the RosettaScriptsElement constructor. The name of the scoring grid is set as an
+        empty string by default.
+
+        Args:
+            **kwargs: Additional parameters to configure the scoring grid element.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added scoring grid element.
+        """
+        return self.add_element("SCORINGGRIDS",
+            RosettaScriptsElement('', **kwargs)
+        )
+
+    @dispatch
+    def add_task_operations(self, task_op: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a task operations element to the 'TASKOPERATIONS' section.
+
+        This method allows for the addition of a pre-existing RosettaScriptsElement representing task operations
+        directly to the TASKOPERATIONS section of the protocol.
+
+        Args:
+            task_op (RosettaScriptsElement): The RosettaScriptsElement representing the task operations to be added.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added task operations element.
+        """
+        return self.add_element("TASKOPERATIONS", task_op)
+
+    @dispatch
+    def add_task_operations(self, to_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a task operations element to the 'TASKOPERATIONS' section using the specified name and parameters.
+
+        This method allows for the creation of a new RosettaScriptsElement for task operations using a provided name
+        and additional keyword arguments for configuration.
+
+        Args:
+            to_name (str): The name of the task operation.
+            **kwargs: Additional parameters to configure the task operation element.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added task operations element.
+        """
+        return self.add_element("TASKOPERATIONS",
+            RosettaScriptsElement(to_name, **kwargs)
+        )
+
+    def to_file(self, fname:str) -> str:
+        """Convert the current instance of the RosettaScriptsProtocol into an XML script that can be fed 
+        to the RosettaScripts exectuable on the command line. Returns the output filename.
+
+        Args:
+            fname: The filename to write the RosettaScriptsProtocol to.
+
+        Returns:
+            The finalized XML script.
+        """
+        content:List[str] = [ "<ROSETTASCRIPTS>"] 
+
+        for sn in self.section_names:
+            if sn == "SCORINGGRIDS":
+                if not self.sections[sn]:
+                    continue
+                opening_line = f"    <SCORINGGRIDS"                
+
+                grid = self.sections[sn][0]
+
+                for k, v in grid.attrib.items():
+                    opening_line += f" {k}=\"{v}\""
+                opening_line += ">"
+                content.append( opening_line )
+
+                for child in grid.children:
+                    content.extend( child.to_lines(2) )
+
+
+                content.append("    </SCORINGGRIDS>")
+                continue
+
+            content.append(f"    <{sn}>")
+
+            for ss in self.sections[sn]:
+                content.extend( ss.to_lines() )
+
+            content.append(f"    </{sn}>")
+
+        content.append("</ROSETTASCRIPTS>")
+
+        fs.write_lines(fname, content)
+
+        return fname
+
+@dataclass
+class RosettaScriptsEgg(ModelingResultEgg):
+    """A data class representing the results of a RosettaScripts job.
+
+    This class encapsulates essential output information for a RosettaScripts run, including the score file
+    and associated PDB files.
+
+    Attributes:
+        score_file (str): The path to the score file generated by the RosettaScripts job.
+        pdb_files (List[str]): A list of paths to PDB files produced as part of the modeling results.
+        parent_job (ClusterJob): The cluster job associated with the RosettaScripts execution.
+    """
+    score_file: str
+    pdb_files: List[str]
+    parent_job: ClusterJob
+
+
+class RosettaScriptsEngine(ModelingEngine):
+    """Engine class for executing RosettaScripts protocols.
+
+    This class is responsible for managing the preparation and execution of RosettaScripts workflow,
+    defining input setup, job submission, and result parsing.
+
+    Attributes:
+        _parent_interface: The interface through which the engine communicates with external components.
+        _work_dir (str): The directory where input/output files for the job are stored.
+        _protocol (RosettaScriptsProtocol): The protocol defining how RosettaScripts should be executed.
+        _opts (RosettaOptions): Options to configure the Rosetta job.
+        _cluster_job_config (Dict): Configuration parameters for cluster job submission.
+    """
+
+    def __init__(self, interface, protocol: RosettaScriptsProtocol, opts: RosettaOptions, cluster_job_config: Dict, work_dir: str):
+        """Initializes a RosettaScriptsEngine instance.
+
+        Args:
+            interface: The interface for communication with external modules.
+            protocol (RosettaScriptsProtocol): The protocol to be executed.
+            opts (RosettaOptions): Options specific to the Rosetta execution.
+            cluster_job_config (Dict): Configuration settings for the cluster job.
+            work_dir (str): Path to the working directory for storing job files.
+        """
+        self._parent_interface = interface
+        self._work_dir = work_dir
+        self._protocol = protocol
+        self._opts = opts
+        self._cluster_job_config = cluster_job_config
+
+    @property
+    def parent_interface(self):
+        """Gets the parent interface for communication with external components.
+
+        Returns:
+            The parent interface.
+        """
+        return self._parent_interface
+
+    @property
+    def work_dir(self) -> str:
+        """Gets the working directory for storing input/output files.
+
+        Returns:
+            str: Path to the working directory.
+        """
+        return self._work_dir
+
+    @property
+    def protocol(self) -> RosettaScriptsProtocol:
+        """Gets the protocol associated with the engine.
+
+        Returns:
+            RosettaScriptsProtocol: The executing protocol.
+        """
+        return self._protocol
+
+    @property
+    def opts(self) -> RosettaOptions:
+        """Gets the options for the Rosetta job execution.
+
+        Returns:
+            RosettaOptions: The options set for the job.
+        """
+        return self._opts
+
+    @property
+    def cluster_job_config(self):
+        """Gets the configuration for cluster job submission.
+
+        Returns:
+            Dict: Configuration settings for cluster jobs.
+        """
+        return self._cluster_job_config
+
+    def engine(self) -> str:
+        """Identifies the engine being used.
+
+        Returns:
+            str: The name of the engine, which is 'rosetta' in this context.
+        """
+        return "rosetta"
+
+    @property
+    def name(self) -> str:
+        """Gets the name of the engine.
+
+        Returns:
+            str: The name of the engine, specifically 'rosetta_scripts'.
+        """
+        return "rosetta_scripts"
+
+    def make_input_files(self, stru: Structure):
+        """Prepares input files for the given structure.
+
+        Args:
+            stru (Structure): The structure for which input files need to be created.
+
+        Raises:
+            NotImplementedError: This method needs to be implemented in a subclass.
+        """
+        pass
+
+    def make_job(self, stru: Structure) -> Tuple[ClusterJob, RosettaScriptsEgg]:
+        """Creates a job for the specified structure.
+
+        Args:
+            stru (Structure): The structure to be processed by the job.
+
+        Returns:
+            Tuple[ClusterJob, RosettaScriptsEgg]: A tuple containing the created cluster job and the result egg.
+
+        Raises:
+            TypeError: If the provided structure is not an instance of Structure.
+        """
+        if not isinstance(stru, Structure):
+            _LOGGER.error("only allow Structure as `stru`")
+            raise TypeError
+
+        # Create necessary working directory and handle file creation
+        fs.safe_mkdir(self.work_dir)
+        pdb_start = Path(f"{self.work_dir}/start.pdb")
+        sp = PDBParser()
+        sp.save_structure(str(pdb_start), stru)
+
+        nstruct = 1
+        if self.opts.has('nstruct'):
+            nstruct = self.opts['nstruct']
+
+        prefix: str = ""
+        if self.opts.has('out:prefix'):
+            prefix = self.opts['out:prefix']
+
+        # Serialize protocol to file
+        prot_file = self.protocol.to_file(f"{self.work_dir}/protocol.xml")
+        self.opts['in:file:s'] = pdb_start.name
+        self.opts['parser:protocol'] = str(Path(prot_file).absolute())
+
+        opt_file = self.opts.to_file(f"{self.work_dir}/rosetta_opts.txt")
+        logfile = str((Path(self.work_dir) / 'log.txt').absolute())
+
+        # Generate command string for job execution
+        cmd_str = f"cd {Path(self.work_dir).absolute()} && {self.parent_interface.config_.ROSETTA_SCRIPTS} @{Path(opt_file).name} > {Path(logfile).name}"
+
+        # Assemble cluster job
+        cluster = self.cluster_job_config["cluster"]
+        res_keywords = self.cluster_job_config["res_keywords"]
+
+        # Environment settings for job execution
+        env_settings = [
+            'export ROSETTA3=/panfs/accrepfs.vampire/data/yang_lab/jurichc/main',
+            'export LD_LIBRARY_PATH=/panfs/accrepfs.vampire/data/yang_lab/jurichc/main/source/cmake/build_release//:$LD_LIBRARY_PATH',
+            'module load GCC/8',
+            'module load OpenMPI/3.1.4',
+            'export ORCA_HOME=$DATA/orca_6_0_0_shared_openmpi416/orca',
+            'export LD_LIBRARY_PATH=$ORCA_HOME:$LD_LIBRARY_PATH',
+        ]
+
+        sub_script_path = fs.get_valid_temp_name(f"{self.work_dir}/submit_{self.name}.cmd")
+        job = ClusterJob.config_job(
+            commands=cmd_str,
+            cluster=cluster,
+            env_settings=env_settings,
+            res_keywords=res_keywords,
+            sub_dir="./",  # Relative path for subdirectory
+            sub_script_path=sub_script_path
+        )
+        job.mimo = {}  # Placeholder for future use
+
+        # Construct result egg containing score file and pdb files
+        pdb_files = [f"{self.work_dir}/{prefix}start_{idx + 1:04d}.pdb" for idx in range(nstruct)]
+        result_egg = RosettaScriptsEgg(
+            score_file=f"{self.work_dir}/{prefix}score.sc",
+            pdb_files=pdb_files,
+            parent_job=job,
+        )
+
+        return (job, result_egg)
+
+    def run(self, stru: Structure) -> List[Structure]:
+        """Executes the RosettaScripts job for the provided structure.
+
+        Args:
+            stru (Structure): The structure to process.
+
+        Returns:
+            List[Structure]: A list of resulting structures obtained from the job execution.
+        """
+        _parser = PDBParser()
+        score_file: str = self.parent_interface.run_rscripts(stru, self.protocol, self.opts, self.work_dir)
+
+        results = self.parent_interface.parse_score_file(score_file)
+        structures = list()
+
+        for i, row in results.iterrows():
+            row_dict = row.to_dict()
+            pdb_file = f"{self.work_dir}/{row_dict.pop('description')}.pdb"
+            stru = _parser.get_structure(pdb_file)
+
+            for rk, rv in row_dict.items():
+                stru.data[rk] = rv
+
+            structures.append(stru)
+
+        return structures
+
+    def translate(self, egg: RosettaScriptsEgg):
+        """Translates the results stored in the RosettaScriptsEgg.
+
+        Args:
+            egg (RosettaScriptsEgg): The egg containing results to be translated.
+        
+        Raises:
+            NotImplementedError: This method needs to be implemented in a subclass.
+        """
+        pass
+
 
 @dataclass
 class RosettaCartesianddGEgg(ddGResultEgg):
@@ -499,37 +1613,95 @@ class RosettaInterface(BaseInterface):
                     changed_atoms += 1
         _LOGGER.info(f"Finished renaming! Changed {changed_residues} residues and {changed_atoms} atoms.")
 
-    def run_rosetta_scripts(self, opts: List[str], logfile: str = None) -> None:
-        """Method that runs the rosettascripts executabl along with the supplied options. Optionally outputs
-        the stdout to a specified logfile. Note that no sanitation is performed prior to running.
+
+    def run_rosetta_scripts(self,
+                    stru: Structure,
+                    protocol:RosettaScriptsProtocol,
+                    opts:RosettaOptions,
+                    prefix:str="rosetta_scripts",
+                    work_dir:str=None,
+                    remove_temp_files:bool=False
+                    ) -> str:
+        """Canonical way to run a RosettaScriptsProtocol on a Structure.
 
         Args:
-            opts: a list() of str() to be run by the RosettaScripts executable.  logfile: The file to output the stdout log to. Optional.
+            stru: The Structure the protocol will applied to.
+            protocol: The RosettaScriptsPorotocol that will be applied to the given Structure.
+            opts: The RosettaOptions object with commandline options for the RosettaScripts run.
+            prefix: Prefix to be used for all associated files. Optional, default is 'rosetta_scripts'.
+            work_dir: Directory where the temporary files are to be saved. Optional, default is None.
+            remove_temp_files: Should temporary files be removed after the RosettaScripts run? Optional, default is False.
+
 
         Returns:
-            Nothing,
+            The .sc scorefile created from the RosettaScripts run.
         """
+        if work_dir is None:
+            if opts.has('out:path:all'):
+                work_dir = opts['out:path:all']
+            else:
+                work_dir = eh_config['system.SCRATCH_DIR']
+                opts['out:path:all'] = work_dir
+       
+        opts_file:str = str(Path(f"{work_dir}/{prefix}_options.txt").absolute())
+        xml_file:str = str(Path(f"{work_dir}/{prefix}_protocol.xml").absolute())
 
-        if logfile:
-            opts.extend([">", str(logfile)])
+        opts['parser:protocol'] = str(Path(xml_file).absolute())
 
-        self.env_manager_.run_command(self.config_.ROSETTA_SCRIPTS, opts, quiet_fail=True)
+        fname:str = f"{work_dir}/{prefix}_start.pdb"
+        old_pattern:str = f"{prefix}_start_????.pdb"
+       
+        # This will get rid of the temp files
+        fs.safe_rm( xml_file )
+        fs.safe_rm( opts_file )
+        fs.safe_rm( fname )
+        
+        parser = PDBParser()
+        parser.save_structure(fname, stru)
 
-        if logfile:
-            _LOGGER.info(f"Saved RosettaScripts log to '{Path(logfile).absolute}'.")
+        opts['in:file:s'] = str(Path(fname).absolute())
+        protocol.to_file(xml_file)
 
-    def parse_score_file(self, fname: str) -> pd.DataFrame:
+        opts['out:file:scorefile'] = Path(f"{work_dir}/{prefix}_score.sc").absolute()
+
+        for op in Path(work_dir).glob(old_pattern):
+            fs.safe_rm( op )
+
+        fs.safe_rm( f"{work_dir}/{prefix}_score.sc" )
+        
+        opts.to_file(opts_file)
+
+        work_dir = Path(opts_file).parent.absolute()
+        start_dir:str = os.getcwd()
+        os.chdir(work_dir)
+        self.env_manager_.run_command(self.config_.ROSETTA_SCRIPTS, [f"@{opts_file}"], quiet_fail=True)
+
+        os.chdir( start_dir )
+
+        if not Path(opts['out:file:scorefile']).exists():
+            raise FileNotFoundError(f"The expected outfile {opts['out:file:scorefile']} does not exist!")
+
+        if remove_temp_files:
+            fs.safe_rm( opts_file )
+            fs.safe_rm( xml_file )
+            fs.safe_rm( fname )
+
+        return opts['out:file:scorefile'] 
+
+    def parse_score_file(self, fname: str, work_dir:str=None) -> pd.DataFrame:
         """Method that parses a score file into a Pandas Dataframe. Only encodes lines that begin with SCORE.
+        Function will change the values in the 'description' column, so that they are .pdb files that can be loaded.
 
         Args:
             fname: Path to the score file. Will error if does not exist.
+            work_dir: The directoy where the function will assume the description files exist.
 
         Returns:
             A pandas dataframe containing the data in the supplied score file.
         """
 
         if not Path(fname).exists():
-            _LOGGER.error(f"The suppliied file '{fname}' does not exist. Exiting...")
+            _LOGGER.error(f"The supplied file '{fname}' does not exist. Exiting...")
             exit(1)
 
         lines: List[str] = fs.lines_from_file(fname)
@@ -545,6 +1717,10 @@ class RosettaInterface(BaseInterface):
             if cn == 'description':
                 continue
             df[cn] = df[cn].astype('float')
+
+        if work_dir is not None:
+            df['description'] = df.apply(lambda row: f"{work_dir}/{row.description}.pdb", axis=1)
+
 
         return df
 
@@ -587,17 +1763,13 @@ class RosettaInterface(BaseInterface):
         return result
 
     def parameterize_ligand(self, mol: Ligand, charge:int=None, work_dir:str=None) -> Tuple[str, str]:
-        """Parameterizes the input ligand for use in the RosettaLigand protocol. Takes an input file with the ligand,
-        as well as the name of the residue in PDB format (3 capitalized letters) as well as optionally where the output
-        directory where the .params and .pdb files should be saved. The underlying script only supports .mol, .mol2, 
-        and .sdf formats. Can also add conformers to end of .params file when conformers file is supplied. Function 
-        exits on invalid inputs. 
-        TODO(CJ): fix this documentation            
+        """Parameterizes the input Ligand for Rosetta protocol, reating a .params file. Input ligand must have 
+        connectivity information for file to be accurate.
+        
         Args:
-            molfile: The name of the input file as a str().
-            res_name: The all-capitalized, three letter string of the ligand in PDB format.
-            outfile: Where the .params file should be saved. Optional.
-            conformers: The conformers file for the given ligand. Optional.
+            mol: The Ligand to parameterize.
+            charge: The integer formal charge of the ligand. Optional.
+            work_dir: Work directory where .params files are prepared and finally saved.
 
         Returns:
             A tuple() with the layout of (.params file, .pdb file)            
@@ -608,7 +1780,6 @@ class RosettaInterface(BaseInterface):
 
         res_name:str=mol.name
         molfile:str = f"{work_dir}/{res_name}.mol2"
-        conformers:str=f"{work_dir}/{res_name}_conformers.pdb"
         params_file:str=f"./{res_name}.params"
         _parser = Mol2Parser()
         _parser.save_ligand(molfile, mol)
@@ -622,7 +1793,6 @@ class RosettaInterface(BaseInterface):
             
         if len(indices) <= 2:            
             flags.append( f"--nbr_atom={indices[0]}" )
-        
 
         self.env_manager_.run_command(self.config_.PY_2_7, flags)
         fs.safe_rm(f"{res_name}_0001.pdb")
@@ -636,30 +1806,20 @@ class RosettaInterface(BaseInterface):
             )
 
         _LOGGER.info(params_file)
+        if mol.has_ensemble:
+            mapper:Dict[str, str] = dict()
+            for ll in fs.lines_from_file( params_file ):
+                if ll.startswith('ATOM'):
+                    mapper[ll[5:9].strip()] = ll[5:9]
+            
+            mol.ensemble.fix_atom_names( mapper )
 
-        n_conformers:int=mol.n_conformers()
-        if n_conformers > 1:
-            conformer_file_content:List[str] = list()
-            mol2_temp:str=f"{work_dir}/__temp_ligand_mol2.mol2"
-            _LOGGER.info(f"Detected {n_conformers} in ligand {res_name}")
-            _parser = Mol2Parser()
-            session = self.parent().pymol.new_session()
-            for cidx in range(1, n_conformers):
-                conf = mol.get_ligand_conformer(cidx)
-                fs.safe_rm(mol2_temp)
-                _parser.save_ligand(mol2_temp, conf)
-                pdb_conf:str=self.parent().pymol.convert(session, mol2_temp, new_ext='.pdb')
-                conformer_file_content.extend(fs.lines_from_file(pdb_conf))
-                fs.safe_rm(pdb_conf)
-
-            conformer_file_content = list(filter(lambda ll: ll.startswith('HETATM') or ll.startswith('END'), conformer_file_content))
-
-            fs.write_lines(conformers, conformer_file_content) 
-
+            conformers:str=f"{work_dir}/{res_name}_conformers.pdb"
+            conformers = str(Path(conformers).absolute())
+            _LOGGER.info(f"Detected {mol.ensemble.n_conformers()} in ligand {res_name}")
+            _parser = PDBParser()
+            _parser.save_ensemble( conformers, mol.ensemble )
             params_content.append(f"PDB_ROTAMERS {conformers}")
-
-            fs.safe_rm(mol2_temp)
-
         fs.write_lines(params_file, params_content)
         
         return params_file 
@@ -695,6 +1855,7 @@ class RosettaInterface(BaseInterface):
         result = " \\\n".join(result)
 
         return result
+
 
     def relax(
         self,
@@ -843,554 +2004,151 @@ class RosettaInterface(BaseInterface):
 
     def score(
         self,
-        infile: str,
-        ignore_zero_occupancy: bool = True,
-        overwrite: bool = True,
-        extra_flags: List[str] = None,
-        output_dir: str = './',
-        delete_scores: bool = True,
-        delete_crash: bool = True,
-    ) -> float:
+        structure:Union[Structure, StructureEnsemble],
+        opts:RosettaOptions=None,
+        protocol:RosettaScriptsProtocol=None,
+        score_fxn:RosettaScriptsElement=None,
+        prefix:str=None,
+        work_dir:str=None        
+    ) -> List[float]:
         """Provides the total score in Rosetta Energy Units (REU) for a given structure. Uses default flags but can have behavior modified
-        via supplied extra_flags. Returns the total score in REU.
+        via supplied extra_flags. Returns total scores in REU.
 
         Arguments:
-            infile: A str() with the path to the .pdb file to relax. 
-            ignore_zero_occupancy: If relax should ignore atoms with zero occupancy. True by default.
-            overwrite: If results should be overwritten. True by default.
-            extra_flags: A List[str] of extra flags to be added to the commandline. Empty by default. NOT CHECKED FOR CORRECTNESS. 
-            output_dir: The output directory where the files will be saved. './' by default.
-            delete_scores: Whether the score.sc file should be deleted after running. True by default.
-            delete_crash: Whether the ROSETTA_CRASH.log file should be deleted after running. True by default.
+            structure: The Structure or StructureEnsemble to score.
+            opts: A RosettaOptions object that dictates the commandline options. Optional.
+            protocol: A RosettaScriptsProtocol that defines the protocol to use for scoring. Optional.
+            score_fxn: The specific scorefxn that should be applied. Optional, uses Ref2015 by default.
+            prefix: File prefix for the temporary files that are created. Optional.
+            work_dir: Where the input and output files will be saved.
 
         Returns:
-            Score of structure in file in REU.
-
+            A List[float] with scores for the Structure()'s in the supplied Structure/StructureEnsemble.
         """
-        fs.check_file_exists(infile)
+        if prefix is None:
+            prefix = "rosetta_score"
 
-        flags: List[str] = [
-            f"-in:file:s '{infile}'",
-            "-ignore_unrecognized_res",
-        ]
+        if opts is None:
+            opts = RosettaOptions()
 
-        flags.append(f"-ignore_zero_occupancy {'true' if ignore_zero_occupancy else 'false'}")
-        flags.append(f"-out:path:all {output_dir}")
+        if score_fxn is None:
+            score_fxn = RosettaScriptsElement('ScoreFunction', name='sfxn', weights='ref2015')
 
-        if overwrite:
-            flags.append("-overwrite")
+        if isinstance(structure, Structure):
+            structure = StructureEnsemble.from_single_stru( structure )
 
-        if extra_flags:
-            flags.extend(extra_flags)
+        if protocol is None:
+            protocol = RosettaScriptsProtocol()
 
-        fs.safe_rm(f"{output_dir}/score.sc")
+        protocol.add_scorefunction(
+            score_fxn            
+        ).add_simple_metric(
+            'TotalEnergyMetric', name='score', scorefxn='sfxn'
+        ).add_protocol(
+            metrics='score'
+        )
 
-        fs.safe_mkdir(output_dir)
-
-        self.env_manager_.run_command(self.config_.SCORE, flags)
-
-        df: pd.DataFrame = self.parse_score_file(f"{output_dir}/score.sc")
-
-        if len(df) != 1:
-            _LOGGER.error("Found more than one entry in score.sc file. Exiting...")
-            exit(1)
-
-        if delete_scores:
-            self._delete_score_file(output_dir)
-
-        if delete_crash:
-            self._delete_crash_log()
-
-        return df.iloc[0].total_score
-
-    def relax_loops(
-        self,
-        infile: str,
-        nstruct: int,
-        ignore_zero_occupancy: bool = True,
-        full_atom: bool = True,
-        detect_disulf: bool = True,
-        linmem_ig: int = 10,
-        constrain_relax_to_start_coords: bool = True,
-        coord_constrain_sidechains: bool = True,
-        ramp_constraints: bool = True,
-        prefix: str = None,
-        overwrite: bool = True,
-        extra_flags: List[str] = None,
-        output_dir: str = './',
-        delete_scores: bool = True,
-        delete_crash: bool = True,
-    ) -> pd.DataFrame:
-        """
-
-        Args:
-            infile: A str() with the path to the .pdb file to relax. 
-            nstruct: Number of structures to create. 
-            ignore_zero_occupancy: If relax should ignore atoms with zero occupancy. True by default.
-            full_atom: If relax should do full atom relaxation. True by default.
-            detect_disulf: If Rosetta should detect disulfide bonds. True by default.
-            linmem_ig: Number of recent rotamers to store. 10 by default.
-            constrain_relax_to_start_coords: If the backbone atoms should be constrained. True by default.
-            coord_constrain_sidechains: If the sidechain heavy atoms should be constrained. True by default.
-            ramp_constraints: If the constraints should be ramped during initial relaxation stage. True by default.
-            prefix: str() with prefix for output file names. None and not used by default.
-            overwrite: If results should be overwritten. True by default.
-            extra_flags: A List[str] of extra flags to be added to the commandline. Empty by default. NOT CHECKED FOR CORRECTNESS. 
-            output_dir: The output directory where the files will be saved. './' by default.
-            delete_scores: Whether the score.sc file should be deleted after running. True by default.
-            delete_crash: Whether the ROSETTA_CRASH.log file should be deleted after running. True by default.
-
-
-        Returns:
-            pandas DataFrame containing the results and energies of the relaxed structures. Description column contains
-            full paths to relaxed files. 
-        """
-        #TODO(CJ):should also be able to take a Structure as input.
-        fs.check_file_exists(infile)
-
-        if Path(infile).suffix != '.pdb':
-            _LOGGER.error(f"Expected input file format is .pdb. {infile} is an invalid entry. Exiting...")
-            exit(1)
-
-        fs.safe_rm(f'{output_dir}/score.sc')
-        #/dors/meilerlab/apps/rosetta/rosetta-3.13/main/source/bin/relax.default.linuxgccrelease
-        #-out:prefix $prefix
-        #-out:file:scorefile ${prefix}.sc &
-        flags: List[str] = [
-            f"-in:file:s '{infile}'",
-            f"-nstruct {nstruct}",
-            f"-linmem_ig {linmem_ig}",
-        ]
-
-        flags.append(f"-ignore_zero_occupancy {'true' if ignore_zero_occupancy else 'false'}")
-        flags.append(f"-relax:constrain_relax_to_start_coords {'true' if constrain_relax_to_start_coords else 'false'}")
-        flags.append(f"-coord_constrain_sidechains {'true' if coord_constrain_sidechains else 'false'}")
-        flags.append(f"-ramp_constraints {'true' if ramp_constraints else 'false'}")
-        flags.append(f"-out:path:all {output_dir}")
-
-        if full_atom:
-            flags.append("-in:file:fullatom")
-
-        if detect_disulf:
-            flags.append("-in:detect_disulf")
-
-        if prefix:
-            flags.append(f"-out:prefix '{prefix}'")
-
-        if overwrite:
-            flags.append("-overwrite")
-
-        if extra_flags:
-            flags.extend(extra_flags)
-
-        fs.safe_mkdir(output_dir)
-
-        self.env_manager_.run_command(self.config_.RELAX, flags)
-
-        df: pd.DataFrame = self.parse_score_file(f'{output_dir}/score.sc')
-
-        df['description'] = df.apply(lambda row: f"{output_dir}/{row.description}.pdb", axis=1)
-
-        if delete_scores:
-            self._delete_score_file(output_dir)
-
-        if delete_crash:
-            self._delete_crash_log()
-
-        return df
-
-    def write_script(self, fname: str, args: List[Dict]) -> str:
-        """Writes an XML script to be used with RosettaScripts. Each element of the XML script is represented
-        as a dict() within a list() of args. Note that each element dict() is required to have two keys, "parent"
-        and "tag". "parent" refers to which element it should be nested under. In the case that there are multiple
-        levels of nesting, they are joined by "." characters. The "tag" is the tag name of the element but note
-        that there is NO checking for whether or not the included element tags are valid.
+        opts['overwrite'] = True
         
+        results:List[float] = list()
+        for stru in structure.structures():
+            try:
+                score_file:str=self.run_rosetta_scripts(
+                        stru,
+                        protocol,
+                        opts,
+                        prefix=prefix,
+                        work_dir=work_dir
+                        )
+                results.append(
+                    self.parse_score_file( score_file ).iloc[0].score
+                )
+            except:
+                _LOGGER.error(f"Unable to score {stru}. Setting 'rosetta_score' to 0.0. Continuing...")                
+                results.append( 0 )
+
+            stru.data['rosetta_score'] = results[-1]
+        return results
+
+    def write_constraint_file(self, 
+        stru:Structure, 
+        constraints:List[StructureConstraint], 
+        functional:str="LINEAR_PENALTY",
+        work_dir:str = None) -> str:
+        """Given a Structure and its respective constraints, writes a Rosetta formatted .cst file. NOT EnzDes constraint format. 
+
         Args:
-            fname: The .xml file to save the script contents to.
-            args: A list() of dict()'s where each is an element in the final .xml file. 
-            
-        Returns:
-            The name of the script file.
-        """
-
-        def _find_node(elem: ET.Element, name: str) -> ET.Element:
-            """Helper function that recursively finds the specified parent XML node. Assumes that supplied name
-            str() is correctly delimited with '.' characters. DOES NOT check for correctness of nam.e
-
-            Args:
-                elem: The ET.Element to search within.
-                name: The str() name to search for.
-
-            Return:
-                The XML node with the target tag name.
-            """
-            tks: List[str] = name.split('.', 1)
-
-            target: str = tks[0]
-
-            result: ET.Element = None
-            if elem.tag == target:
-                result = elem
-            else:
-                for ee in elem:
-                    if ee.tag == target:
-                        result = ee
-                        break
-                else:
-                    _LOGGER.error(f"There is no element with tag name '{target}' at this level. Exiting...")
-                    exit(1)
-
-            if len(tks) > 1:
-                return _find_node(result, tks[1])
-            else:
-                return result
-
-        root = ET.Element("ROSETTASCRIPTS")
-        ET.SubElement(root, "RESIDUE_SELECTORS")
-        ET.SubElement(root, "SCOREFXNS")
-        ET.SubElement(root, "LIGAND_AREAS")
-        ET.SubElement(root, "INTERFACE_BUILDERS")
-        ET.SubElement(root, "MOVEMAP_BUILDERS")
-        #ET.SubElement(root, "SCORINGGRIDS")
-        ET.SubElement(root, "TASKOPERATIONS")
-        ET.SubElement(root, "SIMPLE_METRICS")
-        ET.SubElement(root, "FILTERS")
-        ET.SubElement(root, "MOVERS")
-        ET.SubElement(root, "PROTOCOLS")
-        ET.SubElement(root, "OUTPUT")
-
-        for arg in args:
-            parent_name = arg.pop("parent", None)
-            tag_name = arg.pop("tag", None)
-            target_node = None
-
-            bad: bool = False
-
-            if not parent_name:
-                #TODO(CJ): check if the parent name has an equal sign specifying the target node
-                # more than what you would specify it otherwise
-                _LOGGER.error("No parent name supplied in XML element dict()!")
-                bad = True
-
-            if bad:
-                _LOGGER.error("Problems with XML elements detected. Exiting...")
-                exit(1)
-
-            child_nodes = arg.pop('child_nodes', list())
-            #if arg.get('append_elements_only', False):
-            #    _ = arg.pop('append_elements_only')
-            #    target_node = _find_node(root, tag_name)
-            #    for attrib, value in arg.items():
-            #        target_node.set( attrib, value )
-
-            #else:
-            parent: ET.Element = _find_node(root, parent_name)
-
-            if arg.get('append_elements_only', False):
-                _ = arg.pop('append_elements_only')
-                if tag_name == "SCORINGGRIDS":
-                    parent: ET.Element = _find_node(root, 'ROSETTASCRIPTS')
-                    target_node = ET.Element(tag_name)
-                    parent.insert(0, target_node)
-                    #target_node = ET.SubElement(parent[0], tag_name )
-                else:
-                    target_node = ET.SubElement(parent, tag_name)
-
-                for attrib, value in arg.items():
-                    target_node.set(attrib, value)
-            else:
-                target_node = ET.SubElement(parent, tag_name, attrib=arg)
-
-            if child_nodes:
-                for cn in child_nodes:
-                    child_child_nodes = cn.pop('child_nodes', None)
-                    tag_name = cn.pop('tag', None)
-                    _ = cn.pop('parent', None)
-                    #TODO(CJ): make this recursive so it actually works for super nested things
-                    placed_child = ET.SubElement(target_node, tag_name, attrib=cn)
-
-                    if child_child_nodes:
-                        for ccn in child_child_nodes:
-                            tag_name = ccn.pop('tag', None)
-                            _ = ccn.pop('parent', None)
-                            _ = ET.SubElement(placed_child, tag_name, attrib=ccn)
-
-        for rr in root:
-            rr.text = "\n\t"
-
-        xmlstr: str = minidom.parseString(ET.tostring(root)).toprettyxml()
-        xml_content: List[str] = xmlstr.replace('<?xml version="1.0" ?>\n', '').splitlines()
-
-        xml_content = list(filter(lambda ll: len(ll.strip()) > 0, xml_content))
-
-        fs.write_lines(fname, xml_content)
-
-        return fname
-
-    def loop_relax(
-        self,
-        infile: str,
-        nstruct: int,
-        ignore_zero_occupancy: bool = True,
-        detect_disulf: bool = True,
-        linmem_ig: int = 10,
-        overwrite: bool = True,
-        extra_flags: List[str] = None,
-        output_dir: str = './',
-        delete_scores: bool = True,
-        delete_crash: bool = True,
-    ) -> pd.DataFrame:
-        """TODO
-        Args:
-            infile: A str() with the path to the .pdb file to relax. 
-            nstruct: Number of structures to create. 
-            ignore_zero_occupancy: If relax should ignore atoms with zero occupancy. True by default.
-            detect_disulf: If Rosetta should detect disulfide bonds. True by default.
-            linmem_ig: Number of recent rotamers to store. 10 by default.
-            overwrite: If results should be overwritten. True by default.
-            extra_flags: A List[str] of extra flags to be added to the commandline. Empty by default. NOT CHECKED FOR CORRECTNESS. 
-            output_dir: The output directory where the files will be saved. './' by default.
-            delete_scores: Whether the score.sc file should be deleted after running. True by default.
-            delete_crash: Whether the ROSETTA_CRASH.log file should be deleted after running. True by default.
+            stru: The relevant Structure.
+            constraints: Constraints that will be written.
+            functional: The Rosetta constraint functional to be used. 
+            work_dir: The output directory to save the .cst file to.
 
         Returns:
-            pandas DataFrame containing the results and energies of the relaxed structures. Description column contains
-            full paths to relaxed files. 
+            The name of the file where the constraints were written.
         """
-        fs.check_file_exists(infile)
-
-        if Path(infile).suffix != '.pdb':
-            _LOGGER.error(f"Expected input file format is .pdb. {infile} is an invalid entry. Exiting...")
-            exit(1)
-
-        fs.safe_rm(f'{output_dir}/score.sc')
-        flags: List[str] = [
-            f"-in:file:s '{infile}'",
-            f"-nstruct {nstruct}",
-            f"-linmem_ig {linmem_ig}",
-        ]
-
-        df: pd.DataFrame = self.parent().pymol.collect('production.pdb', 'resi ss resn'.split(), sele='name CA')
-        df['resi'] = df.resi.astype(int)
-
-        ss = []
-        for i, row in df.iterrows():
-            if row.resn.upper() in "MG ZN HG".split():
-                ss.append('M')
-            else:
-                ss.append(row.ss)
-
-        df['ss'] = ss
-
-        elements: List[Dict] = [
-            {
-                'parent': 'SCOREFXNS',
-                'tag': 'ScoreFunction',
-                'name': 'score_fxn',
-                'weights': 'ref2015'
-            },
-            {
-                'parent': 'MOVERS',
-                'tag': 'FastRelax',
-                'name': 'fast_relax',
-                'scorefxn': 'score_fxn'
-            },
-            {
-                'parent': 'MOVERS.FastRelax',
-                'tag': 'MoveMap',
-                'name': 'move_map'
-            },
-        ]
-
-        temp: Dict[str, str] = deepcopy({
-            'state': df.iloc[0].ss,
-            'start': df.iloc[0].resi,
-            'end': df.iloc[0].resi,
-        })
-
-        for i, row in df.iterrows():
-            #TODO(CJ): need to ignore the non-amino acid stuff here
-            if row.ss == temp['state']:
-                temp['end'] = row.resi
-            else:
-                elements.append(
-                    deepcopy({
-                        'parent': 'MOVERS.FastRelax.MoveMap',
-                        'tag': 'Span',
-                        'begin': str(temp['start']),
-                        'end': str(temp['end']),
-                        'chi': 'true',
-                        'bb': 'true' if temp['state'] == 'L' else 'false'
-                    }))
-                temp = deepcopy({
-                    'state': row.ss,
-                    'start': row.resi,
-                    'end': row.resi,
-                })
-
-        elements.append(
-            deepcopy({
-                'parent': 'MOVERS.FastRelax.MoveMap',
-                'tag': 'Span',
-                'begin': str(temp['start']),
-                'end': str(temp['end']),
-                'chi': 'true',
-                'bb': 'true' if temp['state'] == 'L' else 'false'
-            }))
-
-        elements.append({'parent': 'PROTOCOLS', 'tag': 'Add', 'mover_name': 'fast_relax'})
-
-        fpath = Path(infile)
-        xml_input: str = fpath.parent / "__temp.xml"
-        xml_script = self.write_script(xml_input, elements)
-
-        flags.extend(['-parser:protocol', str(xml_input.absolute())])
-
-        flags.append(f"-ignore_zero_occupancy {'true' if ignore_zero_occupancy else 'false'}")
-        flags.append(f"-out:path:all {output_dir}")
-
-        if detect_disulf:
-            flags.append("-in:detect_disulf")
-
-        if overwrite:
-            flags.append("-overwrite")
-
-        if extra_flags:
-            flags.extend(extra_flags)
-
-        fs.safe_mkdir(output_dir)
-
-        self.run_rosetta_scripts(flags)
-
-        df: pd.DataFrame = self.parse_score_file(f'{output_dir}/score.sc')
-
-        df['description'] = df.apply(lambda row: f"{output_dir}/{row.description}.pdb", axis=1)
-
-        if delete_scores:
-            self._delete_score_file(output_dir)
-
-        if delete_crash:
-            self._delete_crash_log()
-
-        return df
-
-    def create_cst_pdb_line(self, cst:ResiduePairConstraint, idx: int) -> str:
-        """Creates a str() PDB line in the appropriate format so that Rosetta can apply the constrained geometry
-        described by the RosettaCst. This line goes in the corresponding PDB file.
-        
-        Args:
-            idx: The index of the RosettaCst as an int().
-            
-        Returns:
-            The PDB line corresponding to the RosettaCst.
-
-        """
-        return f"REMARK 666 MATCH TEMPLATE {cst.residue1.parent.name} {cst.residue1.name}  {cst.residue1.idx:>3} MATCH MOTIF {cst.residue2.parent.name} {cst.residue2.name}  {cst.residue2.idx:>3}  {idx:>3}  1"
-
-    def create_cst_lines(self, cst:ResiduePairConstraint) -> List[str]:
-        """Creates a List[str] which describes the constrained geometries in the required enzyme design format for Rosetta.
-        These lines go into the corresponding .cst file."""
-        cst_content: List[str] = list()
-        cst_content.append("CST::BEGIN")
-        cst_content.append(f"   TEMPLATE::  ATOM_MAP: 1 atom_name: {' '.join(map(lambda aa: aa.name, cst.residue1_atoms))}")
-        cst_content.append(f"   TEMPLATE::  ATOM_MAP: 1 residue3: {cst.residue1.name}")
-        cst_content.append("")
-        cst_content.append(f"   TEMPLATE::  ATOM_MAP: 2 atom_name: {' '.join(map(lambda aa: aa.name, cst.residue2_atoms))}")
-        cst_content.append(f"   TEMPLATE::  ATOM_MAP: 2 residue3: {cst.residue2.name}")
-        cst_content.append("")
-
-        for ridx, (rname, rule) in enumerate(cst.child_constraints):
-            end = 0                
-            if rule.is_angle_constraint() or rule.is_dihedral_constraint():
-                end = 1
-            cst_content.append(f"   CONSTRAINT::  {rname:>10}: {float(rule.target_value):6.2f} {float(rule.params['rosetta']['tolerance']):6.2f} {float(rule.params['rosetta']['penalty']):6.2f} {end}")
-
-        cst_content.append("CST::END")
-
-        return cst_content
-
-    def write_constraint_file(self, stru:Structure, constraints:List[StructureConstraint], work_dir:str = None) -> str:
-        #TODO(CJ): this!
         if work_dir is None:
             work_dir = "./"
     
         lines:List[str] = list()
         for cst in constraints:
             if cst.is_distance_constraint():
-                assert False
-                pass
+                ridx_1:int=stru.absolute_index(cst.atoms[0].parent, indexed=1)
+                ridx_2:int=stru.absolute_index(cst.atoms[1].parent, indexed=1)
+                lines.append(
+                    f"AtomPair "
+                    f"{cst.atoms[0].name} {ridx_1} "
+                    f"{cst.atoms[1].name} {ridx_2} "
+                    f"{functional} "
+                    f"{cst.target_value:.2f} 0.00 {cst['rosetta']['tolerance']:.2f} {cst['rosetta']['penalty']:.2f}"
+                )
+
             elif cst.is_angle_constraint():
-                assert False
+                ridx_1:int=stru.absolute_index(cst.atoms[0].parent, indexed=1)
+                ridx_2:int=stru.absolute_index(cst.atoms[1].parent, indexed=1)
+                ridx_3:int=stru.absolute_index(cst.atoms[2].parent, indexed=1)
+                lines.append(
+                    f"Angle "
+                    f"{cst.atoms[0].name} {ridx_1} "
+                    f"{cst.atoms[1].name} {ridx_2} "
+                    f"{cst.atoms[2].name} {ridx_3} "
+                    f"{functional} "
+                    f"{np.radians(cst.target_value):.2f} 0.00 {np.radians(cst['rosetta']['tolerance']):.2f} {cst['rosetta']['penalty']/np.radians(1):.2f}"
+                )
             elif cst.is_dihedral_constraint():
-                assert False
-            elif cst.is_residue_pair_constraint():
-                for (cst_name, child_cst) in cst.child_constraints:
-                    if child_cst.is_distance_constraint():
-                        ridx_1:int=stru.absolute_index(child_cst.atoms[0].parent, indexed=1)
-                        ridx_2:int=stru.absolute_index(child_cst.atoms[1].parent, indexed=1)
-                        lines.append(
-                            f"AtomPair {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} LINEAR_PENALTY {child_cst.target_value:.2f} 0.00 {child_cst['rosetta']['tolerance']:.2f} {child_cst['rosetta']['penalty']:.2f}"
-                        )
-                    elif child_cst.is_angle_constraint():
-                        ridx_1:int=stru.absolute_index(child_cst.atoms[0].parent, indexed=1)
-                        ridx_2:int=stru.absolute_index(child_cst.atoms[1].parent, indexed=1)
-                        ridx_3:int=stru.absolute_index(child_cst.atoms[2].parent, indexed=1)
-                        lines.append(
-                            f"Angle {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} {child_cst.atoms[2].name} {ridx_3} LINEAR_PENALTY {np.radians(child_cst.target_value):.2f} 0.00 {np.radians(child_cst['rosetta']['tolerance']):.2f} {child_cst['rosetta']['penalty']/np.radians(1):.2f}"
-                        )
-                    else:
-                        assert False
+                ridx_1:int=stru.absolute_index(cst.atoms[0].parent, indexed=1)
+                ridx_2:int=stru.absolute_index(cst.atoms[1].parent, indexed=1)
+                ridx_3:int=stru.absolute_index(cst.atoms[2].parent, indexed=1)
+                ridx_4:int=stru.absolute_index(cst.atoms[3].parent, indexed=1)
+                lines.append(
+                    f"Dihedral "
+                    f"{cst.atoms[0].name} {ridx_1} "
+                    f"{cst.atoms[1].name} {ridx_2} "
+                    f"{cst.atoms[2].name} {ridx_3} "
+                    f"{cst.atoms[3].name} {ridx_4} "
+                    f"{functional} "
+                    f"{np.radians(cst.target_value):.2f} 0.00 {np.radians(cst['rosetta']['tolerance']):.2f} {cst['rosetta']['penalty']/np.radians(1):.2f}"
+                )
+            elif cst.is_cartesian_freeze():
+                for atom in cst.atoms:
+                    ridx_1:int=stru.absolute_index(atom.parent, indexed=1)
+                    lines.append(
+                        f"CoordinateConstraint "
+                        f"{atom.name} {ridx_1} "
+                        f"{atom.name} {ridx_1} "
+                        f"0 0 0 "
+                        f"{functional} "
+                        f"1"
+                    )
+
+                    
 
         fs.safe_mkdir(work_dir)
         fname:str = f"{work_dir}/constraints.cst"
         fs.write_lines(fname, lines )
         return fname 
 
-    def integrate_enzdes_constraints(self, stru:Structure, constraints:List[StructureConstraint], work_dir:str=None) -> Tuple[str,str]:
-        #TODO(CJ): update this
-
-        if work_dir is None:
-            work_dir = "./"
-
-        fs.safe_mkdir(work_dir)
-
-        _LOGGER.info("Beginning RosettaCst constraint integration...")
-        parser = PDBParser()
-        file_str = parser.get_file_str(stru, if_renumber=False, if_fix_atomname=False)
-    
-        pdb_content: List[str] = ["HEADER                                            xx-MMM-xx"]
-        cst_content: List[str] = list()
-        counter = 1
-        for cidx, cst in enumerate(constraints):
-            if cst.is_residue_pair_constraint():
-                pdb_content.append(self.create_cst_pdb_line(cst, counter))
-                cst_content.extend(self.create_cst_lines(cst))
-                counter += 1
-    
-        pdb_file: str = f"{work_dir}/start.pdb"
-        cst_file: str = f"{work_dir}/rdock.cst"
-    
-        if not Path(pdb_file).exists():
-            fs.write_lines(pdb_file, pdb_content + file_str.splitlines())
-    
-        if not Path(cst_file).exists():
-            fs.write_lines(cst_file, cst_content)
-    
-        _LOGGER.info("RosettaCst constraint integration successful! Relevant files:")
-        _LOGGER.info(f"\t.pdb file: {Path(pdb_file).absolute()}")
-        _LOGGER.info(f"\t.cst file: {Path(cst_file).absolute()}")
-    
-        return (pdb_file, cst_file)
-
-    def score_energy(self, cst) -> float: 
-        """TODO(CJ): add documentation"""
-
-        if cst.is_residue_pair_constraint():
-            total:float = 0.0
-            for (_,child_cst) in self.child_constraints:
-                total += self.score_energy(child_cst)
-            return total
+    def score_energy(self, cst:StructureConstraint) -> float: 
+        """Determines the current energy for the supplied constraint."""
 
         penalty:float = cst['rosetta']['penalty'] 
         tolerance:float = cst['rosetta']['tolerance']
@@ -1526,77 +2284,6 @@ class RosettaInterface(BaseInterface):
             Nothing.
         """
 
-        def fix_remodel(stru:Structure, seq_res:List[chem.SeqRes], work_dir:str) -> Structure:
-            """Hacky helper method that makes sure all of amino acids have the correct identities."""
-            content = """<ROSETTASCRIPTS>
-<SCOREFXNS>
-</SCOREFXNS>
-<RESIDUE_SELECTORS>
-</RESIDUE_SELECTORS>
-<PACKER_PALETTES>
-</PACKER_PALETTES>
-<TASKOPERATIONS>
-</TASKOPERATIONS>
-<MOVE_MAP_FACTORIES>
-</MOVE_MAP_FACTORIES>
-<SIMPLE_METRICS>
-</SIMPLE_METRICS>
-<FILTERS>
-</FILTERS>
-<MOVERS>""".split()
-            sr: chem.SeqRes  
-            muts = list()
-            for idx,(res, sr) in enumerate(zip(stru.residues, seq_res)):
-                seq_res_three_letter = chem.convert_to_three_letter(sr.one_letter())
-                if res.name == seq_res_three_letter:
-                    continue
-                mut_name = f"mut{idx+1}"
-                content.append(f"""<MutateResidue name="{mut_name}" target="{idx+1}" new_res="{seq_res_three_letter}" />""")
-                muts.append( mut_name )
-            if not muts:
-                return stru
-            content.extend("""</MOVERS>
-<PROTOCOLS>""".split())
-            
-            for mm in muts:
-                content.append(f"\t<Add mover_name=\"{mm}\"/>")
-
-            content.extend("""</PROTOCOLS>
-<OUTPUT />
-</ROSETTASCRIPTS>""".splitlines())
-            
-            script_file = f"{work_dir}/fix_remodel_script.xml"
-            pdb_infile = f"{work_dir}/fix_remodel.pdb"
-            pdb_outfile = f"{work_dir}/fix_remodel_0001.pdb"
-
-            fs.write_lines(script_file, content)
-            sp = PDBParser()
-            sp.save_structure(pdb_infile, stru)
-
-            opts = [
-                '-in:file:s', pdb_infile,
-                '-parser:protocol', script_file,
-                '-out:path:all', work_dir
-            ]
-            self.run_rosetta_scripts( opts )
-
-            if not Path(pdb_outfile).exists():
-                err_msg:str=f"The output file '{pdb_outfile}' was not created. Error during loop reconstruction fixing protocol."
-                _LOGGER.error( err_msg )
-                raise ValueError( err_msg )
-
-            result =  sp.get_structure( pdb_outfile )
-
-            fs.safe_rm(script_file)
-            fs.safe_rm(pdb_infile)
-            fs.safe_rm(pdb_outfile)
-
-            return result
-
-
-
-        fs.safe_mkdir( work_dir )
-
         translate_structure( stru, end_naming='rosetta' )
         
         all_chains:List[Chain] = stru.non_polypeptides
@@ -1633,38 +2320,43 @@ class RosettaInterface(BaseInterface):
 
             remodel_file:str = f"{work_dir}/input.remodel"
             fs.write_lines( remodel_file, content ) 
-            script_file:str=f"{work_dir}/remodel_script.xml"
-            pdb_file = f"{work_dir}/remodel_input.pdb"
-            pdb_outfile = f"{work_dir}/remodel_input_0001.pdb"
-            
-            opts:List[str] = [
-                    "-in:file:s", pdb_file,
-                    "-remodel:num_trajectory", "1",
-                    "-remodel:quick_and_dirty",
-                    "-overwrite",
-                    "-ignore_zero_occupancy", "false",
-                    "-remodel:use_blueprint_sequence", "true",
-                    "-remodel:blueprint", remodel_file,
-                    "-out:path:all", f"{work_dir}",
-                    ]
-            
+
+            opts = RosettaOptions()
+            opts['remodel:num_trajectory'] = 1
+            opts['remodel:quick_and_dirty'] = True
+            opts['overwrite'] = True
+            opts['ignore_zero_occupancy'] = False
+            opts['remodel:use_blueprint_sequence'] = True
+            opts['out:path:all'] =  f"{work_dir}"
+
+            protocol = RosettaScriptsProtocol()
+            protocol.add_mover( 
+                'RemodelMover', name='rm', blueprint=remodel_file
+            ).add_protocol(
+                mover_name='rm'
+            )
+
+            self.run_rosetta_scripts( single_chain_stru, protocol, opts )
+            df : pd.DataFrame = self.parse_score_file( opts['out:file:scorefile'] )
             parser = PDBParser() 
-            parser.save_structure( pdb_file, single_chain_stru )
-            self.env_manager_.run_command(
-                self.config_.get_exe("REMODEL"), 
-                opts, quiet_fail=True)
-        
-            if not Path(pdb_outfile).exists():
-                err_msg:str=f"The output file '{pdb_outfile}' was not created. Error during loop reconstruction."
-                _LOGGER.error( err_msg )
-                raise ValueError( err_msg )
-
-            filled_single_chain_stru = parser.get_structure( pdb_outfile )
+            filled_single_chain_stru = parser.get_structure( f"{opts['out:path:all']}/{df.iloc[0].description}.pdb")
+            if not chem.same_aa_sequence( 
+                filled_single_chain_stru.seqres_sequence,
+                seq_res ):
+                mut_protocol = RosettaScriptsProtocol()
+                for midx, (act, targ) in enumerate(zip( filled_single_chain_stru.seqres_sequence, seq_res)):
+                    
+                    if not act.same_aa( targ ):
+                        mut_name:str=f"mut{midx+1}"
+                        mut_protocol.add_mover(
+                            'MutateResidue', name=mut_name, target=f"{midx+1}", new_res=chem.convert_to_three_letter(targ.one_letter())
+                        ).add_protocol(
+                            mover_name=mut_name
+                        )
+                self.run_rosetta_scripts( filled_single_chain_stru, mut_protocol, opts )
+                df : pd.DataFrame = self.parse_score_file( opts['out:file:scorefile'] )
+                filled_single_chain_stru = parser.get_structure( f"{opts['out:path:all']}/{df.iloc[0].description}.pdb")
             
-            filled_single_chain_stru = fix_remodel(filled_single_chain_stru, seq_res, work_dir)
-            
-            assert len(seq_res) == len(filled_single_chain_stru.residues) 
-
             for sr, res in zip(seq_res, filled_single_chain_stru.residues ):
                 res.idx = sr.idx
                 res.parent.name = sr.chain 
@@ -1676,3 +2368,31 @@ class RosettaInterface(BaseInterface):
         translate_structure(filled_stru, start_naming='rosetta' )
         filled_stru.sort_chains()
         stru.chains = filled_stru.chains
+
+
+    def parameterize_structure(self, stru:Structure, param_dir:str, overwrite:bool=False) -> None:
+        """Setup non-standad residues and ligands for use in Rosetta. All files are created in the standard
+        .params format, and saved to the supplied param_dir. The params list() is stored in the .data attribute
+        of the supplied Structure() with the key 'rosetta_params'.
+        
+        Args:
+            stru: The Structure() to add params files to.
+            param_dir: Where the .params files should be stored.
+    
+        Returns:
+            Nothing.
+        """
+        fs.safe_mkdir( param_dir )
+
+        params_list:List[str] = list()
+        for res in stru.residues:
+            if res.is_ligand():
+                lname:str = res.name
+                params_file:str = Path(param_dir)/ f"{lname}.params"
+                if not params_file.exists() or overwrite:
+                    self.parameterize_ligand(res, charge=res.net_charge, work_dir=param_dir)
+                
+                params_list.append( str(params_file) )
+        
+        stru.data['rosetta_params'] = params_list
+

@@ -47,7 +47,9 @@ class Accre(ClusterInterface):
     }
 
     G16_ENV = {
-        "CPU":{ "head" : """module load Gaussian/16.B.01
+        "CPU":{ "head" : """
+setup_accre_software_stack
+module load Gaussian/16.B.01
 mkdir $TMPDIR/$SLURM_JOB_ID
 export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID""",
                 "tail" : """rm -rf $TMPDIR/$SLURM_JOB_ID"""},
@@ -78,6 +80,9 @@ export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
 {MULTIWFN_ENV['CPU']}""",
         "GPU": None,
     }
+    XTB_ENV = {
+        "CPU": "source /home/jurichc/setup-accre.sh"
+    }
     #############################
     ### Internal use constant ###
     #############################
@@ -103,7 +108,7 @@ export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
     RES_KEYWORDS_MAP = { 
         "core_type" : None,
         "nodes":"nodes=",
-        "node_cores" : {"cpu": "tasks-per-node=", "gpu": "gres=gpu:"},
+        "node_cores" : {"cpu": "tasks-per-node=", "gpu": "gres=gpu:nvidia_rtx_a6000:"},
         "job_name" : "job-name=",
         "partition" : "partition=",
         "mem_per_core" : {"cpu": "mem-per-cpu=", "gpu": "mem="}, # previously using mem-per-gpu= change to mem= (calculate the total memory) base on issue #57
@@ -162,7 +167,7 @@ export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
         for k in new_dict:
             if k == "mem=":
                 mem_per_core_n_gb = new_dict[k].rstrip("GB")
-                total_mem = round_by(float(mem_per_core_n_gb) * float(res_dict["node_cores"]), 0.1) # round up
+                total_mem = round_by(float(mem_per_core_n_gb) * float(res_dict["node_cores"].split(':')[-1]), 0.1) # round up
                 new_dict[k] = f"{total_mem}G"
         return new_dict
 
@@ -177,6 +182,8 @@ export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
             res_line = f"#SBATCH --{k}{v}\n"
             res_str += res_line
         res_str += "#SBATCH --export=NONE\n"
+        #res_str += "#SBATCH --gres=gpu:nvidia_rtx_a6000:1"
+        #res_str += "#SBATCH --exclude=gpu0022,gpu0002\n"
         return res_str
     
     @classmethod

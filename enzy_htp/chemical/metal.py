@@ -178,5 +178,3 @@ def get_atom_radii(element: str, method: str = "ionic") -> float:
         sys.exit(1)
     return result
 
-
-# TODO(CJ): add method is_metal() that checks if an atom is a metal
