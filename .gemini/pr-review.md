@@ -62,5 +62,10 @@ When you provide feedback, follow these guidelines:
 4.  Run the relevant tests to ensure that the changes are working as expected and do not break existing functionality.
 5.  Summarize your findings in a clear and concise manner.
 6.  If there are issues, provide specific feedback and suggestions for improvement. (Use `gh api` to put comments to files and lines)
+    This is an exmpale for adding a multi-line comment:
+    `gh api repos/ChemBioHTP/EnzyHTP/pulls/184/comments -f 'body=test' -f 'commit_id=5e71224a3ac256e576ecb9b4f03c338b8701725a' -f 'path=.gemini/pr-review.md' -F 'start_line=1' -F 'line=10'`
+    The format is
+    `gh api repos/<repo_name>/pulls/<pr_number>/comments -f 'body=<comment body>' -f 'commit_id=<the current commit SHA>' -f 'path=<target file path>' -F 'start_line=<target statr line number>' -F 'line=<target end line number>'`
+    (NOTE!! The value you put in `start_line` should be smaller than the value you put in `line`)
 
 IMPORTANT! Never try to change the code. When you see a problem, just leave a PR comment in the review.
