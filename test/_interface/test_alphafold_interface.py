@@ -18,10 +18,13 @@ from enzy_htp.structure import Structure
 from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core.clusters.accre_r9 import AccreR9
 from enzy_htp.core.logger import _LOGGER
+import enzy_htp.core.file_system as fs
 from enzy_htp.chemical.sequence import create_fasta_from_sequences
 af_interface = interface.alphafold
 af_config = eh_config.alphafold
 
+DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
+WORK_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/work_dir/"
 
 @pytest.fixture
 def alphafold_config_modifier():
@@ -267,6 +270,7 @@ class TestAlphafoldClusterJobs:
             UNIREF30_DATABASE_PATH="/sb/apps/alphafold-data.230/uniref30/UniRef30_2021_03",
             BFD_DATABASE_PATH="/sb/apps/alphafold-data.230/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt",
             TEMPLATE_MMCIF_DIR="/sb/apps/alphafold-data.230/pdb_mmcif/mmcif_files",
+            PDB70_DATABASE_PATH="/sb/apps/alphafold-data.230/pdb70/pdb70",
             PDB_SEQRES_DATABASE_PATH="/sb/apps/alphafold-data.230/pdb_seqres/pdb_seqres.txt",
             OBSOLETE_PDBS_PATH="/sb/apps/alphafold-data.230/pdb_mmcif/obsolete.dat",
             UNIPROT_DATABASE_PATH="/sb/apps/alphafold-data.230/uniprot/uniprot.fasta",
@@ -394,6 +398,7 @@ class TestAlphafoldClusterJobs:
             UNIREF30_DATABASE_PATH="/sb/apps/alphafold-data.230/uniref30/UniRef30_2021_03",
             BFD_DATABASE_PATH="/sb/apps/alphafold-data.230/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt",
             TEMPLATE_MMCIF_DIR="/sb/apps/alphafold-data.230/pdb_mmcif/mmcif_files",
+            PDB70_DATABASE_PATH="/sb/apps/alphafold-data.230/pdb70/pdb70",
             PDB_SEQRES_DATABASE_PATH="/sb/apps/alphafold-data.230/pdb_seqres/pdb_seqres.txt",
             OBSOLETE_PDBS_PATH="/sb/apps/alphafold-data.230/pdb_mmcif/obsolete.dat",
             UNIPROT_DATABASE_PATH="/sb/apps/alphafold-data.230/uniprot/uniprot.fasta",
@@ -583,6 +588,7 @@ class TestAlphafoldAccreR9Integration:
             UNIREF30_DATABASE_PATH="/sb/apps/alphafold-data.230/uniref30/UniRef30_2021_03",
             BFD_DATABASE_PATH="/sb/apps/alphafold-data.230/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt",
             TEMPLATE_MMCIF_DIR="/sb/apps/alphafold-data.230/pdb_mmcif/mmcif_files",
+            PDB70_DATABASE_PATH="/sb/apps/alphafold-data.230/pdb70/pdb70",
             OBSOLETE_PDBS_PATH="/sb/apps/alphafold-data.230/pdb_mmcif/obsolete.dat",
             USE_GPU_RELAX=True
         )
@@ -601,17 +607,23 @@ class TestAlphafoldAccreR9Integration:
 
         # Very short test sequence to minimize computational cost
         sequences = ["MSTPSLIPSGVHEVLAKYKDGN"]
+        test_output_dir = Path(f"{WORK_DIR}/test_af2_output")
         
-        with tempfile.TemporaryDirectory() as temp_dir:
+        try:
             # Create result eggs for actual submission
             result = af_interface.af2_predict(
                 sequences=sequences,
-                out_dir=Path(temp_dir) / "output",
+                out_dir=test_output_dir,
                 cluster_job_config=cluster_job_config,
                 seq_per_job=1,
                 model_preset="monomer_ptm",
             )
             print(result)
+        finally:
+            pass
+            # Cleanup test directory
+            # if test_output_dir.exists():
+            #     fs.safe_rmdir(test_output_dir)
 
 class TestAlphaFold2ResultEgg:
     """Tests for AlphaFold2 result egg functionality."""

@@ -63,6 +63,9 @@ class AlphafoldConfig(BaseConfig):
     BFD_DATABASE_PATH: str = ""
     """Path to BFD database."""
     
+    PDB70_DATABASE_PATH: str = ""
+    """Path to PDB70 database."""
+    
     TEMPLATE_MMCIF_DIR: str = ""
     """Path to template mmCIF directory."""
     

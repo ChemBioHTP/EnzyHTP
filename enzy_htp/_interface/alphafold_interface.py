@@ -12,6 +12,7 @@ from typing import Union, List, Optional, Dict
 from pathlib import Path
 from dataclasses import dataclass
 
+from enzy_htp import config as eh_config
 from .base_interface import BaseInterface
 from .handle_types.modeling_engine import ModelingResultEgg
 from enzy_htp.structure import Structure
@@ -116,21 +117,21 @@ class AlphafoldInterface(BaseInterface):
         stru_parser = PDBParser()
         
         try:
-            # Create FASTA file using helper function
+            # Create output directory first
+            if out_dir is None:
+                scratch_dir = eh_config.system.SCRATCH_DIR
+                out_dir = fs.get_valid_temp_name(f"{scratch_dir}/alphafold2")
+                temp_paths.append(out_dir)
+            fs.safe_mkdir(out_dir)
+
             sequence_ids = [f"seq_{i}" for i in range(len(sequences))]
-            fasta_path = create_fasta_from_sequences(
+            fasta_path = fs.get_valid_temp_name(f"{out_dir}/input_sequences.fasta")
+            create_fasta_from_sequences(
                 sequences, 
-                sequence_ids, 
+                sequence_ids,
+                output_path=fasta_path
             )
             temp_paths.append(fasta_path)
-
-            # Create output directory
-            if out_dir is None:
-                out_dir = Path(tempfile.mkdtemp(prefix='alphafold2_'))
-                temp_paths.append(str(out_dir))
-            else:
-                out_dir = Path(out_dir)
-            out_dir.mkdir(exist_ok=True)
 
             if cluster_job_config:
                 # Run on cluster using array jobs
@@ -331,10 +332,11 @@ class AlphafoldInterface(BaseInterface):
         for i in range(0, len(fasta_sequences), seq_per_job):
             job_sequences = fasta_sequences[i:i+seq_per_job]
             job_seq_ids = [seq_id for seq_id, _ in job_sequences]
+            job_seq = [seq for _, seq in job_sequences]
             
             # Create FASTA for this job
             job_fasta_path = create_fasta_from_sequences(
-                [seq for _, seq in job_sequences],
+                job_seq,
                 job_seq_ids,
                 output_path=out_dir / f"job_{i//seq_per_job}.fasta"
             )
@@ -525,21 +527,51 @@ class AlphafoldInterface(BaseInterface):
 
     def _build_alphafold2_native_python_command(
         self,
-        fasta_path: str,
-        out_dir: Path,
-        num_models: int,
-        num_recycles: int,
-        num_relax: int,
-        relax_max_iteration: int,
-        use_templates: bool,
-        model_preset: str,
-        additional_options: Optional[List[str]],
-        core_type: str = "gpu"
+        fasta_path: str, # --fasta_paths
+        out_dir: Path, # --output_dir
+        use_templates: bool, # if this is false, set max_template_date to 1900-01-01
+        model_preset: str = None, # --model_preset (we need to make auto default value for monomer and multimer)
+        additional_options: Optional[List[str]] = None,
+        max_template_date: Optional[str] = None, # --max_template_date
+        models_to_relax: str = "best", # --models_to_relax
+        num_multimer_predictions_per_model: int = 5, # --num_multimer_predictions_per_model
+        use_precomputed_msas: bool = False, # --use_precomputed_msas
+        random_seed: Optional[int] = None, # --random_seed
+        db_preset: str = "full_dbs", # --db_preset
+        core_type: str = "gpu",
     ) -> List[str]:
         """Build command for AlphaFold2 native Python execution.
         
         Args:
             non_armer_core_type: Computing core type ('gpu' or 'cpu')
+        
+        TODO
+        # DB paths
+        --bfd_database_path: Path to the BFD database for use by HHblits.
+        --data_dir: Path to directory of supporting data.
+        --mgnify_database_path: Path to the MGnify database for use by JackHMMER.
+        --obsolete_pdbs_path: Path to file containing a mapping from obsolete PDB IDs to the PDB IDs of their replacements.
+        --pdb70_database_path: Path to the PDB70 database for use by HHsearch.
+        --pdb_seqres_database_path: Path to the PDB seqres database for use by hmmsearch.
+        --small_bfd_database_path: Path to the small version of BFD used with the "reduced_dbs" preset.
+        --template_mmcif_dir: Path to a directory with template mmCIF structures, each named <pdb_id>.cif
+        --uniprot_database_path: Path to the Uniprot database for use by JackHMMer.
+        --uniref30_database_path: Path to the UniRef30 database for use by HHblits.
+        --uniref90_database_path: Path to the Uniref90 database for use by JackHMMER.
+
+        # exe configs        
+        --hhblits_binary_path: Path to the HHblits executable.
+            (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/hhblits')
+        --hhsearch_binary_path: Path to the HHsearch executable.
+            (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/hhsearch')
+        --hmmbuild_binary_path: Path to the hmmbuild executable.
+            (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/hmmbuild')
+        --hmmsearch_binary_path: Path to the hmmsearch executable.
+            (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/hmmsearch')
+        --jackhmmer_binary_path: Path to the JackHMMER executable.
+            (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/jackhmmer')
+        --kalign_binary_path: Path to the Kalign executable.
+            (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/kalign')
         """
         config = self.config_
         
@@ -549,19 +581,17 @@ class AlphafoldInterface(BaseInterface):
         cmd.extend(["--data_dir", config.DATA_DIR])
         cmd.extend(["--max_template_date", "9999-12-31"])
         
-        # Add AlphaFold2-specific parameters (note: not all parameters from ColabFold are supported)
+        # Add AlphaFold2-specific parameters 
+        # TODO auto default value for preset ("monomer_ptm" for monomer and "multimer" for multimer)
         if model_preset:
             cmd.extend(["--model_preset", model_preset])
-        
-        # Note: num_models, num_recycles, num_relax, relax_max_iteration, use_templates
-        # are not directly supported by native AlphaFold2 run_alphafold.py
-        # These are typically configured in the model preset or configuration files
-        
+                
         # Add all database paths required by AlphaFold
         if hasattr(config, 'UNIREF90_DATABASE_PATH') and config.UNIREF90_DATABASE_PATH:
             cmd.extend(["--uniref90_database_path", config.UNIREF90_DATABASE_PATH])
 
-        cmd.extend(["--pdb70_database_path", "/sb/apps/alphafold-data.230/pdb70/pdb70"])
+        if hasattr(config, 'PDB70_DATABASE_PATH') and config.PDB70_DATABASE_PATH:
+            cmd.extend(["--pdb70_database_path", config.PDB70_DATABASE_PATH])
 
         if hasattr(config, 'MGNIFY_DATABASE_PATH') and config.MGNIFY_DATABASE_PATH:
             cmd.extend(["--mgnify_database_path", config.MGNIFY_DATABASE_PATH])
