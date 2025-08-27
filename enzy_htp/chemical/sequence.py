@@ -16,7 +16,6 @@ def create_fasta_from_sequences(
     sequences: Union[str, List[str]], 
     sequence_ids: Union[str, List[str], None] = None,
     output_path: Union[str, Path, None] = None,
-    delete_on_close: bool = True
 ) -> str:
     """Create a FASTA file from protein sequences.
     
@@ -59,8 +58,8 @@ def create_fasta_from_sequences(
     if output_path is None:
         temp_file = tempfile.NamedTemporaryFile(
             mode='w', 
-            suffix='.fasta', 
-            delete=delete_on_close
+            suffix='.fasta',
+            delete=False,
         )
         file_handle = temp_file
         file_path = temp_file.name

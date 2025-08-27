@@ -70,9 +70,10 @@ class AlphafoldInterface(BaseInterface):
         self, 
         sequences: List[str], 
         out_dir: Union[str, Path, None] = None,
+        # local run related
+        non_armer_core_type: str = "gpu",
         # cluster job related
         cluster_job_config: Optional[Union[ClusterJobConfig, Dict]] = None,
-        non_armer_core_type: str = "gpu",
         array_size: int = 0,
         job_check_period: int = 30,
         seq_per_job: int = 1,
@@ -120,7 +121,6 @@ class AlphafoldInterface(BaseInterface):
             fasta_path = create_fasta_from_sequences(
                 sequences, 
                 sequence_ids, 
-                delete_on_close=False
             )
             temp_paths.append(fasta_path)
 
@@ -149,7 +149,7 @@ class AlphafoldInterface(BaseInterface):
                     cluster_job_config=cluster_job_config,
                     seq_per_job=seq_per_job
                 )
-                
+                import pdb;pdb.set_trace()
                 # Submit and wait for array jobs
                 all_jobs = [egg.job for egg in result_eggs]
                 failed_jobs = ClusterJob.wait_to_array_end_plus(
@@ -560,7 +560,9 @@ class AlphafoldInterface(BaseInterface):
         # Add all database paths required by AlphaFold
         if hasattr(config, 'UNIREF90_DATABASE_PATH') and config.UNIREF90_DATABASE_PATH:
             cmd.extend(["--uniref90_database_path", config.UNIREF90_DATABASE_PATH])
-        
+
+        cmd.extend(["--pdb70_database_path", "/sb/apps/alphafold-data.230/pdb70/pdb70"])
+
         if hasattr(config, 'MGNIFY_DATABASE_PATH') and config.MGNIFY_DATABASE_PATH:
             cmd.extend(["--mgnify_database_path", config.MGNIFY_DATABASE_PATH])
             
@@ -573,14 +575,14 @@ class AlphafoldInterface(BaseInterface):
         if hasattr(config, 'TEMPLATE_MMCIF_DIR') and config.TEMPLATE_MMCIF_DIR:
             cmd.extend(["--template_mmcif_dir", config.TEMPLATE_MMCIF_DIR])
             
-        if hasattr(config, 'PDB_SEQRES_DATABASE_PATH') and config.PDB_SEQRES_DATABASE_PATH:
-            cmd.extend(["--pdb_seqres_database_path", config.PDB_SEQRES_DATABASE_PATH])
+        # if hasattr(config, 'PDB_SEQRES_DATABASE_PATH') and config.PDB_SEQRES_DATABASE_PATH:
+        #     cmd.extend(["--pdb_seqres_database_path", config.PDB_SEQRES_DATABASE_PATH])
             
         if hasattr(config, 'OBSOLETE_PDBS_PATH') and config.OBSOLETE_PDBS_PATH:
             cmd.extend(["--obsolete_pdbs_path", config.OBSOLETE_PDBS_PATH])
             
-        if hasattr(config, 'UNIPROT_DATABASE_PATH') and config.UNIPROT_DATABASE_PATH:
-            cmd.extend(["--uniprot_database_path", config.UNIPROT_DATABASE_PATH])
+        # if hasattr(config, 'UNIPROT_DATABASE_PATH') and config.UNIPROT_DATABASE_PATH:
+        #     cmd.extend(["--uniprot_database_path", config.UNIPROT_DATABASE_PATH])
         
         # Add GPU relax option
         if hasattr(config, 'USE_GPU_RELAX') and config.USE_GPU_RELAX and core_type == "gpu":

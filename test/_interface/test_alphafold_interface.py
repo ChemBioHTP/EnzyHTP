@@ -17,9 +17,54 @@ from enzy_htp._config.alphafold_config import AlphafoldConfig
 from enzy_htp.structure import Structure
 from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core.clusters.accre_r9 import AccreR9
+from enzy_htp.core.logger import _LOGGER
 from enzy_htp.chemical.sequence import create_fasta_from_sequences
 af_interface = interface.alphafold
 af_config = eh_config.alphafold
+
+
+@pytest.fixture
+def alphafold_config_modifier():
+    """Fixture to modify any attributes in alphafold config and restore them after test."""
+    original_values = {}
+    
+    def _modify_config(**kwargs):
+        """Modify config attributes and store original values for restoration.
+        
+        Args:
+            **kwargs: Key-value pairs where keys are attribute names and values are new values.
+            
+        Returns:
+            The modified config object.
+            
+        Examples:
+            # Modify single attribute
+            config = alphafold_config_modifier(INSTALL_TYPE="alphafold2_native_python")
+            
+            # Modify multiple attributes
+            config = alphafold_config_modifier(
+                INSTALL_TYPE="alphafold2_native_python",
+                EXECUTABLE_PATH="/path/to/run_alphafold.py",
+                DATA_DIR="/path/to/data"
+            )
+        """
+        for attr_name, new_value in kwargs.items():
+            if hasattr(af_config, attr_name):
+                # Store original value if not already stored
+                if attr_name not in original_values:
+                    original_values[attr_name] = getattr(af_config, attr_name)
+                # Set new value
+                setattr(af_config, attr_name, new_value)
+            else:
+                raise AttributeError(f"AlphafoldConfig has no attribute '{attr_name}'")
+        return af_config
+    
+    yield _modify_config
+    
+    # Restore all original values after test
+    for attr_name, original_value in original_values.items():
+        setattr(af_config, attr_name, original_value)
+
 
 class TestAlphafoldInterfaceUnmocked:
     """Un-mocked tests for AlphafoldInterface."""
@@ -69,11 +114,13 @@ class TestAlphafoldInterfaceUnmocked:
         assert "--model-type" in cmd
         assert "alphafold2_ptm" in cmd
 
-    def test_build_alphafold2_native_container_command(self):
+    def test_build_alphafold2_native_container_command(self, alphafold_config_modifier):
         """Test building native AlphaFold2 command without mocking."""
         # Arrange
-        self.config.DATA_DIR = "/path/to/data"
-        self.config.EXECUTABLE_PATH = "/path/to/run_alphafold.py"
+        alphafold_config_modifier(
+            DATA_DIR="/path/to/data",
+            EXECUTABLE_PATH="/path/to/run_alphafold.py"
+        )
         fasta_path = "/tmp/test.fasta"
         out_dir = Path("/tmp/out")
         
@@ -95,11 +142,13 @@ class TestAlphafoldInterfaceUnmocked:
         assert "--max_template_date" in cmd
         assert "2023-05-01" in cmd
 
-    def test_build_alphafold2_native_python_command(self):
+    def test_build_alphafold2_native_python_command(self, alphafold_config_modifier):
         """Test building AlphaFold2 native Python command without mocking."""
         # Arrange
-        self.config.EXECUTABLE_PATH = "/path/to/run_alphafold.py"
-        self.config.DATA_DIR = "/path/to/data"
+        alphafold_config_modifier(
+            EXECUTABLE_PATH="/path/to/run_alphafold.py",
+            DATA_DIR="/path/to/data"
+        )
         fasta_path = "/tmp/test.fasta"
         out_dir = Path("/tmp/out")
         
@@ -153,11 +202,14 @@ class TestAlphafoldInterfaceUnmocked:
             assert "unrelaxed" in result["seq_1"]  # Only unrelaxed available
             assert len(result) == 2  # Should not include non-PDB files
 
-    def test_unsupported_install_type_error(self):
+    def test_unsupported_install_type_error(self, alphafold_config_modifier):
         """Test error handling for unsupported install type."""
         # Arrange
-        self.config.INSTALL_TYPE = "unsupported_type"
-        
+        alphafold_config_modifier(
+            INSTALL_TYPE="unsupported_type",
+            EXECUTABLE_PATH="placeholder"
+        )
+
         # Act & Assert
         with pytest.raises(ValueError, match="Unsupported install type"):
             self.interface.run("/tmp/test.fasta", "/tmp/out")
@@ -176,11 +228,10 @@ class TestAlphafoldInterfaceUnmocked:
             )
             
             # Import an actual cluster type for testing
-            from enzy_htp.core.clusters.accre import Accre
-            cluster = Accre()
+            cluster = AccreR9()
             
             # Act
-            result_egg = self.interface.make_job(
+            result_eggs = self.interface.make_job(
                 fasta_path=fasta_path,
                 out_dir=temp_path / "output",
                 seq_per_job=2,
@@ -188,36 +239,42 @@ class TestAlphafoldInterfaceUnmocked:
             )
             
             # Assert
-            assert isinstance(result_egg, AlphaFold2ResultEgg)
-            assert result_egg.fasta_path == fasta_path
-            assert result_egg.output_dir == temp_path / "output"
-            assert len(result_egg.sequence_ids) == 3
-            assert len(result_egg.jobs) == 2  # 3 sequences / 2 per job = 2 jobs
-            assert result_egg.sequence_ids == ["seq_0", "seq_1", "seq_2"]
+            assert isinstance(result_eggs, list)
+            assert len(result_eggs) == 2  # 3 sequences / 2 per job = 2 jobs
+            assert all(isinstance(egg, AlphaFold2ResultEgg) for egg in result_eggs)
+            
+            # First job should have 2 sequences
+            assert len(result_eggs[0].sequence_ids) == 2
+            assert result_eggs[0].sequence_ids == ["seq_0", "seq_1"]
+            
+            # Second job should have 1 sequence 
+            assert len(result_eggs[1].sequence_ids) == 1
+            assert result_eggs[1].sequence_ids == ["seq_2"]
 
 
 class TestAlphafoldClusterJobs:
     """Tests for AlphaFold2 cluster job functionality."""
 
-    def test_af2_predict_with_cluster_job_config_accre_r9(self):
-        """Test af2_predict with ACCRE R9 cluster job configuration."""
+    def test_make_job_with_cluster_job_config_accre_r9(self, alphafold_config_modifier):
+        """Test make_job with ACCRE R9 cluster job configuration."""
         # Setup test config for ACCRE R9 alphafold native python install
-        test_config = AlphafoldConfig()
-        test_config.INSTALL_TYPE = "alphafold2_native_python"
-        test_config.EXECUTABLE_PATH = "/sb/apps/alphafold232/alphafold/run_alphafold.py"
-        test_config.DATA_DIR = "/sb/apps/alphafold-data.230"
-        test_config.UNIREF90_DATABASE_PATH = "/sb/apps/alphafold-data.230/uniref90/uniref90.fasta"
-        test_config.MGNIFY_DATABASE_PATH = "/sb/apps/alphafold-data.230/mgnify/mgy_clusters_2022_05.fa"
-        test_config.UNIREF30_DATABASE_PATH = "/sb/apps/alphafold-data.230/uniref30/UniRef30_2021_03"
-        test_config.BFD_DATABASE_PATH = "/sb/apps/alphafold-data.230/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt"
-        test_config.TEMPLATE_MMCIF_DIR = "/sb/apps/alphafold-data.230/pdb_mmcif/mmcif_files"
-        test_config.PDB_SEQRES_DATABASE_PATH = "/sb/apps/alphafold-data.230/pdb_seqres/pdb_seqres.txt"
-        test_config.OBSOLETE_PDBS_PATH = "/sb/apps/alphafold-data.230/pdb_mmcif/obsolete.dat"
-        test_config.UNIPROT_DATABASE_PATH = "/sb/apps/alphafold-data.230/uniprot/uniprot.fasta"
-        test_config.USE_GPU_RELAX = True
+        alphafold_config_modifier(
+            INSTALL_TYPE="alphafold2_native_python",
+            EXECUTABLE_PATH="/sb/apps/alphafold232/alphafold/run_alphafold.py",
+            DATA_DIR="/sb/apps/alphafold-data.230",
+            UNIREF90_DATABASE_PATH="/sb/apps/alphafold-data.230/uniref90/uniref90.fasta",
+            MGNIFY_DATABASE_PATH="/sb/apps/alphafold-data.230/mgnify/mgy_clusters_2022_05.fa",
+            UNIREF30_DATABASE_PATH="/sb/apps/alphafold-data.230/uniref30/UniRef30_2021_03",
+            BFD_DATABASE_PATH="/sb/apps/alphafold-data.230/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt",
+            TEMPLATE_MMCIF_DIR="/sb/apps/alphafold-data.230/pdb_mmcif/mmcif_files",
+            PDB_SEQRES_DATABASE_PATH="/sb/apps/alphafold-data.230/pdb_seqres/pdb_seqres.txt",
+            OBSOLETE_PDBS_PATH="/sb/apps/alphafold-data.230/pdb_mmcif/obsolete.dat",
+            UNIPROT_DATABASE_PATH="/sb/apps/alphafold-data.230/uniprot/uniprot.fasta",
+            USE_GPU_RELAX=True
+        )
 
-        # Create interface with test config
-        interface = AlphafoldInterface(None, test_config)
+        # Create interface with global config
+        interface = af_interface
         
         # Setup cluster job config for ACCRE R9
         cluster_job_config = {
@@ -264,7 +321,7 @@ class TestAlphafoldClusterJobs:
             assert "#SBATCH --mem=24G" in script_content
             assert "#SBATCH --time=16:00:00" in script_content
 
-    def test_af2_predict_default_res_keywords(self):
+    def test_make_job_default_res_keywords(self):
         """Test that default res_keywords are properly applied."""
         interface = AlphafoldInterface(None, AlphafoldConfig())
         
@@ -288,15 +345,15 @@ class TestAlphafoldClusterJobs:
             script_content = job.sub_script_str
             
             # Check that default values appear in the submission script
-            assert "#SBATCH --account=yang_lab_csb_iacc" in script_content
-            assert "#SBATCH --partition=interactive_gpu" in script_content
-            assert "#SBATCH --qos=debug_iacc" in script_content
+            # Note: this test uses default AlphafoldConfig which has <fillthis> placeholders
+            assert "#SBATCH --account=<fillthis>" in script_content
+            assert "#SBATCH --partition=<fillthis>" in script_content
             assert "#SBATCH --gres=gpu:nvidia_rtx_a4000:1" in script_content
             assert "#SBATCH --job-name=AF2_EnzyHTP" in script_content
             assert "#SBATCH --mem=24G" in script_content
             assert "#SBATCH --time=16:00:00" in script_content
 
-    def test_af2_predict_env_settings_reflection(self):
+    def test_make_job_env_settings_reflection(self):
         """Test that environment settings properly reflect core_type for cluster jobs."""
         interface = AlphafoldInterface(None, AlphafoldConfig())
         
@@ -324,27 +381,24 @@ class TestAlphafoldClusterJobs:
             assert "source /sb/apps/alphafold232/miniconda3/bin/activate af232" in script_content
             assert "export LD_LIBRARY_PATH=/sb/apps/alphafold232/miniconda3/envs/af232/lib:$LD_LIBRARY_PATH" in script_content
 
-    # TODO make a real test by hand.
     @pytest.mark.slow
-    def test_af2_predict_real_cluster_submission(self):
+    def test_af2_predict_real_cluster_submission(self, alphafold_config_modifier):
         """Test actual cluster job submission (non-mocked)."""
         # Setup for ACCRE R9 with real configuration
-        test_config = AlphafoldConfig()
-        test_config.INSTALL_TYPE = "alphafold2_native_python"
-        test_config.EXECUTABLE_PATH = "/sb/apps/alphafold232/alphafold/run_alphafold.py"
-        test_config.DATA_DIR = "/sb/apps/alphafold-data.230"
-        # Set all required database paths as shown in feedback example
-        test_config.UNIREF90_DATABASE_PATH = "/sb/apps/alphafold-data.230/uniref90/uniref90.fasta"
-        test_config.MGNIFY_DATABASE_PATH = "/sb/apps/alphafold-data.230/mgnify/mgy_clusters_2022_05.fa"
-        test_config.UNIREF30_DATABASE_PATH = "/sb/apps/alphafold-data.230/uniref30/UniRef30_2021_03"
-        test_config.BFD_DATABASE_PATH = "/sb/apps/alphafold-data.230/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt"
-        test_config.TEMPLATE_MMCIF_DIR = "/sb/apps/alphafold-data.230/pdb_mmcif/mmcif_files"
-        test_config.PDB_SEQRES_DATABASE_PATH = "/sb/apps/alphafold-data.230/pdb_seqres/pdb_seqres.txt"
-        test_config.OBSOLETE_PDBS_PATH = "/sb/apps/alphafold-data.230/pdb_mmcif/obsolete.dat"
-        test_config.UNIPROT_DATABASE_PATH = "/sb/apps/alphafold-data.230/uniprot/uniprot.fasta"
-        test_config.USE_GPU_RELAX = True
-
-        interface = AlphafoldInterface(None, test_config)
+        alphafold_config_modifier(
+            INSTALL_TYPE="alphafold2_native_python",
+            EXECUTABLE_PATH="/sb/apps/alphafold232/alphafold/run_alphafold.py",
+            DATA_DIR="/sb/apps/alphafold-data.230",
+            UNIREF90_DATABASE_PATH="/sb/apps/alphafold-data.230/uniref90/uniref90.fasta",
+            MGNIFY_DATABASE_PATH="/sb/apps/alphafold-data.230/mgnify/mgy_clusters_2022_05.fa",
+            UNIREF30_DATABASE_PATH="/sb/apps/alphafold-data.230/uniref30/UniRef30_2021_03",
+            BFD_DATABASE_PATH="/sb/apps/alphafold-data.230/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt",
+            TEMPLATE_MMCIF_DIR="/sb/apps/alphafold-data.230/pdb_mmcif/mmcif_files",
+            PDB_SEQRES_DATABASE_PATH="/sb/apps/alphafold-data.230/pdb_seqres/pdb_seqres.txt",
+            OBSOLETE_PDBS_PATH="/sb/apps/alphafold-data.230/pdb_mmcif/obsolete.dat",
+            UNIPROT_DATABASE_PATH="/sb/apps/alphafold-data.230/uniprot/uniprot.fasta",
+            USE_GPU_RELAX=True
+        )
         
         # Cluster configuration for actual submission
         cluster_job_config = {
@@ -362,11 +416,10 @@ class TestAlphafoldClusterJobs:
         
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create result eggs but don't actually submit (for safety)
-            result_eggs = interface.make_job(
+            result_eggs = af_interface.make_job(
                 fasta_path=create_fasta_from_sequences(sequences, ["test_seq"], output_path=Path(temp_dir) / "test.fasta"),
                 out_dir=Path(temp_dir) / "output",
                 cluster_job_config=cluster_job_config,
-                core_type="gpu",
                 seq_per_job=1
             )
             
@@ -387,6 +440,180 @@ class TestAlphafoldClusterJobs:
             assert "--data_dir /sb/apps/alphafold-data.230" in script_content
             assert "--use_gpu_relax" in script_content
 
+    def test_af2_predict_non_armer_core_type_cpu(self, alphafold_config_modifier):
+        """Test non_armer_core_type parameter with CPU setting for local execution."""
+        # Setup config for alphafold2_native_python
+        alphafold_config_modifier(
+            INSTALL_TYPE="alphafold2_native_python",
+            EXECUTABLE_PATH="/sb/apps/alphafold232/alphafold/run_alphafold.py",
+            DATA_DIR="/sb/apps/alphafold-data.230",
+            USE_GPU_RELAX=True  # This should be ignored when core_type is cpu
+        )
+        
+        interface = AlphafoldInterface(None, af_config)
+        
+        sequences = ["MST"]
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Test CPU core type with local execution (cluster_job_config=None)
+            fasta_path = create_fasta_from_sequences(sequences, ["test_seq"], output_path=Path(temp_dir) / "test.fasta")
+            
+            # Test command building directly
+            cmd = interface._build_alphafold2_native_python_command(
+                fasta_path=fasta_path,
+                out_dir=Path(temp_dir) / "output",
+                num_models=1,
+                num_recycles=1,
+                num_relax=0,
+                relax_max_iteration=100,
+                use_templates=False,
+                model_preset="monomer",
+                additional_options=None,
+                core_type="cpu"
+            )
+            
+            # CPU mode should NOT include --use_gpu_relax
+            assert "--use_gpu_relax" not in cmd
+            assert "python" in cmd[0]
+            assert "/sb/apps/alphafold232/alphafold/run_alphafold.py" in cmd
+
+    def test_af2_predict_non_armer_core_type_gpu(self, alphafold_config_modifier):
+        """Test non_armer_core_type parameter with GPU setting for local execution."""
+        # Setup config for alphafold2_native_python
+        alphafold_config_modifier(
+            INSTALL_TYPE="alphafold2_native_python",
+            EXECUTABLE_PATH="/sb/apps/alphafold232/alphafold/run_alphafold.py",
+            DATA_DIR="/sb/apps/alphafold-data.230",
+            USE_GPU_RELAX=True
+        )
+        
+        interface = AlphafoldInterface(None, af_config)
+        
+        sequences = ["MST"]
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Test GPU core type with local execution (cluster_job_config=None)
+            fasta_path = create_fasta_from_sequences(sequences, ["test_seq"], output_path=Path(temp_dir) / "test.fasta")
+            
+            # Test command building directly
+            cmd = interface._build_alphafold2_native_python_command(
+                fasta_path=fasta_path,
+                out_dir=Path(temp_dir) / "output",
+                num_models=1,
+                num_recycles=1,
+                num_relax=0,
+                relax_max_iteration=100,
+                use_templates=False,
+                model_preset="monomer",
+                additional_options=None,
+                core_type="gpu"
+            )
+            
+            # GPU mode should include --use_gpu_relax
+            assert "--use_gpu_relax" in cmd
+            assert "python" in cmd[0]
+            assert "/sb/apps/alphafold232/alphafold/run_alphafold.py" in cmd
+
+    def test_colabfold_container_core_type_cpu(self):
+        """Test ColabFold container command building with CPU core type."""
+        interface = AlphafoldInterface(None, AlphafoldConfig())
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fasta_path = create_fasta_from_sequences(["MST"], ["test_seq"], output_path=Path(temp_dir) / "test.fasta")
+            
+            # Test CPU core type
+            cmd = interface._build_colabfold_container_command(
+                fasta_path=fasta_path,
+                out_dir=Path(temp_dir) / "output",
+                num_models=1,
+                num_recycles=1,
+                num_relax=0,
+                relax_max_iteration=100,
+                use_templates=False,
+                model_preset="alphafold2_ptm",
+                additional_options=None,
+                core_type="cpu"
+            )
+            
+            # CPU mode should NOT include --nv
+            assert "--nv" not in cmd
+            assert "apptainer" in cmd
+            assert "run" in cmd
+            
+    def test_colabfold_container_core_type_gpu(self):
+        """Test ColabFold container command building with GPU core type."""
+        interface = AlphafoldInterface(None, AlphafoldConfig())
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fasta_path = create_fasta_from_sequences(["MST"], ["test_seq"], output_path=Path(temp_dir) / "test.fasta")
+            
+            # Test GPU core type
+            cmd = interface._build_colabfold_container_command(
+                fasta_path=fasta_path,
+                out_dir=Path(temp_dir) / "output",
+                num_models=1,
+                num_recycles=1,
+                num_relax=0,
+                relax_max_iteration=100,
+                use_templates=False,
+                model_preset="alphafold2_ptm",
+                additional_options=None,
+                core_type="gpu"
+            )
+            
+            # GPU mode should include --nv
+            assert "--nv" in cmd
+            assert "apptainer" in cmd
+            assert "run" in cmd
+
+
+class TestAlphafoldAccreR9Integration:
+    """Tests for AlphaFold2 integration with ACCRE R9 cluster."""
+
+    @pytest.mark.slow
+    def test_af2_real_accre_r9_native_python_job_setup(self, alphafold_config_modifier):
+        """Test real AF2 job setup for ACCRE R9 with native Python install (no mocking)."""
+        # Setup for actual ACCRE R9 alphafold native python install
+        alphafold_config_modifier(
+            INSTALL_TYPE="alphafold2_native_python",
+            EXECUTABLE_PATH="/sb/apps/alphafold232/alphafold/run_alphafold.py",
+            DATA_DIR="/sb/apps/alphafold-data.230",
+            UNIREF90_DATABASE_PATH="/sb/apps/alphafold-data.230/uniref90/uniref90.fasta",
+            MGNIFY_DATABASE_PATH="/sb/apps/alphafold-data.230/mgnify/mgy_clusters_2022_05.fa",
+            UNIREF30_DATABASE_PATH="/sb/apps/alphafold-data.230/uniref30/UniRef30_2021_03",
+            BFD_DATABASE_PATH="/sb/apps/alphafold-data.230/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt",
+            TEMPLATE_MMCIF_DIR="/sb/apps/alphafold-data.230/pdb_mmcif/mmcif_files",
+            PDB_SEQRES_DATABASE_PATH="/sb/apps/alphafold-data.230/pdb_seqres/pdb_seqres.txt",
+            OBSOLETE_PDBS_PATH="/sb/apps/alphafold-data.230/pdb_mmcif/obsolete.dat",
+            UNIPROT_DATABASE_PATH="/sb/apps/alphafold-data.230/uniprot/uniprot.fasta",
+            USE_GPU_RELAX=True
+        )
+        
+        # Cluster configuration for ACCRE R9 
+        cluster_job_config = {
+            "cluster": AccreR9(),
+            "res_keywords": {
+                "account": "yang_lab_csb_iacc",
+                "partition": "interactive_gpu",
+                "qos": "debug_iacc", 
+                "node_cores": "nvidia_rtx_a4000:1",
+                "walltime": "30:00",
+            }
+        }
+
+        # Very short test sequence to minimize computational cost
+        sequences = ["MSTPSLIPSGVHEVLAKYKDGN"]
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create result eggs for actual submission
+            result = af_interface.af2_predict(
+                sequences=sequences,
+                out_dir=Path(temp_dir) / "output",
+                cluster_job_config=cluster_job_config,
+                seq_per_job=1,
+                model_preset="monomer_ptm",
+            )
+            print(result)
 
 class TestAlphaFold2ResultEgg:
     """Tests for AlphaFold2 result egg functionality."""

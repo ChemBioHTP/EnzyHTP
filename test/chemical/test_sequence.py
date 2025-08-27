@@ -23,7 +23,7 @@ class TestCreateFastaFromSequences:
     def test_single_sequence_string(self):
         """Test creating FASTA from single sequence string."""
         sequence = "ACDEFGHIKLMNPQRSTVWY"
-        fasta_path = create_fasta_from_sequences(sequence, delete_on_close=False)
+        fasta_path = create_fasta_from_sequences(sequence)
         
         try:
             with open(fasta_path, 'r') as f:
@@ -37,7 +37,7 @@ class TestCreateFastaFromSequences:
     def test_multiple_sequences_list(self):
         """Test creating FASTA from multiple sequences."""
         sequences = ["ACDEFGHIKLMNPQRSTVWY", "DEFGHIKLMNPQRSTVWY"]
-        fasta_path = create_fasta_from_sequences(sequences, delete_on_close=False)
+        fasta_path = create_fasta_from_sequences(sequences)
         
         try:
             with open(fasta_path, 'r') as f:
@@ -52,7 +52,7 @@ class TestCreateFastaFromSequences:
         """Test creating FASTA with custom sequence IDs."""
         sequences = ["ACDEFG", "GHIKLM"]
         seq_ids = ["protein1", "protein2"]
-        fasta_path = create_fasta_from_sequences(sequences, seq_ids, delete_on_close=False)
+        fasta_path = create_fasta_from_sequences(sequences, seq_ids)
         
         try:
             with open(fasta_path, 'r') as f:
