@@ -149,7 +149,7 @@ class AlphafoldInterface(BaseInterface):
                     cluster_job_config=cluster_job_config,
                     seq_per_job=seq_per_job
                 )
-                import pdb;pdb.set_trace()
+
                 # Submit and wait for array jobs
                 all_jobs = [egg.job for egg in result_eggs]
                 failed_jobs = ClusterJob.wait_to_array_end_plus(
@@ -575,14 +575,14 @@ class AlphafoldInterface(BaseInterface):
         if hasattr(config, 'TEMPLATE_MMCIF_DIR') and config.TEMPLATE_MMCIF_DIR:
             cmd.extend(["--template_mmcif_dir", config.TEMPLATE_MMCIF_DIR])
             
-        # if hasattr(config, 'PDB_SEQRES_DATABASE_PATH') and config.PDB_SEQRES_DATABASE_PATH:
-        #     cmd.extend(["--pdb_seqres_database_path", config.PDB_SEQRES_DATABASE_PATH])
+        if hasattr(config, 'PDB_SEQRES_DATABASE_PATH') and config.PDB_SEQRES_DATABASE_PATH:
+            cmd.extend(["--pdb_seqres_database_path", config.PDB_SEQRES_DATABASE_PATH])
             
         if hasattr(config, 'OBSOLETE_PDBS_PATH') and config.OBSOLETE_PDBS_PATH:
             cmd.extend(["--obsolete_pdbs_path", config.OBSOLETE_PDBS_PATH])
             
-        # if hasattr(config, 'UNIPROT_DATABASE_PATH') and config.UNIPROT_DATABASE_PATH:
-        #     cmd.extend(["--uniprot_database_path", config.UNIPROT_DATABASE_PATH])
+        if hasattr(config, 'UNIPROT_DATABASE_PATH') and config.UNIPROT_DATABASE_PATH:
+            cmd.extend(["--uniprot_database_path", config.UNIPROT_DATABASE_PATH])
         
         # Add GPU relax option
         if hasattr(config, 'USE_GPU_RELAX') and config.USE_GPU_RELAX and core_type == "gpu":

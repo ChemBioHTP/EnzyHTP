@@ -583,9 +583,7 @@ class TestAlphafoldAccreR9Integration:
             UNIREF30_DATABASE_PATH="/sb/apps/alphafold-data.230/uniref30/UniRef30_2021_03",
             BFD_DATABASE_PATH="/sb/apps/alphafold-data.230/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt",
             TEMPLATE_MMCIF_DIR="/sb/apps/alphafold-data.230/pdb_mmcif/mmcif_files",
-            PDB_SEQRES_DATABASE_PATH="/sb/apps/alphafold-data.230/pdb_seqres/pdb_seqres.txt",
             OBSOLETE_PDBS_PATH="/sb/apps/alphafold-data.230/pdb_mmcif/obsolete.dat",
-            UNIPROT_DATABASE_PATH="/sb/apps/alphafold-data.230/uniprot/uniprot.fasta",
             USE_GPU_RELAX=True
         )
         
