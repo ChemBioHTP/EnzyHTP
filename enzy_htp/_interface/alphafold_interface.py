@@ -132,14 +132,22 @@ class AlphafoldInterface(BaseInterface):
             fs.safe_mkdir(out_dir)
 
             # Handle different sequence input formats
-            fasta_sequences, sequence_ids = self._prepare_sequences_and_ids(sequences)
-            fasta_path = fs.get_valid_temp_name(f"{out_dir}/input_sequences.fasta")
-            create_fasta_from_sequences(
-                fasta_sequences, 
-                sequence_ids,
-                output_path=fasta_path
-            )
-            temp_paths.append(fasta_path)
+            if self.config_.INSTALL_TYPE != "colabfold_container" and isinstance(sequences[0], list):
+                # Native AlphaFold with multimers: create separate FASTA files for each multimer
+                fasta_paths = self._create_multimer_fasta_files(sequences, out_dir)
+                temp_paths.extend(fasta_paths)
+                # For native AlphaFold, use comma-separated paths
+                fasta_path = ",".join(fasta_paths)
+            else:
+                # Single FASTA file for ColabFold or single sequences
+                fasta_sequences, sequence_ids = self._prepare_sequences_and_ids(sequences)
+                fasta_path = fs.get_valid_temp_name(f"{out_dir}/input_sequences.fasta")
+                create_fasta_from_sequences(
+                    fasta_sequences, 
+                    sequence_ids,
+                    output_path=fasta_path
+                )
+                temp_paths.append(fasta_path)
 
             if cluster_job_config:
                 # Run on cluster using array jobs
@@ -297,8 +305,18 @@ class AlphafoldInterface(BaseInterface):
         
         # Get all files and select best ones for sequences
         filename_to_path = self._find_output_files_map(out_dir)
-        fasta_sequences = parse_fasta_file(fasta_path)
-        sequence_ids = [seq_id for seq_id, _ in fasta_sequences]
+        
+        # Handle comma-separated FASTA paths (for native AlphaFold multimers)
+        if "," in fasta_path:
+            sequence_ids = []
+            for path in fasta_path.split(","):
+                path = path.strip()
+                fasta_sequences = parse_fasta_file(path)
+                sequence_ids.extend([seq_id for seq_id, _ in fasta_sequences])
+        else:
+            fasta_sequences = parse_fasta_file(fasta_path)
+            sequence_ids = [seq_id for seq_id, _ in fasta_sequences]
+            
         return self._select_best_files_for_sequences(filename_to_path, sequence_ids)
 
     def make_job(
@@ -621,58 +639,75 @@ class AlphafoldInterface(BaseInterface):
         if benchmark:
             cmd.append("--benchmark")
                 
-        # Add all database paths required by AlphaFold
-        if afconfig.UNIREF90_DATABASE_PATH:
-            cmd.extend(["--uniref90_database_path", afconfig.UNIREF90_DATABASE_PATH])
+        # Add all database paths required by AlphaFold using getter functions
+        uniref90_path = afconfig.get_uniref90_database_path()
+        if uniref90_path:
+            cmd.extend(["--uniref90_database_path", uniref90_path])
 
-        if afconfig.PDB70_DATABASE_PATH:
-            cmd.extend(["--pdb70_database_path", afconfig.PDB70_DATABASE_PATH])
+        pdb70_path = afconfig.get_pdb70_database_path()
+        if pdb70_path:
+            cmd.extend(["--pdb70_database_path", pdb70_path])
 
-        if afconfig.MGNIFY_DATABASE_PATH:
-            cmd.extend(["--mgnify_database_path", afconfig.MGNIFY_DATABASE_PATH])
+        mgnify_path = afconfig.get_mgnify_database_path()
+        if mgnify_path:
+            cmd.extend(["--mgnify_database_path", mgnify_path])
             
-        if afconfig.UNIREF30_DATABASE_PATH:
-            cmd.extend(["--uniref30_database_path", afconfig.UNIREF30_DATABASE_PATH])
+        uniref30_path = afconfig.get_uniref30_database_path()
+        if uniref30_path:
+            cmd.extend(["--uniref30_database_path", uniref30_path])
             
-        if afconfig.BFD_DATABASE_PATH:
-            cmd.extend(["--bfd_database_path", afconfig.BFD_DATABASE_PATH])
+        bfd_path = afconfig.get_bfd_database_path()
+        if bfd_path:
+            cmd.extend(["--bfd_database_path", bfd_path])
             
         # small_bfd_database_path is only for reduced_dbs preset
-        if db_preset == "reduced_dbs" and afconfig.SMALL_BFD_DATABASE_PATH:
-            cmd.extend(["--small_bfd_database_path", afconfig.SMALL_BFD_DATABASE_PATH])
+        if db_preset == "reduced_dbs":
+            small_bfd_path = afconfig.get_small_bfd_database_path()
+            if small_bfd_path:
+                cmd.extend(["--small_bfd_database_path", small_bfd_path])
             
-        if afconfig.TEMPLATE_MMCIF_DIR:
-            cmd.extend(["--template_mmcif_dir", afconfig.TEMPLATE_MMCIF_DIR])
+        template_mmcif_dir = afconfig.get_template_mmcif_dir()
+        if template_mmcif_dir:
+            cmd.extend(["--template_mmcif_dir", template_mmcif_dir])
             
         # PDB seqres and Uniprot are only for multimer model preset
         if model_preset == "multimer":
-            if afconfig.PDB_SEQRES_DATABASE_PATH:
-                cmd.extend(["--pdb_seqres_database_path", afconfig.PDB_SEQRES_DATABASE_PATH])
+            pdb_seqres_path = afconfig.get_pdb_seqres_database_path()
+            if pdb_seqres_path:
+                cmd.extend(["--pdb_seqres_database_path", pdb_seqres_path])
                 
-            if afconfig.UNIPROT_DATABASE_PATH:
-                cmd.extend(["--uniprot_database_path", afconfig.UNIPROT_DATABASE_PATH])
+            uniprot_path = afconfig.get_uniprot_database_path()
+            if uniprot_path:
+                cmd.extend(["--uniprot_database_path", uniprot_path])
 
-        if afconfig.OBSOLETE_PDBS_PATH:
-            cmd.extend(["--obsolete_pdbs_path", afconfig.OBSOLETE_PDBS_PATH])
+        obsolete_pdbs_path = afconfig.get_obsolete_pdbs_path()
+        if obsolete_pdbs_path:
+            cmd.extend(["--obsolete_pdbs_path", obsolete_pdbs_path])
         
-        # Add binary paths
-        if afconfig.HHBLITS_BINARY_PATH:
-            cmd.extend(["--hhblits_binary_path", afconfig.HHBLITS_BINARY_PATH])
+        # Add binary paths using getter functions
+        hhblits_path = afconfig.get_hhblits_binary_path()
+        if hhblits_path:
+            cmd.extend(["--hhblits_binary_path", hhblits_path])
             
-        if afconfig.HHSEARCH_BINARY_PATH:
-            cmd.extend(["--hhsearch_binary_path", afconfig.HHSEARCH_BINARY_PATH])
+        hhsearch_path = afconfig.get_hhsearch_binary_path()
+        if hhsearch_path:
+            cmd.extend(["--hhsearch_binary_path", hhsearch_path])
             
-        if afconfig.HMMBUILD_BINARY_PATH:
-            cmd.extend(["--hmmbuild_binary_path", afconfig.HMMBUILD_BINARY_PATH])
+        hmmbuild_path = afconfig.get_hmmbuild_binary_path()
+        if hmmbuild_path:
+            cmd.extend(["--hmmbuild_binary_path", hmmbuild_path])
             
-        if afconfig.HMMSEARCH_BINARY_PATH:
-            cmd.extend(["--hmmsearch_binary_path", afconfig.HMMSEARCH_BINARY_PATH])
+        hmmsearch_path = afconfig.get_hmmsearch_binary_path()
+        if hmmsearch_path:
+            cmd.extend(["--hmmsearch_binary_path", hmmsearch_path])
             
-        if afconfig.JACKHMMER_BINARY_PATH:
-            cmd.extend(["--jackhmmer_binary_path", afconfig.JACKHMMER_BINARY_PATH])
+        jackhmmer_path = afconfig.get_jackhmmer_binary_path()
+        if jackhmmer_path:
+            cmd.extend(["--jackhmmer_binary_path", jackhmmer_path])
             
-        if afconfig.KALIGN_BINARY_PATH:
-            cmd.extend(["--kalign_binary_path", afconfig.KALIGN_BINARY_PATH])
+        kalign_path = afconfig.get_kalign_binary_path()
+        if kalign_path:
+            cmd.extend(["--kalign_binary_path", kalign_path])
         
         # Add GPU relax option
         if afconfig.USE_GPU_RELAX and core_type == "gpu":
@@ -708,15 +743,48 @@ class AlphafoldInterface(BaseInterface):
                     combined_seq = ":".join(multimer_seqs)
                     fasta_sequences.append(combined_seq)
                 else:
-                    # Native AlphaFold: put multiple sequences in same FASTA file
-                    # Only add the first sequence here, as native AF handles multiple sequences in file
-                    fasta_sequences.append(":".join(multimer_seqs))
+                    # Native AlphaFold: each chain becomes separate sequence in FASTA
+                    for j, chain_seq in enumerate(multimer_seqs):
+                        fasta_sequences.append(chain_seq)
+                        sequence_ids.append(seq_id)
+                        if j > 1:  # Only add additional chain IDs, first one uses seq_id
+                            _LOGGER.error("Native AlphaFold does not support multimer input with ':' in chain IDs. "
+                            f"Found {len(multimer_seqs)} chains in multimer sequence '{seq_id}'. In principle, the code should not end up in this flow, but if it does, please report this issue.")
+                            raise ValueError(f"Bug: wrong flow control")
         else:
             # Single sequence format: [seq1, seq2, seq3, ...]
             fasta_sequences = list(sequences)
             sequence_ids = [f"seq_{i}" for i in range(len(sequences))]
             
         return fasta_sequences, sequence_ids
+    
+    def _create_multimer_fasta_files(self, sequences: List[List[str]], out_dir: Union[str, Path]) -> List[str]:
+        """Create separate FASTA files for native AlphaFold multimer input.
+        
+        Args:
+            sequences: List of multimer sequences [[seq1_chain_A, seq1_chain_B], ...]
+            out_dir: Output directory for FASTA files
+            
+        Returns:
+            List of FASTA file paths created
+        """
+        fasta_paths = []
+        
+        for i, multimer_seqs in enumerate(sequences):
+            seq_id = f"seq_{i}"
+            # Create individual chain IDs for each chain in the multimer
+            chain_ids = [f"{seq_id}_chain_{j}" for j in range(len(multimer_seqs))]
+            
+            # Create FASTA file for this multimer (all chains in one file)
+            fasta_path = fs.get_valid_temp_name(f"{out_dir}/{seq_id}.fasta")
+            create_fasta_from_sequences(
+                multimer_seqs,
+                chain_ids, 
+                output_path=fasta_path
+            )
+            fasta_paths.append(fasta_path)
+        
+        return fasta_paths
     
     def _map_seq_id_to_original(self, seq_id: str, original_sequences: Union[List[str], List[List[str]]]) -> Union[str, Tuple[str, ...]]:
         """Map sequence ID back to original input format.

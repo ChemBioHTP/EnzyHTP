@@ -45,59 +45,62 @@ class AlphafoldConfig(BaseConfig):
     For native AlphaFold2: path to run_alphafold.py or run_docker.py
     """
     
-    DATA_DIR: str = ""
+    DATA_DIR: str = "/sb/apps/alphafold-data.230"
     """Path to AlphaFold2 data directory.
     Required for native AlphaFold2 installations.
     """
     
     # Database paths for native AlphaFold2 
-    UNIREF90_DATABASE_PATH: str = ""
+    UNIREF90_DATABASE_PATH: str = "{DATA_DIR}/uniref90/uniref90.fasta"
     """Path to UniRef90 database."""
     
-    MGNIFY_DATABASE_PATH: str = ""
+    MGNIFY_DATABASE_PATH: str = "{DATA_DIR}/mgnify/mgy_clusters_2022_05.fa"
     """Path to MGnify database."""
     
-    UNIREF30_DATABASE_PATH: str = ""
+    UNIREF30_DATABASE_PATH: str = "{DATA_DIR}/uniref30/UniRef30_2021_03"
     """Path to UniRef30 database."""
     
-    BFD_DATABASE_PATH: str = ""
+    BFD_DATABASE_PATH: str = "{DATA_DIR}/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt"
     """Path to BFD database."""
     
-    PDB70_DATABASE_PATH: str = ""
+    PDB70_DATABASE_PATH: str = "{DATA_DIR}/pdb70/pdb70"
     """Path to PDB70 database."""
     
-    TEMPLATE_MMCIF_DIR: str = ""
+    TEMPLATE_MMCIF_DIR: str = "{DATA_DIR}/pdb_mmcif/mmcif_files"
     """Path to template mmCIF directory."""
     
-    PDB_SEQRES_DATABASE_PATH: str = ""
+    PDB_SEQRES_DATABASE_PATH: str = "{DATA_DIR}/pdb_seqres/pdb_seqres.txt"
     """Path to PDB seqres database."""
     
-    OBSOLETE_PDBS_PATH: str = ""
+    OBSOLETE_PDBS_PATH: str = "{DATA_DIR}/pdb_mmcif/obsolete.dat"
     """Path to obsolete PDBs file."""
     
-    UNIPROT_DATABASE_PATH: str = ""
+    UNIPROT_DATABASE_PATH: str = "{DATA_DIR}/uniprot/uniprot.fasta"
     """Path to UniProt database."""
     
-    SMALL_BFD_DATABASE_PATH: str = ""
+    SMALL_BFD_DATABASE_PATH: str = "{DATA_DIR}/small_bfd/bfd-first_non_consensus_sequences.fasta"
     """Path to small BFD database for reduced_dbs preset."""
     
     # Binary paths for native AlphaFold2
-    HHBLITS_BINARY_PATH: str = ""
+    ALPHAFOLD_BIN_DIR: str = "/sb/apps/alphafold232/miniconda3/envs/af232/bin"
+    """Base directory for AlphaFold2 binary executables."""
+    
+    HHBLITS_BINARY_PATH: str = "{ALPHAFOLD_BIN_DIR}/hhblits"
     """Path to HHblits executable."""
     
-    HHSEARCH_BINARY_PATH: str = ""
+    HHSEARCH_BINARY_PATH: str = "{ALPHAFOLD_BIN_DIR}/hhsearch"
     """Path to HHsearch executable."""
     
-    HMMBUILD_BINARY_PATH: str = ""
+    HMMBUILD_BINARY_PATH: str = "{ALPHAFOLD_BIN_DIR}/hmmbuild"
     """Path to hmmbuild executable."""
     
-    HMMSEARCH_BINARY_PATH: str = ""
+    HMMSEARCH_BINARY_PATH: str = "{ALPHAFOLD_BIN_DIR}/hmmsearch"
     """Path to hmmsearch executable."""
     
-    JACKHMMER_BINARY_PATH: str = ""
+    JACKHMMER_BINARY_PATH: str = "{ALPHAFOLD_BIN_DIR}/jackhmmer"
     """Path to JackHMMER executable."""
     
-    KALIGN_BINARY_PATH: str = ""
+    KALIGN_BINARY_PATH: str = "{ALPHAFOLD_BIN_DIR}/kalign"
     """Path to Kalign executable."""
     
     USE_GPU_RELAX: bool = True
@@ -138,26 +141,130 @@ class AlphafoldConfig(BaseConfig):
     def get_default_af2_cluster_job_res_keywords(self, key: str) -> Dict:
         """Get default resource keywords for AF2 cluster jobs."""
         return deepcopy(self.DEFAULT_AF2_CLUSTER_JOB_RES_KEYWORDS[key])
+    
+    # Database path getter methods
+    def get_uniref90_database_path(self) -> str:
+        """Get the UniRef90 database path, expanding DATA_DIR if needed."""
+        if self.UNIREF90_DATABASE_PATH and "{DATA_DIR}" in self.UNIREF90_DATABASE_PATH:
+            return self.UNIREF90_DATABASE_PATH.format(DATA_DIR=self.DATA_DIR)
+        return self.UNIREF90_DATABASE_PATH
+    
+    def get_mgnify_database_path(self) -> str:
+        """Get the MGnify database path, expanding DATA_DIR if needed."""
+        if self.MGNIFY_DATABASE_PATH and "{DATA_DIR}" in self.MGNIFY_DATABASE_PATH:
+            return self.MGNIFY_DATABASE_PATH.format(DATA_DIR=self.DATA_DIR)
+        return self.MGNIFY_DATABASE_PATH
+    
+    def get_uniref30_database_path(self) -> str:
+        """Get the UniRef30 database path, expanding DATA_DIR if needed."""
+        if self.UNIREF30_DATABASE_PATH and "{DATA_DIR}" in self.UNIREF30_DATABASE_PATH:
+            return self.UNIREF30_DATABASE_PATH.format(DATA_DIR=self.DATA_DIR)
+        return self.UNIREF30_DATABASE_PATH
+    
+    def get_bfd_database_path(self) -> str:
+        """Get the BFD database path, expanding DATA_DIR if needed."""
+        if self.BFD_DATABASE_PATH and "{DATA_DIR}" in self.BFD_DATABASE_PATH:
+            return self.BFD_DATABASE_PATH.format(DATA_DIR=self.DATA_DIR)
+        return self.BFD_DATABASE_PATH
+    
+    def get_pdb70_database_path(self) -> str:
+        """Get the PDB70 database path, expanding DATA_DIR if needed."""
+        if self.PDB70_DATABASE_PATH and "{DATA_DIR}" in self.PDB70_DATABASE_PATH:
+            return self.PDB70_DATABASE_PATH.format(DATA_DIR=self.DATA_DIR)
+        return self.PDB70_DATABASE_PATH
+    
+    def get_template_mmcif_dir(self) -> str:
+        """Get the template mmCIF directory path, expanding DATA_DIR if needed."""
+        if self.TEMPLATE_MMCIF_DIR and "{DATA_DIR}" in self.TEMPLATE_MMCIF_DIR:
+            return self.TEMPLATE_MMCIF_DIR.format(DATA_DIR=self.DATA_DIR)
+        return self.TEMPLATE_MMCIF_DIR
+    
+    def get_pdb_seqres_database_path(self) -> str:
+        """Get the PDB seqres database path, expanding DATA_DIR if needed."""
+        if self.PDB_SEQRES_DATABASE_PATH and "{DATA_DIR}" in self.PDB_SEQRES_DATABASE_PATH:
+            return self.PDB_SEQRES_DATABASE_PATH.format(DATA_DIR=self.DATA_DIR)
+        return self.PDB_SEQRES_DATABASE_PATH
+    
+    def get_obsolete_pdbs_path(self) -> str:
+        """Get the obsolete PDBs file path, expanding DATA_DIR if needed."""
+        if self.OBSOLETE_PDBS_PATH and "{DATA_DIR}" in self.OBSOLETE_PDBS_PATH:
+            return self.OBSOLETE_PDBS_PATH.format(DATA_DIR=self.DATA_DIR)
+        return self.OBSOLETE_PDBS_PATH
+    
+    def get_uniprot_database_path(self) -> str:
+        """Get the UniProt database path, expanding DATA_DIR if needed."""
+        if self.UNIPROT_DATABASE_PATH and "{DATA_DIR}" in self.UNIPROT_DATABASE_PATH:
+            return self.UNIPROT_DATABASE_PATH.format(DATA_DIR=self.DATA_DIR)
+        return self.UNIPROT_DATABASE_PATH
+    
+    def get_small_bfd_database_path(self) -> str:
+        """Get the small BFD database path, expanding DATA_DIR if needed."""
+        if self.SMALL_BFD_DATABASE_PATH and "{DATA_DIR}" in self.SMALL_BFD_DATABASE_PATH:
+            return self.SMALL_BFD_DATABASE_PATH.format(DATA_DIR=self.DATA_DIR)
+        return self.SMALL_BFD_DATABASE_PATH
+    
+    # Binary path getter methods
+    def get_hhblits_binary_path(self) -> str:
+        """Get the HHblits binary path, expanding ALPHAFOLD_BIN_DIR if needed."""
+        if self.HHBLITS_BINARY_PATH and "{ALPHAFOLD_BIN_DIR}" in self.HHBLITS_BINARY_PATH:
+            return self.HHBLITS_BINARY_PATH.format(ALPHAFOLD_BIN_DIR=self.ALPHAFOLD_BIN_DIR)
+        return self.HHBLITS_BINARY_PATH
+    
+    def get_hhsearch_binary_path(self) -> str:
+        """Get the HHsearch binary path, expanding ALPHAFOLD_BIN_DIR if needed."""
+        if self.HHSEARCH_BINARY_PATH and "{ALPHAFOLD_BIN_DIR}" in self.HHSEARCH_BINARY_PATH:
+            return self.HHSEARCH_BINARY_PATH.format(ALPHAFOLD_BIN_DIR=self.ALPHAFOLD_BIN_DIR)
+        return self.HHSEARCH_BINARY_PATH
+    
+    def get_hmmbuild_binary_path(self) -> str:
+        """Get the hmmbuild binary path, expanding ALPHAFOLD_BIN_DIR if needed."""
+        if self.HMMBUILD_BINARY_PATH and "{ALPHAFOLD_BIN_DIR}" in self.HMMBUILD_BINARY_PATH:
+            return self.HMMBUILD_BINARY_PATH.format(ALPHAFOLD_BIN_DIR=self.ALPHAFOLD_BIN_DIR)
+        return self.HMMBUILD_BINARY_PATH
+    
+    def get_hmmsearch_binary_path(self) -> str:
+        """Get the hmmsearch binary path, expanding ALPHAFOLD_BIN_DIR if needed."""
+        if self.HMMSEARCH_BINARY_PATH and "{ALPHAFOLD_BIN_DIR}" in self.HMMSEARCH_BINARY_PATH:
+            return self.HMMSEARCH_BINARY_PATH.format(ALPHAFOLD_BIN_DIR=self.ALPHAFOLD_BIN_DIR)
+        return self.HMMSEARCH_BINARY_PATH
+    
+    def get_jackhmmer_binary_path(self) -> str:
+        """Get the JackHMMER binary path, expanding ALPHAFOLD_BIN_DIR if needed."""
+        if self.JACKHMMER_BINARY_PATH and "{ALPHAFOLD_BIN_DIR}" in self.JACKHMMER_BINARY_PATH:
+            return self.JACKHMMER_BINARY_PATH.format(ALPHAFOLD_BIN_DIR=self.ALPHAFOLD_BIN_DIR)
+        return self.JACKHMMER_BINARY_PATH
+    
+    def get_kalign_binary_path(self) -> str:
+        """Get the Kalign binary path, expanding ALPHAFOLD_BIN_DIR if needed."""
+        if self.KALIGN_BINARY_PATH and "{ALPHAFOLD_BIN_DIR}" in self.KALIGN_BINARY_PATH:
+            return self.KALIGN_BINARY_PATH.format(ALPHAFOLD_BIN_DIR=self.ALPHAFOLD_BIN_DIR)
+        return self.KALIGN_BINARY_PATH
 
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for Alphafold."""
         if self.INSTALL_TYPE == "colabfold_container":
             return [self.CONTAINER_TYPE]
         if self.INSTALL_TYPE == "alphafold2_native_python":
-            # Return executables that are actually configured
+            # Return executables that are actually configured using getter functions
             executables = []
-            if self.HHBLITS_BINARY_PATH:
-                executables.append(self.HHBLITS_BINARY_PATH)
-            if self.HHSEARCH_BINARY_PATH:
-                executables.append(self.HHSEARCH_BINARY_PATH)
-            if self.HMMBUILD_BINARY_PATH:
-                executables.append(self.HMMBUILD_BINARY_PATH)
-            if self.HMMSEARCH_BINARY_PATH:
-                executables.append(self.HMMSEARCH_BINARY_PATH)
-            if self.JACKHMMER_BINARY_PATH:
-                executables.append(self.JACKHMMER_BINARY_PATH)
-            if self.KALIGN_BINARY_PATH:
-                executables.append(self.KALIGN_BINARY_PATH)
+            hhblits_path = self.get_hhblits_binary_path()
+            if hhblits_path:
+                executables.append(hhblits_path)
+            hhsearch_path = self.get_hhsearch_binary_path()
+            if hhsearch_path:
+                executables.append(hhsearch_path)
+            hmmbuild_path = self.get_hmmbuild_binary_path()
+            if hmmbuild_path:
+                executables.append(hmmbuild_path)
+            hmmsearch_path = self.get_hmmsearch_binary_path()
+            if hmmsearch_path:
+                executables.append(hmmsearch_path)
+            jackhmmer_path = self.get_jackhmmer_binary_path()
+            if jackhmmer_path:
+                executables.append(jackhmmer_path)
+            kalign_path = self.get_kalign_binary_path()
+            if kalign_path:
+                executables.append(kalign_path)
             return executables
         return []
 
