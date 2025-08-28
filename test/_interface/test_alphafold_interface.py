@@ -581,6 +581,7 @@ class TestAlphafoldAccreR9Integration:
         # Setup for actual ACCRE R9 alphafold native python install
         alphafold_config_modifier(
             INSTALL_TYPE="alphafold2_native_python",
+            EXECUTABLE_PATH="/sb/apps/alphafold232/alphafold/run_alphafold.py",
             DATA_DIR="/sb/apps/alphafold-data.230",
             USE_GPU_RELAX=True
         )
@@ -604,7 +605,7 @@ class TestAlphafoldAccreR9Integration:
             # Create result eggs for actual submission
             result = af_interface.af2_predict(
                 sequences=sequences,
-                work_dir=test_output_dir,
+                out_dir=test_output_dir,
                 cluster_job_config=cluster_job_config,
                 seq_per_job=1,
                 model_preset="monomer_ptm",
