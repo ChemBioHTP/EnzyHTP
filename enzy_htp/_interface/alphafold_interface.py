@@ -70,25 +70,30 @@ class AlphafoldInterface(BaseInterface):
     def af2_predict(
         self, 
         sequences: Union[List[str], List[List[str]]], 
-        out_dir: Union[str, Path, None] = None,
-        # local run related
+        # Run type settings
+        work_dir: Union[str, Path, None] = None,
+        # -- local run
         non_armer_core_type: str = "gpu",
-        # cluster job related
+        # -- cluster job run
         cluster_job_config: Optional[Union[ClusterJobConfig, Dict]] = None,
         array_size: int = 0,
         job_check_period: int = 30,
         seq_per_job: int = 1,
-        # AlphaFold2 specific
+        # AlphaFold2 settings
+        # -- model related
+        model_preset: Optional[str] = None,
         num_models: int = 5,
         num_recycles: int = 3,
+        # -- relax related
         num_relax: int = 0,
         relax_max_iteration: int = 200,
+        # -- msa related
+        db_preset: str = "full_dbs", # native AF2 only
+        use_precomputed_msas: bool = False, # native AF2 only
+        # -- template related
         use_templates: bool = False,
-        max_template_date: Optional[str] = None,
-        model_preset: Optional[str] = None,
-        db_preset: str = "reduced_dbs",
+        max_template_date: Optional[str] = None, # native AF2 only
         additional_options: Optional[List[str]] = None,
-        use_precomputed_msas: bool = False,
         random_seed: Optional[int] = None,
         **kwargs
     ) -> Dict[str, Structure]:
@@ -125,23 +130,23 @@ class AlphafoldInterface(BaseInterface):
         
         try:
             # Create output directory first
-            if out_dir is None:
+            if work_dir is None:
                 scratch_dir = eh_config.system.SCRATCH_DIR
-                out_dir = fs.get_valid_temp_name(f"{scratch_dir}/alphafold2")
-                temp_paths.append(out_dir)
-            fs.safe_mkdir(out_dir)
+                work_dir = fs.get_valid_temp_name(f"{scratch_dir}/alphafold2")
+                temp_paths.append(work_dir)
+            fs.safe_mkdir(work_dir)
 
             # Handle different sequence input formats
             if self.config_.INSTALL_TYPE != "colabfold_container" and isinstance(sequences[0], list):
                 # Native AlphaFold with multimers: create separate FASTA files for each multimer
-                fasta_paths = self._create_multimer_fasta_files(sequences, out_dir)
+                fasta_paths = self._create_multimer_fasta_files(sequences, work_dir)
                 temp_paths.extend(fasta_paths)
                 # For native AlphaFold, use comma-separated paths
                 fasta_path = ",".join(fasta_paths)
             else:
                 # Single FASTA file for ColabFold or single sequences
                 fasta_sequences, sequence_ids = self._prepare_sequences_and_ids(sequences)
-                fasta_path = fs.get_valid_temp_name(f"{out_dir}/input_sequences.fasta")
+                fasta_path = fs.get_valid_temp_name(f"{work_dir}/input_sequences.fasta")
                 create_fasta_from_sequences(
                     fasta_sequences, 
                     sequence_ids,
@@ -153,7 +158,7 @@ class AlphafoldInterface(BaseInterface):
                 # Run on cluster using array jobs
                 result_eggs = self.make_job(
                     fasta_path=fasta_path,
-                    out_dir=out_dir,
+                    out_dir=work_dir,
                     num_models=num_models,
                     num_recycles=num_recycles,
                     num_relax=num_relax,
@@ -184,13 +189,13 @@ class AlphafoldInterface(BaseInterface):
                 # Collect results from all eggs
                 result_files = {}
                 for egg in result_eggs:
-                    egg_files = egg.get_expected_output_files()
+                    egg_files = egg.get_expected_output_files() # TODO in multimer + af2 native case, will this work?
                     result_files.update(egg_files)
             else:
                 # Run locally
                 result_files = self.run(
                     fasta_path=fasta_path,
-                    out_dir=out_dir,
+                    out_dir=work_dir,
                     num_models=num_models,
                     num_recycles=num_recycles,
                     num_relax=num_relax,
@@ -231,7 +236,7 @@ class AlphafoldInterface(BaseInterface):
         use_templates: bool = False,
         max_template_date: Optional[str] = None,
         model_preset: Optional[str] = "alphafold2_ptm",
-        db_preset: str = "reduced_dbs",
+        db_preset: str = "full_dbs",
         additional_options: Optional[List[str]] = None,
         use_precomputed_msas: bool = False,
         random_seed: Optional[int] = None,
@@ -266,24 +271,40 @@ class AlphafoldInterface(BaseInterface):
         # build command
         if config.INSTALL_TYPE == "colabfold_container":
             cmd = self._build_colabfold_container_command(
-                fasta_path, out_dir, num_models, num_recycles, 
-                num_relax, relax_max_iteration, use_templates, 
-                model_preset, additional_options, non_armer_core_type
+                fasta_path = fasta_path, 
+                out_dir = out_dir, 
+                num_models = num_models, 
+                num_recycles = num_recycles, 
+                num_relax = num_relax, 
+                relax_max_iteration = relax_max_iteration, 
+                use_templates = use_templates, 
+                model_preset = model_preset, 
+                additional_options = additional_options, 
+                non_armer_core_type = non_armer_core_type
             )
         elif config.INSTALL_TYPE == "alphafold2_native_container":
             cmd = self._build_alphafold2_native_container_command(
-                fasta_path, out_dir, max_template_date, 
-                model_preset, db_preset, additional_options, non_armer_core_type
+                fasta_path = fasta_path, 
+                out_dir = out_dir, 
+                max_template_date = max_template_date, 
+                model_preset = model_preset, 
+                db_preset = db_preset, 
+                additional_options = additional_options, 
+                non_armer_core_type = non_armer_core_type
             )
         elif config.INSTALL_TYPE == "alphafold2_native_python":
             cmd = self._build_alphafold2_native_python_command(
-                fasta_path, out_dir, num_relax, use_templates,
-                model_preset, additional_options, 
-                max_template_date=max_template_date,
-                db_preset=db_preset,
-                use_precomputed_msas=use_precomputed_msas,
-                random_seed=random_seed,
-                core_type=non_armer_core_type
+                fasta_path = fasta_path, 
+                out_dir = out_dir, 
+                num_relax = num_relax, 
+                use_templates = use_templates,
+                model_preset = model_preset,
+                additional_options = additional_options,
+                max_template_date = max_template_date,
+                db_preset = db_preset,
+                use_precomputed_msas = use_precomputed_msas,
+                random_seed = random_seed,
+                core_type = non_armer_core_type
             )
         else:
             _LOGGER.error(f"Unsupported install type: {config.INSTALL_TYPE}")
@@ -330,7 +351,7 @@ class AlphafoldInterface(BaseInterface):
         use_templates: bool = False,
         max_template_date: Optional[str] = None,
         model_preset: Optional[str] = "alphafold2_ptm",
-        db_preset: str = "reduced_dbs",
+        db_preset: str = "full_dbs",
         additional_options: Optional[List[str]] = None,
         use_precomputed_msas: bool = False,
         random_seed: Optional[int] = None,
@@ -396,19 +417,35 @@ class AlphafoldInterface(BaseInterface):
             
             if config.INSTALL_TYPE == "colabfold_container":
                 cmd = self._build_colabfold_container_command(
-                    job_fasta_path, out_dir, num_models, num_recycles, 
-                    num_relax, relax_max_iteration, use_templates, 
-                    model_preset, additional_options, core_type
+                    job_fasta_path=job_fasta_path, 
+                    out_dir=out_dir, 
+                    num_models=num_models, 
+                    num_recycles=num_recycles, 
+                    num_relax=num_relax, 
+                    relax_max_iteration=relax_max_iteration, 
+                    use_templates=use_templates, 
+                    model_preset=model_preset, 
+                    additional_options=additional_options, 
+                    core_type=core_type
                 )
             elif config.INSTALL_TYPE == "alphafold2_native_container":
                 cmd = self._build_alphafold2_native_container_command(
-                    job_fasta_path, out_dir, max_template_date, 
-                    model_preset, db_preset, additional_options, core_type
+                    job_fasta_path=job_fasta_path, 
+                    out_dir=out_dir, 
+                    max_template_date=max_template_date, 
+                    model_preset=model_preset, 
+                    db_preset=db_preset, 
+                    additional_options=additional_options, 
+                    core_type=core_type
                 )
             elif config.INSTALL_TYPE == "alphafold2_native_python":
                 cmd = self._build_alphafold2_native_python_command(
-                    job_fasta_path, out_dir, num_relax, use_templates,
-                    model_preset, additional_options,
+                    job_fasta_path=job_fasta_path, 
+                    out_dir=out_dir, 
+                    num_relax=num_relax, 
+                    use_templates=use_templates,
+                    model_preset=model_preset, 
+                    additional_options=additional_options,
                     max_template_date=max_template_date,
                     db_preset=db_preset,
                     use_precomputed_msas=use_precomputed_msas,
@@ -575,14 +612,15 @@ class AlphafoldInterface(BaseInterface):
         num_relax: int = 0, # mapped to models_to_relax
         use_templates: bool = False, # if this is false, set max_template_date to 1900-01-01
         model_preset: Optional[str] = None, # --model_preset (auto default value for monomer and multimer)
-        additional_options: Optional[List[str]] = None,
         max_template_date: Optional[str] = None, # --max_template_date
-        num_multimer_predictions_per_model: int = 5, # --num_multimer_predictions_per_model
         use_precomputed_msas: bool = False, # --use_precomputed_msas
         random_seed: Optional[int] = None, # --random_seed
         db_preset: str = "full_dbs", # --db_preset
-        benchmark: bool = False, # --benchmark
         core_type: str = "gpu",
+        additional_options: Optional[List[str]] = None,
+        # Not exposed in af2_predict API
+        num_multimer_predictions_per_model: int = 5, # --num_multimer_predictions_per_model
+        benchmark: bool = False, # --benchmark
     ) -> List[str]:
         """Build command for AlphaFold2 native Python execution.
         

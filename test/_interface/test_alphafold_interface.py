@@ -581,15 +581,7 @@ class TestAlphafoldAccreR9Integration:
         # Setup for actual ACCRE R9 alphafold native python install
         alphafold_config_modifier(
             INSTALL_TYPE="alphafold2_native_python",
-            EXECUTABLE_PATH="/sb/apps/alphafold232/alphafold/run_alphafold.py",
             DATA_DIR="/sb/apps/alphafold-data.230",
-            UNIREF90_DATABASE_PATH="/sb/apps/alphafold-data.230/uniref90/uniref90.fasta",
-            MGNIFY_DATABASE_PATH="/sb/apps/alphafold-data.230/mgnify/mgy_clusters_2022_05.fa",
-            UNIREF30_DATABASE_PATH="/sb/apps/alphafold-data.230/uniref30/UniRef30_2021_03",
-            BFD_DATABASE_PATH="/sb/apps/alphafold-data.230/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt",
-            TEMPLATE_MMCIF_DIR="/sb/apps/alphafold-data.230/pdb_mmcif/mmcif_files",
-            PDB70_DATABASE_PATH="/sb/apps/alphafold-data.230/pdb70/pdb70",
-            OBSOLETE_PDBS_PATH="/sb/apps/alphafold-data.230/pdb_mmcif/obsolete.dat",
             USE_GPU_RELAX=True
         )
         
@@ -612,7 +604,7 @@ class TestAlphafoldAccreR9Integration:
             # Create result eggs for actual submission
             result = af_interface.af2_predict(
                 sequences=sequences,
-                out_dir=test_output_dir,
+                work_dir=test_output_dir,
                 cluster_job_config=cluster_job_config,
                 seq_per_job=1,
                 model_preset="monomer_ptm",
