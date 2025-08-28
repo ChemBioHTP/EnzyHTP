@@ -16,7 +16,8 @@ for line in run(["squeue","-h","-t","R,PD","-o","%i %u %T"]).splitlines():
     if len(parts) < 3:
         continue
     jid, user, state = parts
-    jid = jid.split("_")[0]
+    if "[" in jid:
+        jid = jid.split("_")[0]
     rows.append((jid, user, state))
 rows = list(set(rows))  # Deduplicate
 
