@@ -78,6 +78,28 @@ class AlphafoldConfig(BaseConfig):
     UNIPROT_DATABASE_PATH: str = ""
     """Path to UniProt database."""
     
+    SMALL_BFD_DATABASE_PATH: str = ""
+    """Path to small BFD database for reduced_dbs preset."""
+    
+    # Binary paths for native AlphaFold2
+    HHBLITS_BINARY_PATH: str = ""
+    """Path to HHblits executable."""
+    
+    HHSEARCH_BINARY_PATH: str = ""
+    """Path to HHsearch executable."""
+    
+    HMMBUILD_BINARY_PATH: str = ""
+    """Path to hmmbuild executable."""
+    
+    HMMSEARCH_BINARY_PATH: str = ""
+    """Path to hmmsearch executable."""
+    
+    JACKHMMER_BINARY_PATH: str = ""
+    """Path to JackHMMER executable."""
+    
+    KALIGN_BINARY_PATH: str = ""
+    """Path to Kalign executable."""
+    
     USE_GPU_RELAX: bool = True
     """Whether to use GPU for relaxation."""
     
@@ -121,6 +143,22 @@ class AlphafoldConfig(BaseConfig):
         """A hardcoded list of required executables for Alphafold."""
         if self.INSTALL_TYPE == "colabfold_container":
             return [self.CONTAINER_TYPE]
+        if self.INSTALL_TYPE == "alphafold2_native_python":
+            # Return executables that are actually configured
+            executables = []
+            if self.HHBLITS_BINARY_PATH:
+                executables.append(self.HHBLITS_BINARY_PATH)
+            if self.HHSEARCH_BINARY_PATH:
+                executables.append(self.HHSEARCH_BINARY_PATH)
+            if self.HMMBUILD_BINARY_PATH:
+                executables.append(self.HMMBUILD_BINARY_PATH)
+            if self.HMMSEARCH_BINARY_PATH:
+                executables.append(self.HMMSEARCH_BINARY_PATH)
+            if self.JACKHMMER_BINARY_PATH:
+                executables.append(self.JACKHMMER_BINARY_PATH)
+            if self.KALIGN_BINARY_PATH:
+                executables.append(self.KALIGN_BINARY_PATH)
+            return executables
         return []
 
     def required_env_vars(self) -> List[str]:

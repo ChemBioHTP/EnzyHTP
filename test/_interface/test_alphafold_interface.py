@@ -597,11 +597,10 @@ class TestAlphafoldAccreR9Integration:
         cluster_job_config = {
             "cluster": AccreR9(),
             "res_keywords": {
-                "account": "yang_lab_csb_iacc",
-                "partition": "interactive_gpu",
-                "qos": "debug_iacc", 
-                "node_cores": "nvidia_rtx_a4000:1",
-                "walltime": "30:00",
+                "account": "csb_gpu_acc",
+                "partition": "batch_gpu",
+                "node_cores": "nvidia_rtx_a6000:1",
+                "walltime": "1-00:00:00",
             }
         }
 

@@ -8,7 +8,7 @@ import tempfile
 import os
 import re
 import copy
-from typing import Union, List, Optional, Dict
+from typing import Union, List, Optional, Dict, Tuple
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -69,7 +69,7 @@ class AlphafoldInterface(BaseInterface):
 
     def af2_predict(
         self, 
-        sequences: List[str], 
+        sequences: Union[List[str], List[List[str]]], 
         out_dir: Union[str, Path, None] = None,
         # local run related
         non_armer_core_type: str = "gpu",
@@ -88,12 +88,16 @@ class AlphafoldInterface(BaseInterface):
         model_preset: Optional[str] = None,
         db_preset: str = "reduced_dbs",
         additional_options: Optional[List[str]] = None,
+        use_precomputed_msas: bool = False,
+        random_seed: Optional[int] = None,
         **kwargs
     ) -> Dict[str, Structure]:
         """Science API for AlphaFold2 structure prediction.
 
         Args:
-            sequences: List of amino acid sequences to predict
+            sequences: Sequences to predict. Can be:
+                      - List[str]: Single sequences [seq1, seq2, seq3, ...]
+                      - List[List[str]]: Multimers [[seq1_chain_A, seq1_chain_B], [seq2_chain_A, seq2_chain_B], ...]
             out_dir: Output directory for results. If None, creates temporary directory.
             cluster_job_config: Configuration for cluster job submission
             core_type: Type of computing core ('gpu' or 'cpu') for cluster jobs
@@ -102,13 +106,16 @@ class AlphafoldInterface(BaseInterface):
             seq_per_job: Number of sequences per job (for array execution)
             num_models: Number of models to generate
             num_recycles: Number of recycling iterations
-            num_relax: Number of structures to relax
+            num_relax: Number of top ranked structures to relax
             relax_max_iteration: Maximum relaxation iterations
             use_templates: Whether to use templates
             max_template_date: Maximum template date
             model_preset: Model preset configuration
             db_preset: Database preset
             additional_options: Additional command-line options
+            use_precomputed_msas: Whether to use precomputed MSAs 
+                (NOTE: when native af2 distribution is used. HHSearch will still be run. Details: https://github.com/google-deepmind/alphafold/issues/469)
+            random_seed: Random seed for reproducibility
             
         Returns:
             Dict mapping sequence identifiers to Structure objects
@@ -124,10 +131,11 @@ class AlphafoldInterface(BaseInterface):
                 temp_paths.append(out_dir)
             fs.safe_mkdir(out_dir)
 
-            sequence_ids = [f"seq_{i}" for i in range(len(sequences))]
+            # Handle different sequence input formats
+            fasta_sequences, sequence_ids = self._prepare_sequences_and_ids(sequences)
             fasta_path = fs.get_valid_temp_name(f"{out_dir}/input_sequences.fasta")
             create_fasta_from_sequences(
-                sequences, 
+                fasta_sequences, 
                 sequence_ids,
                 output_path=fasta_path
             )
@@ -147,6 +155,8 @@ class AlphafoldInterface(BaseInterface):
                     model_preset=model_preset,
                     db_preset=db_preset,
                     additional_options=additional_options,
+                    use_precomputed_msas=use_precomputed_msas,
+                    random_seed=random_seed,
                     cluster_job_config=cluster_job_config,
                     seq_per_job=seq_per_job
                 )
@@ -182,20 +192,19 @@ class AlphafoldInterface(BaseInterface):
                     model_preset=model_preset,
                     db_preset=db_preset,
                     additional_options=additional_options,
+                    use_precomputed_msas=use_precomputed_msas,
+                    random_seed=random_seed,
                     non_armer_core_type=non_armer_core_type
                 )
 
             # Parse results into Structure objects
-            # Map sequence IDs back to full sequences for return values
-            fasta_sequences = parse_fasta_file(fasta_path)
-            seq_id_to_sequence = {seq_id: seq for seq_id, seq in fasta_sequences}
-            
+            # Map sequence IDs back to original input format
             structures = {}
             for seq_id, pdb_path in result_files.items():
                 structure = stru_parser.get_structure(pdb_path)
-                # Use full sequence as key instead of sequence ID
-                full_sequence = seq_id_to_sequence[seq_id]
-                structures[full_sequence] = structure
+                # Map back to original sequence format
+                original_seq = self._map_seq_id_to_original(seq_id, sequences)
+                structures[original_seq] = structure
 
             return structures
 
@@ -216,6 +225,8 @@ class AlphafoldInterface(BaseInterface):
         model_preset: Optional[str] = "alphafold2_ptm",
         db_preset: str = "reduced_dbs",
         additional_options: Optional[List[str]] = None,
+        use_precomputed_msas: bool = False,
+        random_seed: Optional[int] = None,
         non_armer_core_type: str = "gpu",
     ) -> Dict[str, str]:
         """Execute AlphaFold2 prediction locally.
@@ -232,6 +243,8 @@ class AlphafoldInterface(BaseInterface):
             model_preset: Model preset configuration
             db_preset: Database preset
             additional_options: Additional command-line options
+            use_precomputed_msas: Whether to use precomputed MSAs
+            random_seed: Random seed for reproducibility
             non_armer_core_type: Type of computing core ('gpu' or 'cpu') for local execution
             
         Returns:
@@ -256,9 +269,13 @@ class AlphafoldInterface(BaseInterface):
             )
         elif config.INSTALL_TYPE == "alphafold2_native_python":
             cmd = self._build_alphafold2_native_python_command(
-                fasta_path, out_dir, num_models, num_recycles,
-                num_relax, relax_max_iteration, use_templates,
-                model_preset, additional_options, non_armer_core_type
+                fasta_path, out_dir, num_relax, use_templates,
+                model_preset, additional_options, 
+                max_template_date=max_template_date,
+                db_preset=db_preset,
+                use_precomputed_msas=use_precomputed_msas,
+                random_seed=random_seed,
+                core_type=non_armer_core_type
             )
         else:
             _LOGGER.error(f"Unsupported install type: {config.INSTALL_TYPE}")
@@ -297,6 +314,8 @@ class AlphafoldInterface(BaseInterface):
         model_preset: Optional[str] = "alphafold2_ptm",
         db_preset: str = "reduced_dbs",
         additional_options: Optional[List[str]] = None,
+        use_precomputed_msas: bool = False,
+        random_seed: Optional[int] = None,
         cluster_job_config: Optional[Union[ClusterJobConfig, Dict]] = None,
         seq_per_job: int = 1,
     ) -> List[AlphaFold2ResultEgg]:
@@ -314,6 +333,8 @@ class AlphafoldInterface(BaseInterface):
             model_preset: Model preset configuration
             db_preset: Database preset
             additional_options: Additional command-line options
+            use_precomputed_msas: Whether to use precomputed MSAs
+            random_seed: Random seed for reproducibility
             cluster_job_config: Configuration for cluster job
             seq_per_job: Number of sequences per job
             
@@ -368,9 +389,13 @@ class AlphafoldInterface(BaseInterface):
                 )
             elif config.INSTALL_TYPE == "alphafold2_native_python":
                 cmd = self._build_alphafold2_native_python_command(
-                    job_fasta_path, out_dir, num_models, num_recycles,
-                    num_relax, relax_max_iteration, use_templates,
-                    model_preset, additional_options, core_type
+                    job_fasta_path, out_dir, num_relax, use_templates,
+                    model_preset, additional_options,
+                    max_template_date=max_template_date,
+                    db_preset=db_preset,
+                    use_precomputed_msas=use_precomputed_msas,
+                    random_seed=random_seed,
+                    core_type=core_type
                 )
             else:
                 raise ValueError(f"Unsupported install type: {config.INSTALL_TYPE}")
@@ -529,99 +554,191 @@ class AlphafoldInterface(BaseInterface):
         self,
         fasta_path: str, # --fasta_paths
         out_dir: Path, # --output_dir
-        use_templates: bool, # if this is false, set max_template_date to 1900-01-01
-        model_preset: str = None, # --model_preset (we need to make auto default value for monomer and multimer)
+        num_relax: int = 0, # mapped to models_to_relax
+        use_templates: bool = False, # if this is false, set max_template_date to 1900-01-01
+        model_preset: Optional[str] = None, # --model_preset (auto default value for monomer and multimer)
         additional_options: Optional[List[str]] = None,
         max_template_date: Optional[str] = None, # --max_template_date
-        models_to_relax: str = "best", # --models_to_relax
         num_multimer_predictions_per_model: int = 5, # --num_multimer_predictions_per_model
         use_precomputed_msas: bool = False, # --use_precomputed_msas
         random_seed: Optional[int] = None, # --random_seed
         db_preset: str = "full_dbs", # --db_preset
+        benchmark: bool = False, # --benchmark
         core_type: str = "gpu",
     ) -> List[str]:
         """Build command for AlphaFold2 native Python execution.
         
         Args:
             non_armer_core_type: Computing core type ('gpu' or 'cpu')
+        """        
+        afconfig = self.config_
         
-        TODO
-        # DB paths
-        --bfd_database_path: Path to the BFD database for use by HHblits.
-        --data_dir: Path to directory of supporting data.
-        --mgnify_database_path: Path to the MGnify database for use by JackHMMER.
-        --obsolete_pdbs_path: Path to file containing a mapping from obsolete PDB IDs to the PDB IDs of their replacements.
-        --pdb70_database_path: Path to the PDB70 database for use by HHsearch.
-        --pdb_seqres_database_path: Path to the PDB seqres database for use by hmmsearch.
-        --small_bfd_database_path: Path to the small version of BFD used with the "reduced_dbs" preset.
-        --template_mmcif_dir: Path to a directory with template mmCIF structures, each named <pdb_id>.cif
-        --uniprot_database_path: Path to the Uniprot database for use by JackHMMer.
-        --uniref30_database_path: Path to the UniRef30 database for use by HHblits.
-        --uniref90_database_path: Path to the Uniref90 database for use by JackHMMER.
-
-        # exe configs        
-        --hhblits_binary_path: Path to the HHblits executable.
-            (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/hhblits')
-        --hhsearch_binary_path: Path to the HHsearch executable.
-            (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/hhsearch')
-        --hmmbuild_binary_path: Path to the hmmbuild executable.
-            (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/hmmbuild')
-        --hmmsearch_binary_path: Path to the hmmsearch executable.
-            (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/hmmsearch')
-        --jackhmmer_binary_path: Path to the JackHMMER executable.
-            (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/jackhmmer')
-        --kalign_binary_path: Path to the Kalign executable.
-            (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/kalign')
-        """
-        config = self.config_
-        
-        cmd = ["python", config.EXECUTABLE_PATH]
+        cmd = ["python", afconfig.EXECUTABLE_PATH]
         cmd.extend(["--fasta_paths", fasta_path])
         cmd.extend(["--output_dir", str(out_dir)])
-        cmd.extend(["--data_dir", config.DATA_DIR])
-        cmd.extend(["--max_template_date", "9999-12-31"])
+        cmd.extend(["--data_dir", afconfig.DATA_DIR])
+        cmd.extend(["--db_preset", db_preset])
         
-        # Add AlphaFold2-specific parameters 
-        # TODO auto default value for preset ("monomer_ptm" for monomer and "multimer" for multimer)
-        if model_preset:
-            cmd.extend(["--model_preset", model_preset])
+        # Handle templates
+        if use_templates:
+            if max_template_date:
+                cmd.extend(["--max_template_date", max_template_date])
+            else:
+                cmd.extend(["--max_template_date", "9999-12-31"])
+        else:
+            cmd.extend(["--max_template_date", "1900-01-01"])
+        
+        # Auto-detect model preset based on FASTA content if not provided
+        if model_preset is None:
+            # Parse FASTA to check if it's multimer
+            fasta_sequences = parse_fasta_file(fasta_path)
+            if len(fasta_sequences) > 1 or any(':' in seq for _, seq in fasta_sequences): # BUG native AF2 should not take : containing sequence
+                model_preset = "multimer"
+            else:
+                model_preset = "monomer_ptm"
+        cmd.extend(["--model_preset", model_preset])
+                
+        # Handle relaxation based on num_relax
+        if num_relax <= 0:
+            cmd.extend(["--models_to_relax", "none"])
+        elif num_relax == 1:
+            cmd.extend(["--models_to_relax", "best"])
+        else:
+            _LOGGER.warning("AlphaFold2 native Python interface only supports relaxing 0, 1, or all models. Setting to relax all models.")
+            cmd.extend(["--models_to_relax", "all"])
+        
+        # Add multimer-specific options
+        if model_preset == "multimer":
+            cmd.extend(["--num_multimer_predictions_per_model", str(num_multimer_predictions_per_model)])
+        
+        # Add other options
+        if use_precomputed_msas:
+            cmd.append("--use_precomputed_msas") # NOTE this currently has no effect
+
+        if random_seed is not None:
+            cmd.extend(["--random_seed", str(random_seed)])
+        
+        if benchmark:
+            cmd.append("--benchmark")
                 
         # Add all database paths required by AlphaFold
-        if hasattr(config, 'UNIREF90_DATABASE_PATH') and config.UNIREF90_DATABASE_PATH:
-            cmd.extend(["--uniref90_database_path", config.UNIREF90_DATABASE_PATH])
+        if afconfig.UNIREF90_DATABASE_PATH:
+            cmd.extend(["--uniref90_database_path", afconfig.UNIREF90_DATABASE_PATH])
 
-        if hasattr(config, 'PDB70_DATABASE_PATH') and config.PDB70_DATABASE_PATH:
-            cmd.extend(["--pdb70_database_path", config.PDB70_DATABASE_PATH])
+        if afconfig.PDB70_DATABASE_PATH:
+            cmd.extend(["--pdb70_database_path", afconfig.PDB70_DATABASE_PATH])
 
-        if hasattr(config, 'MGNIFY_DATABASE_PATH') and config.MGNIFY_DATABASE_PATH:
-            cmd.extend(["--mgnify_database_path", config.MGNIFY_DATABASE_PATH])
+        if afconfig.MGNIFY_DATABASE_PATH:
+            cmd.extend(["--mgnify_database_path", afconfig.MGNIFY_DATABASE_PATH])
             
-        if hasattr(config, 'UNIREF30_DATABASE_PATH') and config.UNIREF30_DATABASE_PATH:
-            cmd.extend(["--uniref30_database_path", config.UNIREF30_DATABASE_PATH])
+        if afconfig.UNIREF30_DATABASE_PATH:
+            cmd.extend(["--uniref30_database_path", afconfig.UNIREF30_DATABASE_PATH])
             
-        if hasattr(config, 'BFD_DATABASE_PATH') and config.BFD_DATABASE_PATH:
-            cmd.extend(["--bfd_database_path", config.BFD_DATABASE_PATH])
+        if afconfig.BFD_DATABASE_PATH:
+            cmd.extend(["--bfd_database_path", afconfig.BFD_DATABASE_PATH])
             
-        if hasattr(config, 'TEMPLATE_MMCIF_DIR') and config.TEMPLATE_MMCIF_DIR:
-            cmd.extend(["--template_mmcif_dir", config.TEMPLATE_MMCIF_DIR])
+        # small_bfd_database_path is only for reduced_dbs preset
+        if db_preset == "reduced_dbs" and afconfig.SMALL_BFD_DATABASE_PATH:
+            cmd.extend(["--small_bfd_database_path", afconfig.SMALL_BFD_DATABASE_PATH])
             
-        if hasattr(config, 'PDB_SEQRES_DATABASE_PATH') and config.PDB_SEQRES_DATABASE_PATH:
-            cmd.extend(["--pdb_seqres_database_path", config.PDB_SEQRES_DATABASE_PATH])
+        if afconfig.TEMPLATE_MMCIF_DIR:
+            cmd.extend(["--template_mmcif_dir", afconfig.TEMPLATE_MMCIF_DIR])
             
-        if hasattr(config, 'OBSOLETE_PDBS_PATH') and config.OBSOLETE_PDBS_PATH:
-            cmd.extend(["--obsolete_pdbs_path", config.OBSOLETE_PDBS_PATH])
+        # PDB seqres and Uniprot are only for multimer model preset
+        if model_preset == "multimer":
+            if afconfig.PDB_SEQRES_DATABASE_PATH:
+                cmd.extend(["--pdb_seqres_database_path", afconfig.PDB_SEQRES_DATABASE_PATH])
+                
+            if afconfig.UNIPROT_DATABASE_PATH:
+                cmd.extend(["--uniprot_database_path", afconfig.UNIPROT_DATABASE_PATH])
+
+        if afconfig.OBSOLETE_PDBS_PATH:
+            cmd.extend(["--obsolete_pdbs_path", afconfig.OBSOLETE_PDBS_PATH])
+        
+        # Add binary paths
+        if afconfig.HHBLITS_BINARY_PATH:
+            cmd.extend(["--hhblits_binary_path", afconfig.HHBLITS_BINARY_PATH])
             
-        if hasattr(config, 'UNIPROT_DATABASE_PATH') and config.UNIPROT_DATABASE_PATH:
-            cmd.extend(["--uniprot_database_path", config.UNIPROT_DATABASE_PATH])
+        if afconfig.HHSEARCH_BINARY_PATH:
+            cmd.extend(["--hhsearch_binary_path", afconfig.HHSEARCH_BINARY_PATH])
+            
+        if afconfig.HMMBUILD_BINARY_PATH:
+            cmd.extend(["--hmmbuild_binary_path", afconfig.HMMBUILD_BINARY_PATH])
+            
+        if afconfig.HMMSEARCH_BINARY_PATH:
+            cmd.extend(["--hmmsearch_binary_path", afconfig.HMMSEARCH_BINARY_PATH])
+            
+        if afconfig.JACKHMMER_BINARY_PATH:
+            cmd.extend(["--jackhmmer_binary_path", afconfig.JACKHMMER_BINARY_PATH])
+            
+        if afconfig.KALIGN_BINARY_PATH:
+            cmd.extend(["--kalign_binary_path", afconfig.KALIGN_BINARY_PATH])
         
         # Add GPU relax option
-        if hasattr(config, 'USE_GPU_RELAX') and config.USE_GPU_RELAX and core_type == "gpu":
+        if afconfig.USE_GPU_RELAX and core_type == "gpu":
             cmd.append("--use_gpu_relax")
         
         if additional_options:
             cmd.extend(additional_options)
         
         return cmd
+
+    def _prepare_sequences_and_ids(self, sequences: Union[List[str], List[List[str]]]) -> Tuple[List[str], List[str]]:
+        """Prepare sequences and IDs for FASTA creation based on install type.
+        
+        Args:
+            sequences: Either single sequences or multimer sequences
+            
+        Returns:
+            Tuple of (fasta_sequences, sequence_ids)
+        """
+        config = self.config_
+        
+        if isinstance(sequences[0], list):
+            # Multimer format: [[seq1_chain_A, seq1_chain_B], [seq2_chain_A, seq2_chain_B], ...]
+            fasta_sequences = []
+            sequence_ids = []
+            
+            for i, multimer_seqs in enumerate(sequences):
+                seq_id = f"seq_{i}"
+                sequence_ids.append(seq_id)
+                
+                if config.INSTALL_TYPE == "colabfold_container":
+                    # ColabFold: use ':' to separate chains in same sequence
+                    combined_seq = ":".join(multimer_seqs)
+                    fasta_sequences.append(combined_seq)
+                else:
+                    # Native AlphaFold: put multiple sequences in same FASTA file
+                    # Only add the first sequence here, as native AF handles multiple sequences in file
+                    fasta_sequences.append(":".join(multimer_seqs))
+        else:
+            # Single sequence format: [seq1, seq2, seq3, ...]
+            fasta_sequences = list(sequences)
+            sequence_ids = [f"seq_{i}" for i in range(len(sequences))]
+            
+        return fasta_sequences, sequence_ids
+    
+    def _map_seq_id_to_original(self, seq_id: str, original_sequences: Union[List[str], List[List[str]]]) -> Union[str, Tuple[str, ...]]:
+        """Map sequence ID back to original input format.
+        
+        Args:
+            seq_id: Sequence ID like 'seq_0', 'seq_1', etc.
+            original_sequences: Original input sequences
+            
+        Returns:
+            Original sequence or tuple of sequences for multimers
+        """
+        try:
+            index = int(seq_id.split('_')[1])
+            original_seq = original_sequences[index]
+            
+            if isinstance(original_seq, list):
+                return tuple(original_seq)  # Return as tuple for hashable key
+            else:
+                return original_seq
+        except (IndexError, ValueError):
+            _LOGGER.warning(f"Could not map sequence ID {seq_id} back to original sequence")
+            return seq_id
 
     def _find_output_files_map(self, out_dir: Path) -> Dict[str, str]:
         """Find output PDB files in the output directory and return filename-to-path mapping.
