@@ -16,7 +16,9 @@ for line in run(["squeue","-h","-t","R,PD","-o","%i %u %T"]).splitlines():
     if len(parts) < 3:
         continue
     jid, user, state = parts
+    jid = jid.split("_")[0]
     rows.append((jid, user, state))
+rows = list(set(rows))  # Deduplicate
 
 # 2) Parse GPU request model and count from scontrol single-line output
 pat_reqgres = re.compile(r"\bReqGRES=([^ ]+)")
