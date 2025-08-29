@@ -207,6 +207,8 @@ class AlphafoldInterface(BaseInterface):
             comprehensive_results = {}
             for seq_id in sequences_mapper.keys():
                 original_seq = sequences_mapper[seq_id]
+                if isinstance(original_seq, list):
+                    original_seq = tuple(original_seq)
                 seq_results = self._parse_comprehensive_results(work_dir, seq_id, stru_parser)
                 comprehensive_results[original_seq] = seq_results
 

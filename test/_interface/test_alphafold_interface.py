@@ -86,7 +86,6 @@ class TestAlphafoldInterfaceUnmocked:
         # Act
         result = self.interface.af2_predict(sequence, work_dir=test_output_dir)
 
-        print(result)
         # Assert
         assert isinstance(result, dict)
         # The result keys should be the actual sequences, not seq_0
@@ -109,6 +108,39 @@ class TestAlphafoldInterfaceUnmocked:
         # Check pLDDT scores are valid
         assert isinstance(seq_result["best_model_plddt"], list)
         assert len(seq_result["best_model_plddt"]) == 22  # Same as number of residues
+        fs.safe_rmdir(test_output_dir)
+
+    def test_af2_predict_colabfold_multimer(self):
+        """Test predict_structure without mocking use colabfold"""
+        test_output_dir = Path(f"{WORK_DIR}/test_af2_output")
+        # Arrange
+        sequence = [["MSTPSLIPSGVHEVLAKYKDGN", "MSTPSLIPSGVHEVLAKYKDGN"],]
+        # Act
+        result = self.interface.af2_predict(sequence, work_dir=test_output_dir)
+
+        # Assert
+        assert isinstance(result, dict)
+        # The result keys should be the actual sequences, not seq_0
+        assert tuple(sequence[0]) in result
+        
+        # Check comprehensive output structure
+        seq_result = result[tuple(sequence[0])]
+        assert isinstance(seq_result, dict)
+        
+        # Check best model
+        assert "best_model" in seq_result
+        assert "best_model_plddt" in seq_result
+        assert "best_model_index" in seq_result
+        assert seq_result["best_model"].num_residues == 44
+        assert seq_result["best_model"].num_atoms == 326
+        
+        # Check individual models exist
+        assert "model_1" in seq_result or "model_2" in seq_result or "model_3" in seq_result or "model_4" in seq_result or "model_5" in seq_result
+        
+        # Check pLDDT scores are valid
+        assert isinstance(seq_result["best_model_plddt"], list)
+        assert len(seq_result["best_model_plddt"]) == 44  # Same as number of residues
+        fs.safe_rmdir(test_output_dir)
 
     def test_parse_native_af2_results(self):
         """Test parsing native AlphaFold2 results format using reference data."""
@@ -856,10 +888,9 @@ class TestAlphafoldAccreR9Integration:
             )
             print(result)
         finally:
-            pass
             # Cleanup test directory
-            # if test_output_dir.exists():
-            #     fs.safe_rmdir(test_output_dir)
+            if test_output_dir.exists():
+                fs.safe_rmdir(test_output_dir)
 
 class TestAlphaFold2ResultEgg:
     """Tests for AlphaFold2 result egg functionality."""
