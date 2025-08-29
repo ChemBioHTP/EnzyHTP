@@ -77,13 +77,14 @@ class TestAlphafoldInterfaceUnmocked:
         self.config = af_config
         self.interface = af_interface
 
-    def test_predict_structure(self):
-        """Test predict_structure without mocking."""
+    def test_af2_predict_colabfold(self):
+        """Test predict_structure without mocking use colabfold"""
         # Arrange
         sequence = "MSTPSLIPSGVHEVLAKYKDGN"
         # Act
-        result = predict_structure(sequence, engine="alphafold2")
+        result = self.interface.af2_predict(sequence)
 
+        print(result)
         # Assert
         assert isinstance(result, dict)
         # The result keys should be the actual sequences, not seq_0

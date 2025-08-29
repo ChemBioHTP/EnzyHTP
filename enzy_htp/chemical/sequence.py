@@ -43,8 +43,8 @@ def create_fasta_from_sequences(
     # Normalize inputs
     if isinstance(sequences, str):
         sequences = [sequences]
-    if not isinstance(sequences, list):
-        raise TypeError("sequences must be str or list of str")
+    if not isinstance(sequences, (list, tuple)):
+        raise TypeError("sequences must be str or list/tuple of str")
     
     if sequence_ids is None:
         sequence_ids = [f"seq_{i}" for i in range(len(sequences))]

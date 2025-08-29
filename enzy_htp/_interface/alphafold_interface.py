@@ -127,6 +127,11 @@ class AlphafoldInterface(BaseInterface):
         """
         temp_paths = []
         stru_parser = PDBParser()
+        if not isinstance(sequences, list):
+            sequences = [sequences]
+        # san check on sequence
+        self._validate_sequences(sequences)
+        sequences_mapper = {f"seq_{i}": seq for i, seq in enumerate(sequences)}
         
         try:
             # Create output directory first
@@ -136,28 +141,10 @@ class AlphafoldInterface(BaseInterface):
                 temp_paths.append(work_dir)
             fs.safe_mkdir(work_dir)
 
-            # Handle different sequence input formats
-            if self.config_.INSTALL_TYPE != "colabfold_container" and isinstance(sequences[0], list):
-                # Native AlphaFold with multimers: create separate FASTA files for each multimer
-                fasta_paths = self._create_multimer_fasta_files(sequences, work_dir)
-                temp_paths.extend(fasta_paths)
-                # For native AlphaFold, use comma-separated paths
-                fasta_path = ",".join(fasta_paths)
-            else:
-                # Single FASTA file for ColabFold or single sequences
-                fasta_sequences, sequence_ids = self._prepare_sequences_and_ids(sequences)
-                fasta_path = fs.get_valid_temp_name(f"{work_dir}/input_sequences.fasta")
-                create_fasta_from_sequences(
-                    fasta_sequences, 
-                    sequence_ids,
-                    output_path=fasta_path
-                )
-                temp_paths.append(fasta_path)
-
             if cluster_job_config:
                 # Run on cluster using array jobs
                 result_eggs = self.make_job(
-                    fasta_path=fasta_path,
+                    sequences=sequences_mapper,
                     out_dir=work_dir,
                     num_models=num_models,
                     num_recycles=num_recycles,
@@ -189,12 +176,12 @@ class AlphafoldInterface(BaseInterface):
                 # Collect results from all eggs
                 result_files = {}
                 for egg in result_eggs:
-                    egg_files = egg.get_expected_output_files() # TODO in multimer + af2 native case, will this work?
+                    egg_files = egg.get_expected_output_files()
                     result_files.update(egg_files)
             else:
                 # Run locally
                 result_files = self.run(
-                    fasta_path=fasta_path,
+                    sequences=sequences_mapper,
                     out_dir=work_dir,
                     num_models=num_models,
                     num_recycles=num_recycles,
@@ -216,7 +203,7 @@ class AlphafoldInterface(BaseInterface):
             for seq_id, pdb_path in result_files.items():
                 structure = stru_parser.get_structure(pdb_path)
                 # Map back to original sequence format
-                original_seq = self._map_seq_id_to_original(seq_id, sequences)
+                original_seq = sequences_mapper[seq_id]
                 structures[original_seq] = structure
 
             return structures
@@ -227,7 +214,7 @@ class AlphafoldInterface(BaseInterface):
 
     def run(
         self,
-        fasta_path: str,
+        sequences: Dict[str, Union[List[str], List[List[str]]]],
         out_dir: Union[str, Path],
         num_models: int = 5,
         num_recycles: int = 3,
@@ -245,7 +232,7 @@ class AlphafoldInterface(BaseInterface):
         """Execute AlphaFold2 prediction locally.
         
         Args:
-            fasta_path: Path to input FASTA file
+            sequences: Input sequences to predict {seq_id: [seq, ...], ...}
             out_dir: Output directory for results
             num_models: Number of models to generate
             num_recycles: Number of recycling iterations
@@ -263,10 +250,20 @@ class AlphafoldInterface(BaseInterface):
         Returns:
             Dict mapping sequence IDs to output PDB file paths
         """
+        config = self.config()
         out_dir = Path(out_dir)
         out_dir.mkdir(exist_ok=True)
-        
-        config = self.config_
+
+        sequence_ids = list(sequences.keys())
+
+        # Create FASTA file(s) from sequence data
+        if self.config().INSTALL_TYPE != "colabfold_container":
+            # Native AlphaFold with multimers: create separate FASTA files
+            fasta_paths = self._native_af2_format_fasta(sequences, out_dir)
+            fasta_path = ",".join(fasta_paths)
+        else:
+            # Single FASTA file for ColabFold
+            fasta_path = self._colabfold_format_fasta(sequences, out_dir)
         
         # build command
         if config.INSTALL_TYPE == "colabfold_container":
@@ -280,7 +277,7 @@ class AlphafoldInterface(BaseInterface):
                 use_templates = use_templates, 
                 model_preset = model_preset, 
                 additional_options = additional_options, 
-                non_armer_core_type = non_armer_core_type
+                core_type = non_armer_core_type
             )
         elif config.INSTALL_TYPE == "alphafold2_native_container":
             cmd = self._build_alphafold2_native_container_command(
@@ -290,7 +287,7 @@ class AlphafoldInterface(BaseInterface):
                 model_preset = model_preset, 
                 db_preset = db_preset, 
                 additional_options = additional_options, 
-                non_armer_core_type = non_armer_core_type
+                core_type = non_armer_core_type
             )
         elif config.INSTALL_TYPE == "alphafold2_native_python":
             cmd = self._build_alphafold2_native_python_command(
@@ -326,23 +323,11 @@ class AlphafoldInterface(BaseInterface):
         
         # Get all files and select best ones for sequences
         filename_to_path = self._find_output_files_map(out_dir)
-        
-        # Handle comma-separated FASTA paths (for native AlphaFold multimers)
-        if "," in fasta_path:
-            sequence_ids = []
-            for path in fasta_path.split(","):
-                path = path.strip()
-                fasta_sequences = parse_fasta_file(path)
-                sequence_ids.extend([seq_id for seq_id, _ in fasta_sequences])
-        else:
-            fasta_sequences = parse_fasta_file(fasta_path)
-            sequence_ids = [seq_id for seq_id, _ in fasta_sequences]
-            
         return self._select_best_files_for_sequences(filename_to_path, sequence_ids)
 
     def make_job(
         self,
-        fasta_path: str,
+        sequences: Union[List[str], List[List[str]]],
         out_dir: Union[str, Path],
         num_models: int = 5,
         num_recycles: int = 3,
@@ -361,7 +346,7 @@ class AlphafoldInterface(BaseInterface):
         """Create cluster jobs for running AlphaFold2 with array support.
         
         Args:
-            fasta_path: Path to input FASTA file
+            sequences: Input sequences to predict
             out_dir: Output directory for results
             num_models: Number of models to generate
             num_recycles: Number of recycling iterations
@@ -380,26 +365,26 @@ class AlphafoldInterface(BaseInterface):
         Returns:
             List of AlphaFold2ResultEgg objects, one per job
         """
+        afconfig = self.config()
         out_dir = Path(out_dir)
         out_dir.mkdir(exist_ok=True)
-        
-        # Parse FASTA to get sequences
-        fasta_sequences = parse_fasta_file(fasta_path)
+        seq_w_id = list(sequences.items())
         
         # Create individual jobs for array execution
         result_eggs = []
+        job_data = []
+        for i in range(0, len(seq_w_id), seq_per_job):
+            job_sequences_mapper = dict(seq_w_id[i:i+seq_per_job])
+            if afconfig.INSTALL_TYPE == "colabfold_container":
+                job_fasta_path = self._colabfold_format_fasta(job_sequences_mapper, out_dir)
+            else:
+                job_fasta_path = self._native_af2_format_fasta(job_sequences_mapper, out_dir)
+                job_fasta_path = ",".join(job_fasta_path)
+            job_data.append((job_fasta_path, list(job_sequences_mapper.keys())))
+        # Create cluster jobs for all job data
+        result_eggs = []
         
-        for i in range(0, len(fasta_sequences), seq_per_job):
-            job_sequences = fasta_sequences[i:i+seq_per_job]
-            job_seq_ids = [seq_id for seq_id, _ in job_sequences]
-            job_seq = [seq for _, seq in job_sequences]
-            
-            # Create FASTA for this job
-            job_fasta_path = create_fasta_from_sequences(
-                job_seq,
-                job_seq_ids,
-                output_path=out_dir / f"job_{i//seq_per_job}.fasta"
-            )
+        for job_index, (job_fasta_path, job_seq_ids) in enumerate(job_data):
             
             # Create ClusterJob
             if isinstance(cluster_job_config, dict):
@@ -412,10 +397,8 @@ class AlphafoldInterface(BaseInterface):
                 raise ValueError("cluster_job_config must specify a cluster for job execution")
             core_type = job_config.core_type if job_config.core_type else "gpu"
             
-            # Build command for this job
-            config = self.config_
-            
-            if config.INSTALL_TYPE == "colabfold_container":
+            # Build command for this job            
+            if afconfig.INSTALL_TYPE == "colabfold_container":
                 cmd = self._build_colabfold_container_command(
                     job_fasta_path=job_fasta_path, 
                     out_dir=out_dir, 
@@ -428,7 +411,7 @@ class AlphafoldInterface(BaseInterface):
                     additional_options=additional_options, 
                     core_type=core_type
                 )
-            elif config.INSTALL_TYPE == "alphafold2_native_container":
+            elif afconfig.INSTALL_TYPE == "alphafold2_native_container":
                 cmd = self._build_alphafold2_native_container_command(
                     job_fasta_path=job_fasta_path, 
                     out_dir=out_dir, 
@@ -438,7 +421,7 @@ class AlphafoldInterface(BaseInterface):
                     additional_options=additional_options, 
                     core_type=core_type
                 )
-            elif config.INSTALL_TYPE == "alphafold2_native_python":
+            elif afconfig.INSTALL_TYPE == "alphafold2_native_python":
                 cmd = self._build_alphafold2_native_python_command(
                     fasta_path=job_fasta_path, 
                     out_dir=out_dir, 
@@ -453,11 +436,11 @@ class AlphafoldInterface(BaseInterface):
                     core_type=core_type
                 )
             else:
-                raise ValueError(f"Unsupported install type: {config.INSTALL_TYPE}")
+                raise ValueError(f"Unsupported install type: {afconfig.INSTALL_TYPE}")
             
             # Handle default res_keywords similar to amber_interface
             res_keywords_update = job_config.res_keywords if job_config.has_res_keywords() else {}
-            default_res_keywords = self.config_.get_default_af2_cluster_job_res_keywords(core_type)
+            default_res_keywords = afconfig.get_default_af2_cluster_job_res_keywords(core_type)
             job_config.res_keywords = default_res_keywords | res_keywords_update
             
             # Set up environment settings based on cluster and core type
@@ -465,7 +448,7 @@ class AlphafoldInterface(BaseInterface):
             env_settings = cluster.AF2_ENV[core_type.upper()]
             
             # Create submission script path
-            sub_script_path = out_dir / f"submit_alphafold_{i//seq_per_job}.cmd"
+            sub_script_path = out_dir / f"submit_alphafold_{job_index}.cmd"
             sub_script_path = fs.get_valid_temp_name(str(sub_script_path))
             
             job = ClusterJob.config_job(
@@ -756,95 +739,101 @@ class AlphafoldInterface(BaseInterface):
         
         return cmd
 
-    def _prepare_sequences_and_ids(self, sequences: Union[List[str], List[List[str]]]) -> Tuple[List[str], List[str]]:
-        """Prepare sequences and IDs for FASTA creation based on install type.
+    def _colabfold_format_fasta(self, sequences: Dict[str, Union[List[str], List[List[str]]]], out_dir: Union[str, Path]) -> str:
+        """Convert sequences into ColabFold format FASTA file.
         
         Args:
-            sequences: Either single sequences or multimer sequences
+            sequences: Either single sequences or multimer sequences (seq, id)
+            out_dir: Output directory for the FASTA file
             
         Returns:
-            Tuple of (fasta_sequences, sequence_ids)
+            Path of the generated FASTA file
         """
-        config = self.config_
-        
-        if isinstance(sequences[0], list):
-            # Multimer format: [[seq1_chain_A, seq1_chain_B], [seq2_chain_A, seq2_chain_B], ...]
+        fasta_path = fs.get_valid_temp_name(f"{out_dir}/input_sequences.fasta")
+
+        if isinstance(list(sequences.values())[0], list):
             fasta_sequences = []
             sequence_ids = []
-            
-            for i, multimer_seqs in enumerate(sequences):
-                seq_id = f"seq_{i}"
+
+            for seq_id, multimer_seqs in sequences.items():
+                combined_seq = ":".join(multimer_seqs)
+                fasta_sequences.append(combined_seq)
                 sequence_ids.append(seq_id)
-                
-                if config.INSTALL_TYPE == "colabfold_container":
-                    # ColabFold: use ':' to separate chains in same sequence
-                    combined_seq = ":".join(multimer_seqs)
-                    fasta_sequences.append(combined_seq)
-                else:
-                    # Native AlphaFold: each chain becomes separate sequence in FASTA
-                    for j, chain_seq in enumerate(multimer_seqs):
-                        fasta_sequences.append(chain_seq)
-                        sequence_ids.append(seq_id)
-                        if j > 1:  # Only add additional chain IDs, first one uses seq_id
-                            _LOGGER.error("Native AlphaFold does not support multimer input with ':' in chain IDs. "
-                            f"Found {len(multimer_seqs)} chains in multimer sequence '{seq_id}'. In principle, the code should not end up in this flow, but if it does, please report this issue.")
-                            raise ValueError(f"Bug: wrong flow control")
         else:
-            # Single sequence format: [seq1, seq2, seq3, ...]
-            fasta_sequences = list(sequences)
-            sequence_ids = [f"seq_{i}" for i in range(len(sequences))]
-            
-        return fasta_sequences, sequence_ids
-    
-    def _create_multimer_fasta_files(self, sequences: List[List[str]], out_dir: Union[str, Path]) -> List[str]:
-        """Create separate FASTA files for native AlphaFold multimer input.
+            sequence_ids, fasta_sequences = zip(*sequences.items())
+
+        create_fasta_from_sequences(
+            fasta_sequences, 
+            sequence_ids,
+            output_path=fasta_path
+        )
+
+        return fasta_path
+
+    def _native_af2_format_fasta(self, sequences: Dict[str, Union[List[str], List[List[str]]]], out_dir: Union[str, Path]) -> List[str]:
+        """Create separate FASTA files for native AlphaFold input.
         
         Args:
-            sequences: List of multimer sequences [[seq1_chain_A, seq1_chain_B], ...]
+            sequences: Dictionary of multimer sequences {seq_id: [seq1, seq2, ...]}
             out_dir: Output directory for FASTA files
             
         Returns:
             List of FASTA file paths created
         """
         fasta_paths = []
-        
-        for i, multimer_seqs in enumerate(sequences):
-            seq_id = f"seq_{i}"
-            # Create individual chain IDs for each chain in the multimer
-            chain_ids = [f"{seq_id}_chain_{j}" for j in range(len(multimer_seqs))]
-            
-            # Create FASTA file for this multimer (all chains in one file)
+
+        for seq_id, target_seqs in sequences.items():
             fasta_path = fs.get_valid_temp_name(f"{out_dir}/{seq_id}.fasta")
+            if isinstance(target_seqs, list):
+                # Create individual chain IDs for each chain in the multimer
+                seq_id = [f"{seq_id}_chain_{j}" for j in range(len(target_seqs))]
+
+            # Create FASTA file for this multimer (all chains in one file)
             create_fasta_from_sequences(
-                multimer_seqs,
-                chain_ids, 
+                target_seqs,
+                seq_id, 
                 output_path=fasta_path
             )
             fasta_paths.append(fasta_path)
         
         return fasta_paths
     
-    def _map_seq_id_to_original(self, seq_id: str, original_sequences: Union[List[str], List[List[str]]]) -> Union[str, Tuple[str, ...]]:
-        """Map sequence ID back to original input format.
+    def _validate_sequences(self, sequences: Union[List[str], List[List[str]]]) -> bool:
+        """Validate that sequences are consistently either all multimers or all monomers.
         
         Args:
-            seq_id: Sequence ID like 'seq_0', 'seq_1', etc.
-            original_sequences: Original input sequences
+            sequences: Input sequences to validate
             
         Returns:
-            Original sequence or tuple of sequences for multimers
-        """
-        try:
-            index = int(seq_id.split('_')[1])
-            original_seq = original_sequences[index]
+            True if sequences are multimers, False if monomers
             
-            if isinstance(original_seq, list):
-                return tuple(original_seq)  # Return as tuple for hashable key
-            else:
-                return original_seq
-        except (IndexError, ValueError):
-            _LOGGER.warning(f"Could not map sequence ID {seq_id} back to original sequence")
-            return seq_id
+        Raises:
+            ValueError: If sequences are mixed or invalid format
+        """
+        if not sequences:
+            _LOGGER.error("Empty sequences list provided")
+            raise ValueError("Empty sequences list provided")
+
+        if not isinstance(sequences, list):
+            _LOGGER.error("Invalid sequences format: Expected list")
+            raise ValueError("Invalid sequences format: Expected list")
+
+        # Check first sequence to determine expected type
+        first_is_list = isinstance(sequences[0], list)
+        
+        # Validate all sequences have consistent type
+        for i, seq in enumerate(sequences):
+            is_list = isinstance(seq, list)
+            if is_list != first_is_list:
+                _LOGGER.error(f"Inconsistent sequence format: sequence {i} is {'list' if is_list else 'string'} "
+                             f"but expected {'list' if first_is_list else 'string'} based on first sequence")
+                raise ValueError(f"Mixed sequence formats not supported: sequence {i} format mismatch")
+                
+            if is_list and not seq:
+                _LOGGER.error(f"Empty multimer sequence at index {i}")
+                raise ValueError(f"Empty multimer sequence at index {i}")
+                
+        return first_is_list
 
     def _find_output_files_map(self, out_dir: Path) -> Dict[str, str]:
         """Find output PDB files in the output directory and return filename-to-path mapping.

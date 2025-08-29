@@ -106,13 +106,6 @@ class AlphafoldConfig(BaseConfig):
     USE_GPU_RELAX: bool = True
     """Whether to use GPU for relaxation."""
     
-    # Common configuration
-    CACHE_DIR: str = "~/bin/colabfold/cache"
-    """Path to cache directory for MSA and model downloads."""
-    
-    WORK_DIR: str = "./alphafold2_predictions"
-    """Default working directory for predictions."""
-
     # Default resource settings for cluster jobs
     DEFAULT_AF2_CLUSTER_JOB_RES_KEYWORDS = {
         "gpu": {
