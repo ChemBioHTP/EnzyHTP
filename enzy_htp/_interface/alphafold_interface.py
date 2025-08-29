@@ -8,6 +8,7 @@ import tempfile
 import os
 import re
 import copy
+import json
 from typing import Union, List, Optional, Dict, Tuple
 from pathlib import Path
 from dataclasses import dataclass
@@ -21,6 +22,7 @@ from enzy_htp._config.alphafold_config import AlphafoldConfig
 from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
+from enzy_htp.core.general import load_obj
 from enzy_htp.chemical.sequence import create_fasta_from_sequences,parse_fasta_file
 
 
@@ -123,7 +125,13 @@ class AlphafoldInterface(BaseInterface):
             random_seed: Random seed for reproducibility
             
         Returns:
-            Dict mapping sequence identifiers to Structure objects
+            Dict mapping sequence identifiers to comprehensive prediction results containing:
+                - "best_model": Structure object of the best ranked model
+                - "best_model_plddt": List of pLDDT scores for best model  
+                - "best_model_index": Index (1-based) of the best model
+                - "model_1": Structure object of model 1
+                - "model_1_plddt": List of pLDDT scores for model 1
+                - ... (continues for all models)
         """
         temp_paths = []
         stru_parser = PDBParser()
@@ -197,16 +205,14 @@ class AlphafoldInterface(BaseInterface):
                     non_armer_core_type=non_armer_core_type
                 )
 
-            # Parse results into Structure objects
-            # Map sequence IDs back to original input format
-            structures = {}
-            for seq_id, pdb_path in result_files.items():
-                structure = stru_parser.get_structure(pdb_path)
-                # Map back to original sequence format
+            # Parse results into comprehensive output format
+            comprehensive_results = {}
+            for seq_id in sequences_mapper.keys():
                 original_seq = sequences_mapper[seq_id]
-                structures[original_seq] = structure
+                seq_results = self._parse_comprehensive_results(work_dir, seq_id, stru_parser)
+                comprehensive_results[original_seq] = seq_results
 
-            return structures
+            return comprehensive_results
 
         finally:
             # Clean up temporary files
@@ -927,3 +933,187 @@ class AlphafoldInterface(BaseInterface):
         """
         match = re.search(r'rank_(\d+)', filename)
         return int(match.group(1)) if match else 999  # Lower rank number is better
+
+    def _parse_comprehensive_results(self, work_dir: Union[str, Path], seq_id: str, parser: PDBParser) -> Dict:
+        """Parse comprehensive AlphaFold results for a sequence including all models and scores.
+        
+        Supports both ColabFold and native AF2 output formats.
+        
+        Args:
+            work_dir: Directory containing AlphaFold output files
+            seq_id: Sequence identifier (e.g., 'seq_0')
+            parser: PDB parser instance
+            
+        Returns:
+            Dict containing comprehensive results with all models and scores
+        """
+        work_dir = Path(work_dir)
+        
+        # Check if this is native AF2 format (has ranking_debug.json and .pkl files)
+        seq_subdir = work_dir / seq_id
+        ranking_debug_file = seq_subdir / "ranking_debug.json"
+        is_native_af2 = ranking_debug_file.exists() and list(seq_subdir.glob("result_model_*.pkl"))
+        
+        if is_native_af2:
+            return self._parse_native_af2_results(seq_subdir, seq_id, parser)
+        else:
+            return self._parse_colabfold_results(work_dir, seq_id, parser)
+    
+    def _parse_native_af2_results(self, seq_dir: Path, seq_id: str, parser: PDBParser) -> Dict:
+        """Parse native AlphaFold2 results format.
+        
+        Args:
+            seq_dir: Directory containing sequence results (work_dir/seq_id/)
+            seq_id: Sequence identifier
+            parser: PDB parser instance
+            
+        Returns:
+            Dict containing comprehensive results
+        """
+        results = {}
+        
+        # Load ranking information
+        ranking_file = seq_dir / "ranking_debug.json"
+        with open(ranking_file, 'r') as f:
+            ranking_data = json.load(f)
+        model_order = ranking_data['order']  # Best to worst
+        
+        # Find all available models
+        pkl_files = list(seq_dir.glob("result_model_*_ptm_pred_0.pkl"))
+        ranked_pdb_files = list(seq_dir.glob("ranked_*.pdb"))
+        
+        if not pkl_files or not ranked_pdb_files:
+            _LOGGER.error(f"No pkl files or ranked PDB files found for sequence {seq_id}")
+            raise ValueError(f"No pkl files or ranked PDB files found for sequence {seq_id}")
+        
+        # Parse structures and scores for each model
+        model_data = {}
+        
+        # Load pLDDT scores from pkl files
+        for pkl_file in pkl_files:
+            # Extract model name (e.g., model_1_ptm_pred_0)
+            match = re.search(r'result_(model_\d+_ptm_pred_0)\.pkl', pkl_file.name)
+            if match:
+                model_name = match.group(1)
+                pkl_data = load_obj(str(pkl_file))
+                plddt_scores = pkl_data.get('plddt', [])
+                model_data[model_name] = {
+                    'plddt': plddt_scores.tolist() if hasattr(plddt_scores, 'tolist') else list(plddt_scores)
+                }
+        
+        # Load structures from ranked PDB files
+        for i, ranked_pdb in enumerate(sorted(ranked_pdb_files)):
+            try:
+                structure = parser.get_structure(str(ranked_pdb))
+                rank = i  # 0-based ranking
+                
+                if rank < len(model_order):
+                    model_name = model_order[rank]
+                    if model_name in model_data:
+                        model_data[model_name]['structure'] = structure
+                        model_data[model_name]['rank'] = rank
+            except Exception as e:
+                _LOGGER.warning(f"Could not parse structure file {ranked_pdb}: {e}")
+        
+        if not model_data:
+            _LOGGER.error(f"No valid model data found for sequence {seq_id}")
+            raise ValueError(f"No valid model data found for sequence {seq_id}")
+        
+        # Build comprehensive results
+        # Best model is first in order
+        best_model_name = model_order[0]
+        if best_model_name in model_data and 'structure' in model_data[best_model_name]:
+            # Extract model number (e.g., 5 from model_5_ptm_pred_0)
+            model_num_match = re.search(r'model_(\d+)', best_model_name)
+            best_model_num = int(model_num_match.group(1)) if model_num_match else 1
+            
+            results['best_model'] = model_data[best_model_name]['structure']
+            results['best_model_plddt'] = model_data[best_model_name]['plddt']
+            results['best_model_index'] = best_model_num
+        
+        # Add all individual models
+        for model_name, data in model_data.items():
+            if 'structure' in data:
+                model_num_match = re.search(r'model_(\d+)', model_name)
+                if model_num_match:
+                    model_num = int(model_num_match.group(1))
+                    results[f'model_{model_num}'] = data['structure']
+                    results[f'model_{model_num}_plddt'] = data['plddt']
+        
+        return results
+    
+    def _parse_colabfold_results(self, work_dir: Path, seq_id: str, parser: PDBParser) -> Dict:
+        """Parse ColabFold results format.
+        
+        Args:
+            work_dir: Directory containing AlphaFold output files
+            seq_id: Sequence identifier (e.g., 'seq_0')
+            parser: PDB parser instance
+            
+        Returns:
+            Dict containing comprehensive results
+        """
+        # Find all PDB files for this sequence
+        pdb_files = list(work_dir.glob(f"{seq_id}_*.pdb"))
+        
+        # Find all JSON score files for this sequence  
+        json_files = list(work_dir.glob(f"{seq_id}_scores_*.json"))
+        
+        if not pdb_files:
+            _LOGGER.warning(f"No PDB files found for sequence {seq_id}")
+            return {}
+        
+        # Parse scores from JSON files
+        model_scores = {}
+        for json_file in json_files:
+            # Extract model number and rank from filename
+            # Format: seq_0_scores_rank_001_alphafold2_ptm_model_5_seed_000.json
+            match = re.search(r'rank_(\d+).*model_(\d+)', json_file.name)
+            if match:
+                rank = int(match.group(1))
+                model_num = int(match.group(2))
+                
+                with open(json_file, 'r') as f:
+                    score_data = json.load(f)
+                model_scores[rank] = {
+                    'model_num': model_num,
+                    'plddt': score_data.get('plddt', [])
+                }
+        
+        # Parse structures from PDB files
+        model_structures = {}
+        for pdb_file in pdb_files:
+            # Extract rank and model number from filename
+            match = re.search(r'rank_(\d+).*model_(\d+)', pdb_file.name)
+            if match:
+                rank = int(match.group(1))
+                model_num = int(match.group(2))
+                
+                structure = parser.get_structure(str(pdb_file))
+                model_structures[rank] = {
+                    'model_num': model_num,
+                    'structure': structure
+                }
+        
+        if not model_structures:
+            _LOGGER.error(f"No valid structures found for sequence {seq_id}")
+            return {}
+        
+        # Build comprehensive results
+        results = {}
+        
+        # Get best model (rank 1)
+        if 1 in model_structures and 1 in model_scores:
+            best_model_num = model_structures[1]['model_num']
+            results['best_model'] = model_structures[1]['structure']
+            results['best_model_plddt'] = model_scores[1]['plddt']
+            results['best_model_index'] = best_model_num
+        
+        # Add all individual models
+        for rank in sorted(model_structures.keys()):
+            if rank in model_scores:
+                model_num = model_structures[rank]['model_num']
+                results[f'model_{model_num}'] = model_structures[rank]['structure']
+                results[f'model_{model_num}_plddt'] = model_scores[rank]['plddt']
+        
+        return results

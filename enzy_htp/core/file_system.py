@@ -46,7 +46,7 @@ def safe_mv(src: str, dest: str) -> str:
 
     return str(shutil.move(src, dest))
 
-def safe_cp(src: str, dest: str) -> str:
+def safe_cp(src: str, dest: str, allow_dir: bool = False) -> str:
     """Robust move method that replicates shell 'cp' command. Creates temporary directories
     when needed.
     
@@ -63,8 +63,10 @@ def safe_cp(src: str, dest: str) -> str:
     if dest.is_dir():
         safe_mkdir(dest)
         dest = dest / src.name
-
-    return str(shutil.copy(src, dest))
+    if allow_dir:
+        return str(shutil.copytree(src, dest))
+    else:
+        return str(shutil.copy(src, dest))
 
 # == dir ==
 def is_empty_dir(dir_path: str) -> bool:

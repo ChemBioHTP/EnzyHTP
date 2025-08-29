@@ -15,6 +15,7 @@ from enzy_htp._interface.alphafold_interface import AlphafoldInterface, AlphaFol
 from enzy_htp.structure_prediction.prediction import predict_structure
 from enzy_htp._config.alphafold_config import AlphafoldConfig
 from enzy_htp.structure import Structure
+from enzy_htp.structure.structure_io.pdb_io import PDBParser
 from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core.clusters.accre_r9 import AccreR9
 from enzy_htp.core.logger import _LOGGER
@@ -79,18 +80,77 @@ class TestAlphafoldInterfaceUnmocked:
 
     def test_af2_predict_colabfold(self):
         """Test predict_structure without mocking use colabfold"""
+        test_output_dir = Path(f"{WORK_DIR}/test_af2_output")
         # Arrange
         sequence = "MSTPSLIPSGVHEVLAKYKDGN"
         # Act
-        result = self.interface.af2_predict(sequence)
+        result = self.interface.af2_predict(sequence, work_dir=test_output_dir)
 
         print(result)
         # Assert
         assert isinstance(result, dict)
         # The result keys should be the actual sequences, not seq_0
         assert sequence in result
-        assert result[sequence].num_residues == 22 
-        assert result[sequence].num_atoms == 163 
+        
+        # Check comprehensive output structure
+        seq_result = result[sequence]
+        assert isinstance(seq_result, dict)
+        
+        # Check best model
+        assert "best_model" in seq_result
+        assert "best_model_plddt" in seq_result
+        assert "best_model_index" in seq_result
+        assert seq_result["best_model"].num_residues == 22
+        assert seq_result["best_model"].num_atoms == 163
+        
+        # Check individual models exist
+        assert "model_1" in seq_result or "model_2" in seq_result or "model_3" in seq_result or "model_4" in seq_result or "model_5" in seq_result
+        
+        # Check pLDDT scores are valid
+        assert isinstance(seq_result["best_model_plddt"], list)
+        assert len(seq_result["best_model_plddt"]) == 22  # Same as number of residues
+
+    def test_parse_native_af2_results(self):
+        """Test parsing native AlphaFold2 results format using reference data."""
+        # Arrange
+        ref_output_dir = Path(f"{DATA_DIR}/test_af2_output_ref")
+        seq_id = "seq_0"
+        parser = PDBParser()
+        
+        # Act
+        result = self.interface._parse_comprehensive_results(ref_output_dir, seq_id, parser)
+        
+        # Assert
+        assert isinstance(result, dict)
+        assert len(result) > 0, "Should have parsed some results"
+        
+        # Check comprehensive output structure
+        assert "best_model" in result
+        assert "best_model_plddt" in result
+        assert "best_model_index" in result
+        
+        # Verify best model structure
+        assert result["best_model"].num_residues == 22
+        assert result["best_model"].num_atoms == 163
+        
+        # Check pLDDT scores are valid
+        assert isinstance(result["best_model_plddt"], list)
+        assert len(result["best_model_plddt"]) == 22  # Same as number of residues
+        
+        # Based on ranking_debug.json, model_5 should be the best
+        assert result["best_model_index"] == 5
+        
+        # Check that all 5 models are present
+        for i in range(1, 6):
+            assert f"model_{i}" in result
+            assert f"model_{i}_plddt" in result
+            assert isinstance(result[f"model_{i}_plddt"], list)
+            assert len(result[f"model_{i}_plddt"]) == 22
+        
+        # Verify no PAE in output (removed as per feedback)
+        assert "best_model_pae" not in result
+        for i in range(1, 6):
+            assert f"model_{i}_pae" not in result
 
     def test_build_colabfold_container_command(self):
         """Test building ColabFold container command without mocking."""
@@ -578,12 +638,19 @@ class TestAlphafoldAccreR9Integration:
 
     @pytest.mark.slow
     def test_af2_real_accre_r9_native_python_job_setup(self, alphafold_config_modifier):
-        """Test real AF2 job setup for ACCRE R9 with native Python install (no mocking)."""
+        """Test real AF2 job setup for ACCRE R9 with native Python install (no mocking).
+        The test take 13~27 mins even with precomputed msas"""
         # Setup for actual ACCRE R9 alphafold native python install
+        dummydb_path = f"{DATA_DIR}/dummy_af2_template_database"
+        dummy_msa_path = f"{DATA_DIR}/dummy_msas_1"
         alphafold_config_modifier(
             INSTALL_TYPE="alphafold2_native_python",
             EXECUTABLE_PATH="/sb/apps/alphafold232/alphafold/run_alphafold.py",
             DATA_DIR="/sb/apps/alphafold-data.230",
+            PDB_SEQRES_DATABASE_PATH=f"{dummydb_path}/dummy_fas.fas",
+            TEMPLATE_MMCIF_DIR=f"{dummydb_path}/",
+            PDB70_DATABASE_PATH=f"{dummydb_path}/dummydb",
+            OBSOLETE_PDBS_PATH=f"{dummydb_path}/dummy_obsolete.dat",
             USE_GPU_RELAX=True
         )
         
@@ -591,76 +658,80 @@ class TestAlphafoldAccreR9Integration:
         cluster_job_config = {
             "cluster": AccreR9(),
             "res_keywords": {
-                "account": "csb_gpu_acc",
-                "partition": "batch_gpu",
-                "node_cores": "nvidia_rtx_a6000:1",
-                "walltime": "1-00:00:00",
+                "account": "yang_lab_csb_iacc",
+                "partition": "interactive_gpu",
+                "qos": "debug_iacc",
+                "node_cores": "nvidia_rtx_a4000:1",
+                "walltime": "30:00",
             }
         }
 
         # Very short test sequence to minimize computational cost
         sequences = ["MSTPSLIPSGVHEVLAKYKDGN"]
         test_output_dir = Path(f"{WORK_DIR}/test_af2_output")
-        
+        fs.safe_mkdir(str(test_output_dir))
+        fs.safe_mkdir(str(test_output_dir / "seq_0"))
+        fs.safe_cp(dummy_msa_path, f"{test_output_dir}/seq_0/msas", allow_dir=True)
+
         try:
             # Create result eggs for actual submission
             result = af_interface.af2_predict(
                 sequences=sequences,
-                out_dir=test_output_dir,
+                work_dir=test_output_dir,
                 cluster_job_config=cluster_job_config,
                 seq_per_job=1,
                 model_preset="monomer_ptm",
+                use_precomputed_msas=True,
             )
             print(result)
         finally:
-            pass
             # Cleanup test directory
-            # if test_output_dir.exists():
-            #     fs.safe_rmdir(test_output_dir)
+            if test_output_dir.exists():
+                fs.safe_rmdir(test_output_dir)
 
     @pytest.mark.slow
     def test_af2_real_accre_r9_native_python_multimer(self, alphafold_config_modifier):
         """Test real AF2 job setup for ACCRE R9 with native Python install (no mocking)."""
         # Setup for actual ACCRE R9 alphafold native python install
+        dummydb_path = f"{DATA_DIR}/dummy_af2_template_database"
+        dummy_msa_path = f"{DATA_DIR}/dummy_msas_1"
         alphafold_config_modifier(
             INSTALL_TYPE="alphafold2_native_python",
             EXECUTABLE_PATH="/sb/apps/alphafold232/alphafold/run_alphafold.py",
             DATA_DIR="/sb/apps/alphafold-data.230",
+            PDB_SEQRES_DATABASE_PATH=f"{dummydb_path}/dummy_fas.fas",
+            TEMPLATE_MMCIF_DIR=f"{dummydb_path}/",
+            PDB70_DATABASE_PATH=f"{dummydb_path}/dummydb",
+            OBSOLETE_PDBS_PATH=f"{dummydb_path}/dummy_obsolete.dat",
             USE_GPU_RELAX=True
         )
         
-        # Cluster configuration for ACCRE R9 
-        # cluster_job_config = {
-        #     "cluster": AccreR9(),
-        #     "res_keywords": {
-        #         "account": "csb_gpu_acc",
-        #         "partition": "batch_gpu",
-        #         "node_cores": "nvidia_rtx_a6000:1",
-        #         "walltime": "1-00:00:00",
-        #     }
-        # }
         cluster_job_config = {
             "cluster": AccreR9(),
             "res_keywords": {
-                "account": "csb_gpu_acc",
-                "partition": "batch_gpu",
-                "node_cores": "nvidia_rtx_a6000:1",
-                "walltime": "1-00:00:00",
+                "account": "yang_lab_csb_iacc",
+                "partition": "interactive_gpu",
+                "qos": "debug_iacc",
+                "node_cores": "nvidia_rtx_a4000:1",
+                "walltime": "30:00",
             }
         }
 
         # Very short test sequence to minimize computational cost
-        sequences = [["MSTPSLIPSGVHEVLAKYKDGN", "MSTPSLIPSGVHEVLAKYKDGN"], ["MSTPSLIPAAAAAKYKDGN", "MSTPSLIPAAAAAKYKDGN"],]
+        sequences = [["MSTPSLIPSGVHEVLAKYKDGN", "MSTPSLIPSGVHEVLAKYKDGN"],]
         test_output_dir = Path(f"{WORK_DIR}/test_af2_output")
+        fs.safe_mkdir(str(test_output_dir))
+        fs.safe_mkdir(str(test_output_dir / "seq_0"))
+        fs.safe_cp(dummy_msa_path, f"{test_output_dir}/seq_0/msas", allow_dir=True)
         
         try:
             # Create result eggs for actual submission
             result = af_interface.af2_predict(
                 sequences=sequences,
-                out_dir=test_output_dir,
+                work_dir=test_output_dir,
                 cluster_job_config=cluster_job_config,
                 seq_per_job=1,
-                model_preset="monomer_ptm",
+                use_precomputed_msas=True,
             )
             print(result)
         finally:
