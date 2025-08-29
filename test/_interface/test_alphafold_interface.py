@@ -617,6 +617,57 @@ class TestAlphafoldAccreR9Integration:
             # if test_output_dir.exists():
             #     fs.safe_rmdir(test_output_dir)
 
+    @pytest.mark.slow
+    def test_af2_real_accre_r9_native_python_multimer(self, alphafold_config_modifier):
+        """Test real AF2 job setup for ACCRE R9 with native Python install (no mocking)."""
+        # Setup for actual ACCRE R9 alphafold native python install
+        alphafold_config_modifier(
+            INSTALL_TYPE="alphafold2_native_python",
+            EXECUTABLE_PATH="/sb/apps/alphafold232/alphafold/run_alphafold.py",
+            DATA_DIR="/sb/apps/alphafold-data.230",
+            USE_GPU_RELAX=True
+        )
+        
+        # Cluster configuration for ACCRE R9 
+        # cluster_job_config = {
+        #     "cluster": AccreR9(),
+        #     "res_keywords": {
+        #         "account": "csb_gpu_acc",
+        #         "partition": "batch_gpu",
+        #         "node_cores": "nvidia_rtx_a6000:1",
+        #         "walltime": "1-00:00:00",
+        #     }
+        # }
+        cluster_job_config = {
+            "cluster": AccreR9(),
+            "res_keywords": {
+                "account": "csb_gpu_acc",
+                "partition": "batch_gpu",
+                "node_cores": "nvidia_rtx_a6000:1",
+                "walltime": "1-00:00:00",
+            }
+        }
+
+        # Very short test sequence to minimize computational cost
+        sequences = [["MSTPSLIPSGVHEVLAKYKDGN", "MSTPSLIPSGVHEVLAKYKDGN"], ["MSTPSLIPAAAAAKYKDGN", "MSTPSLIPAAAAAKYKDGN"],]
+        test_output_dir = Path(f"{WORK_DIR}/test_af2_output")
+        
+        try:
+            # Create result eggs for actual submission
+            result = af_interface.af2_predict(
+                sequences=sequences,
+                out_dir=test_output_dir,
+                cluster_job_config=cluster_job_config,
+                seq_per_job=1,
+                model_preset="monomer_ptm",
+            )
+            print(result)
+        finally:
+            pass
+            # Cleanup test directory
+            # if test_output_dir.exists():
+            #     fs.safe_rmdir(test_output_dir)
+
 class TestAlphaFold2ResultEgg:
     """Tests for AlphaFold2 result egg functionality."""
 

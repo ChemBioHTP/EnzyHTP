@@ -440,7 +440,7 @@ class AlphafoldInterface(BaseInterface):
                 )
             elif config.INSTALL_TYPE == "alphafold2_native_python":
                 cmd = self._build_alphafold2_native_python_command(
-                    job_fasta_path=job_fasta_path, 
+                    fasta_path=job_fasta_path, 
                     out_dir=out_dir, 
                     num_relax=num_relax, 
                     use_templates=use_templates,
