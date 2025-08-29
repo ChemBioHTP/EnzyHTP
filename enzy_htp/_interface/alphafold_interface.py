@@ -47,18 +47,6 @@ class AlphaFold2ResultEgg(ModelingResultEgg):
     
     interface: 'AlphafoldInterface'
     """Reference to the parent interface for accessing helper methods."""
-    
-    def get_expected_output_files(self) -> Dict[str, str]:
-        """Get expected output PDB file paths for each sequence.
-        
-        Returns:
-            Dict mapping sequence IDs to expected PDB file paths
-        """
-        # Get all available files first
-        filename_to_path = self.interface._find_output_files_map(self.output_dir)
-        
-        # Filter and select best files for this job's sequences
-        return self.interface._select_best_files_for_sequences(filename_to_path, self.sequence_ids)
 
 
 class AlphafoldInterface(BaseInterface):
@@ -840,99 +828,6 @@ class AlphafoldInterface(BaseInterface):
                 raise ValueError(f"Empty multimer sequence at index {i}")
                 
         return first_is_list
-
-    def _find_output_files_map(self, out_dir: Path) -> Dict[str, str]:
-        """Find output PDB files in the output directory and return filename-to-path mapping.
-        
-        Args:
-            out_dir: Output directory to search
-            
-        Returns:
-            Dict mapping filenames to PDB file paths
-        """
-        filename_to_path = {}
-        
-        # Look for PDB files
-        for pdb_file in out_dir.glob("**/*.pdb"):
-            filename = pdb_file.stem
-            filename_to_path[filename] = str(pdb_file)
-        
-        return filename_to_path
-    
-    def _select_best_files_for_sequences(self, filename_to_path: Dict[str, str], sequence_ids: List[str]) -> Dict[str, str]:
-        """Filter and select the best files for the given sequences.
-        
-        Args:
-            filename_to_path: Mapping of filename to file path
-            sequence_ids: List of sequence identifiers to find files for
-            
-        Returns:
-            Dict mapping sequence IDs to the best PDB file path for each sequence
-        """
-        result_files = {}
-        
-        for seq_id in sequence_ids:
-            # Find all files for this sequence
-            seq_files = {}
-            
-            for filename, filepath in filename_to_path.items():
-                # Check if this file belongs to the current sequence
-                if filename.startswith(f"{seq_id}_"):
-                    seq_files[filename] = filepath
-            
-            if seq_files:
-                # Select the best file: prefer relaxed over unrelaxed, and higher ranked models
-                best_filename = self._select_best_file(seq_files.keys())
-                result_files[seq_id] = seq_files[best_filename]
-            else:
-                _LOGGER.warning(f"No files found for sequence ID {seq_id}. "
-                "AlphaFold may have error on sequence.")
-
-        return result_files
-    
-    def _select_best_file(self, filenames: List[str]) -> str:
-        """Select the best filename from a list based on ranking and relaxation status.
-        
-        Args:
-            filenames: List of filenames to choose from
-            
-        Returns:
-            The best filename
-        """
-        if not filenames:
-            _LOGGER.error("No filenames provided to select best file")
-            raise ValueError("No filenames provided")
-            
-        if len(filenames) == 1:
-            return list(filenames)[0]
-        
-        relaxed_files = []
-        unrelaxed_files = []
-        
-        for filename in filenames:
-            if "unrelaxed" in filename:
-                unrelaxed_files.append(filename)
-            else:
-                relaxed_files.append(filename)
-        
-        # Prefer relaxed files
-        candidates = relaxed_files if relaxed_files else unrelaxed_files
-        
-        # If we have multiple candidates, prefer higher ranked models
-        # Look for patterns like rank_001, rank_002, etc.
-        return min(candidates, key=self._get_rank)
-
-    def _get_rank(self, filename: str) -> int:
-        """Extract rank number from filename for sorting purposes.
-        
-        Args:
-            filename: Filename containing rank information (e.g., 'seq_0_rank_001_model_1.pdb')
-            
-        Returns:
-            Rank number if found, otherwise 999 (for consistent sorting behavior)
-        """
-        match = re.search(r'rank_(\d+)', filename)
-        return int(match.group(1)) if match else 999  # Lower rank number is better
 
     def _parse_comprehensive_results(self, work_dir: Union[str, Path], seq_id: str, parser: PDBParser) -> Dict:
         """Parse comprehensive AlphaFold results for a sequence including all models and scores.
