@@ -357,8 +357,9 @@ class TestAlphafoldClusterJobs:
         
         with tempfile.TemporaryDirectory() as temp_dir:
             # Test make_job method
+            sequences_dict = {"test_seq": sequences[0]}
             result_eggs = interface.make_job(
-                fasta_path=create_fasta_from_sequences(sequences, ["test_seq"], output_path=Path(temp_dir) / "test.fasta"),
+                sequences=sequences_dict,
                 out_dir=Path(temp_dir) / "output",
                 cluster_job_config=cluster_job_config,
                 seq_per_job=1

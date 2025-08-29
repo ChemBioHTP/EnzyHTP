@@ -180,15 +180,9 @@ class AlphafoldInterface(BaseInterface):
                 if failed_jobs:
                     _LOGGER.error(f"{len(failed_jobs)} AlphaFold2 jobs failed")
                     raise RuntimeError(f"{len(failed_jobs)} AlphaFold2 jobs failed")
-                
-                # Collect results from all eggs
-                result_files = {}
-                for egg in result_eggs:
-                    egg_files = egg.get_expected_output_files()
-                    result_files.update(egg_files)
             else:
                 # Run locally
-                result_files = self.run(
+                self.run(
                     sequences=sequences_mapper,
                     out_dir=work_dir,
                     num_models=num_models,
@@ -254,13 +248,11 @@ class AlphafoldInterface(BaseInterface):
             non_armer_core_type: Type of computing core ('gpu' or 'cpu') for local execution
             
         Returns:
-            Dict mapping sequence IDs to output PDB file paths
+            None (execution only, results parsed separately)
         """
         config = self.config()
         out_dir = Path(out_dir)
         out_dir.mkdir(exist_ok=True)
-
-        sequence_ids = list(sequences.keys())
 
         # Create FASTA file(s) from sequence data
         if self.config().INSTALL_TYPE != "colabfold_container":
@@ -326,10 +318,6 @@ class AlphafoldInterface(BaseInterface):
         except Exception as e:
             _LOGGER.error(f"AlphaFold2 execution failed: {e}")
             raise RuntimeError(f"AlphaFold2 execution failed: {e}")
-        
-        # Get all files and select best ones for sequences
-        filename_to_path = self._find_output_files_map(out_dir)
-        return self._select_best_files_for_sequences(filename_to_path, sequence_ids)
 
     def make_job(
         self,
