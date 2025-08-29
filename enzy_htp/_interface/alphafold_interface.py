@@ -86,6 +86,7 @@ class AlphafoldInterface(BaseInterface):
         model_preset: Optional[str] = None,
         num_models: int = 5,
         num_recycles: int = 3,
+        num_multimer_predictions_per_model: int = 5, # native AF2 only
         # -- relax related
         num_relax: int = 0,
         relax_max_iteration: int = 200,
@@ -139,7 +140,6 @@ class AlphafoldInterface(BaseInterface):
             sequences = [sequences]
         # san check on sequence
         self._validate_sequences(sequences)
-        sequences_mapper = {f"seq_{i}": seq for i, seq in enumerate(sequences)}
         
         try:
             # Create output directory first
@@ -148,6 +148,8 @@ class AlphafoldInterface(BaseInterface):
                 work_dir = fs.get_valid_temp_name(f"{scratch_dir}/alphafold2")
                 temp_paths.append(work_dir)
             fs.safe_mkdir(work_dir)
+
+            sequences_mapper = self._create_sequence_mapper(sequences, work_dir)
 
             if cluster_job_config:
                 # Run on cluster using array jobs
@@ -166,7 +168,8 @@ class AlphafoldInterface(BaseInterface):
                     use_precomputed_msas=use_precomputed_msas,
                     random_seed=random_seed,
                     cluster_job_config=cluster_job_config,
-                    seq_per_job=seq_per_job
+                    seq_per_job=seq_per_job,
+                    num_multimer_predictions_per_model=num_multimer_predictions_per_model
                 )
 
                 # Submit and wait for array jobs
@@ -196,7 +199,8 @@ class AlphafoldInterface(BaseInterface):
                     additional_options=additional_options,
                     use_precomputed_msas=use_precomputed_msas,
                     random_seed=random_seed,
-                    non_armer_core_type=non_armer_core_type
+                    non_armer_core_type=non_armer_core_type,
+                    num_multimer_predictions_per_model=num_multimer_predictions_per_model
                 )
 
             # Parse results into comprehensive output format
@@ -228,6 +232,7 @@ class AlphafoldInterface(BaseInterface):
         use_precomputed_msas: bool = False,
         random_seed: Optional[int] = None,
         non_armer_core_type: str = "gpu",
+        num_multimer_predictions_per_model: int = 5,
     ) -> Dict[str, str]:
         """Execute AlphaFold2 prediction locally.
         
@@ -299,7 +304,8 @@ class AlphafoldInterface(BaseInterface):
                 db_preset = db_preset,
                 use_precomputed_msas = use_precomputed_msas,
                 random_seed = random_seed,
-                core_type = non_armer_core_type
+                core_type = non_armer_core_type,
+                num_multimer_predictions_per_model = num_multimer_predictions_per_model,
             )
         else:
             _LOGGER.error(f"Unsupported install type: {config.INSTALL_TYPE}")
@@ -329,13 +335,14 @@ class AlphafoldInterface(BaseInterface):
         relax_max_iteration: int = 200,
         use_templates: bool = False,
         max_template_date: Optional[str] = None,
-        model_preset: Optional[str] = "alphafold2_ptm",
+        model_preset: Optional[str] = None,
         db_preset: str = "full_dbs",
         additional_options: Optional[List[str]] = None,
         use_precomputed_msas: bool = False,
         random_seed: Optional[int] = None,
         cluster_job_config: Optional[Union[ClusterJobConfig, Dict]] = None,
         seq_per_job: int = 1,
+        num_multimer_predictions_per_model: int = 5
     ) -> List[AlphaFold2ResultEgg]:
         """Create cluster jobs for running AlphaFold2 with array support.
         
@@ -427,7 +434,8 @@ class AlphafoldInterface(BaseInterface):
                     db_preset=db_preset,
                     use_precomputed_msas=use_precomputed_msas,
                     random_seed=random_seed,
-                    core_type=core_type
+                    core_type=core_type,
+                    num_multimer_predictions_per_model=num_multimer_predictions_per_model
                 )
             else:
                 raise ValueError(f"Unsupported install type: {afconfig.INSTALL_TYPE}")
@@ -624,8 +632,9 @@ class AlphafoldInterface(BaseInterface):
         # Auto-detect model preset based on FASTA content if not provided
         if model_preset is None:
             # Parse FASTA to check if it's multimer
-            fasta_sequences = parse_fasta_file(fasta_path)
-            if len(fasta_sequences) > 1 or any(':' in seq for _, seq in fasta_sequences): # BUG native AF2 should not take : containing sequence
+            task0_path = fasta_path.split(",")[0] # only check the first file if multiple
+            fasta_sequences = parse_fasta_file(task0_path)
+            if len(fasta_sequences) > 1:
                 model_preset = "multimer"
             else:
                 model_preset = "monomer_ptm"
@@ -659,9 +668,10 @@ class AlphafoldInterface(BaseInterface):
         if uniref90_path:
             cmd.extend(["--uniref90_database_path", uniref90_path])
 
-        pdb70_path = afconfig.get_pdb70_database_path()
-        if pdb70_path:
-            cmd.extend(["--pdb70_database_path", pdb70_path])
+        if model_preset != "multimer":
+            pdb70_path = afconfig.get_pdb70_database_path()
+            if pdb70_path:
+                cmd.extend(["--pdb70_database_path", pdb70_path])
 
         mgnify_path = afconfig.get_mgnify_database_path()
         if mgnify_path:
@@ -967,7 +977,7 @@ class AlphafoldInterface(BaseInterface):
         model_order = ranking_data['order']  # Best to worst
         
         # Find all available models
-        pkl_files = list(seq_dir.glob("result_model_*_ptm_pred_0.pkl"))
+        pkl_files = list(seq_dir.glob("result_model_*.pkl"))
         ranked_pdb_files = list(seq_dir.glob("ranked_*.pdb"))
         
         if not pkl_files or not ranked_pdb_files:
@@ -980,7 +990,7 @@ class AlphafoldInterface(BaseInterface):
         # Load pLDDT scores from pkl files
         for pkl_file in pkl_files:
             # Extract model name (e.g., model_1_ptm_pred_0)
-            match = re.search(r'result_(model_\d+_ptm_pred_0)\.pkl', pkl_file.name)
+            match = re.search(r'result_(model_\d+.+)\.pkl', pkl_file.name)
             if match:
                 model_name = match.group(1)
                 pkl_data = load_obj(str(pkl_file))
@@ -1105,3 +1115,34 @@ class AlphafoldInterface(BaseInterface):
                 results[f'model_{model_num}_plddt'] = model_scores[rank]['plddt']
         
         return results
+
+    def _create_sequence_mapper(self, sequences: Union[List[str], List[List[str]]], work_dir: Path) -> Dict[str, Union[str, List[str]]]:
+        """Creates a mapper from unique sequence IDs to sequences.
+
+        Ensures that the generated sequence IDs do not conflict with existing
+        FASTA files in the working directory.
+
+        Args:
+            sequences: A list of sequences or a list of list of sequences (for multimers).
+            work_dir: The directory where output files will be stored.
+
+        Returns:
+            A dictionary mapping unique sequence IDs to their corresponding sequences.
+        """
+        work_dir = Path(work_dir)
+        sequences_mapper = {}
+        i = 0
+        for seq in sequences:
+            while True:
+                seq_id = f"seq_{i}"
+                # Check for existing FASTA file for this seq_id
+                potential_fasta_path = work_dir / f"{seq_id}.fasta"
+                if not potential_fasta_path.exists():
+                    sequences_mapper[seq_id] = seq
+                    i += 1
+                    break
+                i += 1
+                if i > 99999: # safety
+                    _LOGGER.error("Loop exceeded maximum iterations. Failed to find unique sequence ID.")
+                    raise RuntimeError("Failed to generate unique sequence IDs after 9999 attempts.")
+        return sequences_mapper

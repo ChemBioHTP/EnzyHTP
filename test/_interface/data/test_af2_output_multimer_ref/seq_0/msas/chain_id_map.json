@@ -1,0 +1,10 @@
+{
+    "A": {
+        "description": "seq_0_chain_0",
+        "sequence": "MSTPSLIPSGVHEVLAKYKDGN"
+    },
+    "B": {
+        "description": "seq_0_chain_1",
+        "sequence": "MSTPSLIPSGVHEVLAKYKDGN"
+    }
+}

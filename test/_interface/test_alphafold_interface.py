@@ -152,6 +152,48 @@ class TestAlphafoldInterfaceUnmocked:
         for i in range(1, 6):
             assert f"model_{i}_pae" not in result
 
+    def test_parse_native_af2_multimer_results(self):
+        """Test parsing native AlphaFold2 results format using reference data."""
+        # Arrange
+        ref_output_dir = Path(f"{DATA_DIR}/test_af2_output_multimer_ref")
+        seq_id = "seq_0"
+        parser = PDBParser()
+        
+        # Act
+        result = self.interface._parse_comprehensive_results(ref_output_dir, seq_id, parser)
+        
+        # Assert
+        assert isinstance(result, dict)
+        assert len(result) > 0, "Should have parsed some results"
+        
+        # Check comprehensive output structure
+        assert "best_model" in result
+        assert "best_model_plddt" in result
+        assert "best_model_index" in result
+        
+        # Verify best model structure
+        assert result["best_model"].num_residues == 44
+        assert result["best_model"].num_atoms == 326
+        
+        # Check pLDDT scores are valid
+        assert isinstance(result["best_model_plddt"], list)
+        assert len(result["best_model_plddt"]) == 44  # Same as number of residues
+        
+        # Based on ranking_debug.json, model_5 should be the best
+        assert result["best_model_index"] == 2
+        
+        # Check that all 5 models are present
+        for i in range(1, 6):
+            assert f"model_{i}" in result
+            assert f"model_{i}_plddt" in result
+            assert isinstance(result[f"model_{i}_plddt"], list)
+            assert len(result[f"model_{i}_plddt"]) == 44
+        
+        # Verify no PAE in output (removed as per feedback)
+        assert "best_model_pae" not in result
+        for i in range(1, 6):
+            assert f"model_{i}_pae" not in result
+
     def test_build_colabfold_container_command(self):
         """Test building ColabFold container command without mocking."""
         # Arrange
@@ -684,7 +726,84 @@ class TestAlphafoldAccreR9Integration:
                 model_preset="monomer_ptm",
                 use_precomputed_msas=True,
             )
-            print(result)
+            assert result
+            assert isinstance(result, dict)
+            for seq in sequences:
+                assert seq in result
+                seq_result = result[seq]
+                assert isinstance(seq_result, dict)
+                assert "best_model" in seq_result
+                assert "best_model_plddt" in seq_result
+                assert "best_model_index" in seq_result
+                assert isinstance(seq_result["best_model_plddt"], list)
+                assert len(seq_result["best_model_plddt"]) == 22
+                assert isinstance(seq_result["best_model"], Structure)
+        finally:
+            # Cleanup test directory
+            if test_output_dir.exists():
+                fs.safe_rmdir(test_output_dir)
+
+    @pytest.mark.slow
+    def test_af2_real_accre_r9_native_python_multi_job(self, alphafold_config_modifier):
+        """Test real AF2 job setup for ACCRE R9 with native Python install (no mocking).
+        The test take 13~27 mins even with precomputed msas"""
+        # Setup for actual ACCRE R9 alphafold native python install
+        dummydb_path = f"{DATA_DIR}/dummy_af2_template_database"
+        dummy_msa_path = f"{DATA_DIR}/dummy_msas_1"
+        alphafold_config_modifier(
+            INSTALL_TYPE="alphafold2_native_python",
+            EXECUTABLE_PATH="/sb/apps/alphafold232/alphafold/run_alphafold.py",
+            DATA_DIR="/sb/apps/alphafold-data.230",
+            PDB_SEQRES_DATABASE_PATH=f"{dummydb_path}/dummy_fas.fas",
+            TEMPLATE_MMCIF_DIR=f"{dummydb_path}/",
+            PDB70_DATABASE_PATH=f"{dummydb_path}/dummydb",
+            OBSOLETE_PDBS_PATH=f"{dummydb_path}/dummy_obsolete.dat",
+            USE_GPU_RELAX=True
+        )
+        
+        # Cluster configuration for ACCRE R9 
+        cluster_job_config = {
+            "cluster": AccreR9(),
+            "res_keywords": {
+                "account": "yang_lab_csb_iacc",
+                "partition": "interactive_gpu",
+                "qos": "debug_iacc",
+                "node_cores": "nvidia_rtx_a4000:1",
+                "walltime": "30:00",
+            }
+        }
+
+        # Very short test sequence to minimize computational cost
+        sequences = ["MSTPSLIPSGVHEVLAKYKDGN", "MSTPSLAAAGVHEVLAKYKDGN"]
+        test_output_dir = Path(f"{WORK_DIR}/test_af2_output")
+        fs.safe_mkdir(str(test_output_dir))
+        fs.safe_mkdir(str(test_output_dir / "seq_0"))
+        fs.safe_mkdir(str(test_output_dir / "seq_1"))
+        fs.safe_cpdir(dummy_msa_path, f"{test_output_dir}/seq_0/msas/")
+        fs.safe_cpdir(dummy_msa_path, f"{test_output_dir}/seq_1/msas/")
+
+        try:
+            # Create result eggs for actual submission
+            result = af_interface.af2_predict(
+                sequences=sequences,
+                work_dir=test_output_dir,
+                cluster_job_config=cluster_job_config,
+                seq_per_job=1,
+                model_preset="monomer_ptm",
+                use_precomputed_msas=True,
+            )
+            assert result
+            assert isinstance(result, dict)
+            for seq in sequences:
+                assert seq in result
+                seq_result = result[seq]
+                assert isinstance(seq_result, dict)
+                assert "best_model" in seq_result
+                assert "best_model_plddt" in seq_result
+                assert "best_model_index" in seq_result
+                assert isinstance(seq_result["best_model_plddt"], list)
+                assert len(seq_result["best_model_plddt"]) == 22
+                assert isinstance(seq_result["best_model"], Structure)
         finally:
             # Cleanup test directory
             if test_output_dir.exists():
@@ -721,10 +840,10 @@ class TestAlphafoldAccreR9Integration:
         # Very short test sequence to minimize computational cost
         sequences = [["MSTPSLIPSGVHEVLAKYKDGN", "MSTPSLIPSGVHEVLAKYKDGN"],]
         test_output_dir = Path(f"{WORK_DIR}/test_af2_output")
-        fs.safe_mkdir(str(test_output_dir))
-        fs.safe_mkdir(str(test_output_dir / "seq_0"))
-        fs.safe_cp(dummy_msa_path, f"{test_output_dir}/seq_0/msas", allow_dir=True)
-        
+        fs.safe_mkdir(str(test_output_dir / "seq_0/msas"))
+        fs.safe_cpdir(dummy_msa_path, f"{test_output_dir}/seq_0/msas/A/")
+        fs.safe_cpdir(dummy_msa_path, f"{test_output_dir}/seq_0/msas/B/")
+
         try:
             # Create result eggs for actual submission
             result = af_interface.af2_predict(
@@ -733,6 +852,7 @@ class TestAlphafoldAccreR9Integration:
                 cluster_job_config=cluster_job_config,
                 seq_per_job=1,
                 use_precomputed_msas=True,
+                num_multimer_predictions_per_model=1,
             )
             print(result)
         finally:
