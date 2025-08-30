@@ -7,20 +7,13 @@ import pytest
 import tempfile
 import os
 from pathlib import Path
-from unittest.mock import MagicMock, Mock
 
 from enzy_htp import interface
 from enzy_htp import config as eh_config
-from enzy_htp._interface.alphafold_interface import AlphafoldInterface, AlphaFold2ResultEgg
-from enzy_htp.structure_prediction.prediction import predict_structure
-from enzy_htp._config.alphafold_config import AlphafoldConfig
 from enzy_htp.structure import Structure
 from enzy_htp.structure.structure_io.pdb_io import PDBParser
-from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core.clusters.accre_r9 import AccreR9
-from enzy_htp.core.logger import _LOGGER
 import enzy_htp.core.file_system as fs
-from enzy_htp.chemical.sequence import create_fasta_from_sequences
 af_interface = interface.alphafold
 af_config = eh_config.alphafold
 
