@@ -276,11 +276,16 @@ class AlphafoldInterface(BaseInterface):
             cmd = self._build_alphafold2_native_container_command(
                 fasta_path = fasta_path, 
                 out_dir = out_dir, 
-                max_template_date = max_template_date, 
-                model_preset = model_preset, 
-                db_preset = db_preset, 
-                additional_options = additional_options, 
-                core_type = non_armer_core_type
+                num_relax = num_relax, 
+                use_templates = use_templates,
+                model_preset = model_preset,
+                additional_options = additional_options,
+                max_template_date = max_template_date,
+                db_preset = db_preset,
+                use_precomputed_msas = use_precomputed_msas,
+                random_seed = random_seed,
+                core_type = non_armer_core_type,
+                num_multimer_predictions_per_model = num_multimer_predictions_per_model,
             )
         elif config.INSTALL_TYPE == "alphafold2_native_python":
             cmd = self._build_alphafold2_native_python_command(
@@ -404,13 +409,18 @@ class AlphafoldInterface(BaseInterface):
                 )
             elif afconfig.INSTALL_TYPE == "alphafold2_native_container":
                 cmd = self._build_alphafold2_native_container_command(
-                    job_fasta_path=job_fasta_path, 
+                    fasta_path=job_fasta_path, 
                     out_dir=out_dir, 
-                    max_template_date=max_template_date, 
+                    num_relax=num_relax, 
+                    use_templates=use_templates,
                     model_preset=model_preset, 
-                    db_preset=db_preset, 
-                    additional_options=additional_options, 
-                    core_type=core_type
+                    additional_options=additional_options,
+                    max_template_date=max_template_date,
+                    db_preset=db_preset,
+                    use_precomputed_msas=use_precomputed_msas,
+                    random_seed=random_seed,
+                    core_type=core_type,
+                    num_multimer_predictions_per_model=num_multimer_predictions_per_model
                 )
             elif afconfig.INSTALL_TYPE == "alphafold2_native_python":
                 cmd = self._build_alphafold2_native_python_command(
@@ -537,46 +547,42 @@ class AlphafoldInterface(BaseInterface):
 
     def _build_alphafold2_native_container_command(
         self,
-        fasta_path: str,
-        out_dir: Path,
-        max_template_date: Optional[str],
-        model_preset: str,
-        db_preset: str,
-        additional_options: Optional[List[str]],
-        core_type: str = "gpu"
+        fasta_path: str, # --fasta_paths
+        out_dir: Path, # --output_dir
+        num_relax: int = 0, # mapped to models_to_relax
+        use_templates: bool = False, # if this is false, set max_template_date to 1900-01-01
+        model_preset: Optional[str] = None, # --model_preset (auto default value for monomer and multimer)
+        max_template_date: Optional[str] = None, # --max_template_date
+        use_precomputed_msas: bool = False, # --use_precomputed_msas
+        random_seed: Optional[int] = None, # --random_seed
+        db_preset: str = "full_dbs", # --db_preset
+        core_type: str = "gpu",
+        additional_options: Optional[List[str]] = None,
+        # Not exposed in af2_predict API
+        num_multimer_predictions_per_model: int = 5, # --num_multimer_predictions_per_model
+        benchmark: bool = False, # --benchmark
     ) -> List[str]:
         """Build command for native AlphaFold2 execution.
-        
-        Args:
-            non_armer_core_type: Computing core type ('gpu' or 'cpu')
+        This corresponds to the installation described in the AF2 repo
+        (https://github.com/google-deepmind/alphafold)
         """
-        config = self.config_
-        
-        cmd = ["python", config.EXECUTABLE_PATH]
-        cmd.extend(["--fasta_paths", fasta_path])
-        cmd.extend(["--output_dir", str(out_dir)])
-        cmd.extend(["--data_dir", config.DATA_DIR])
-        cmd.extend(["--model_preset", model_preset])
-        cmd.extend(["--db_preset", db_preset])
-        
-        if max_template_date:
-            cmd.extend(["--max_template_date", max_template_date])
-        
-        # Add database paths (these would typically be in config)
-        if hasattr(config, 'UNIREF90_DATABASE_PATH') and config.UNIREF90_DATABASE_PATH:
-            cmd.extend(["--uniref90_database_path", config.UNIREF90_DATABASE_PATH])
-        
-        if hasattr(config, 'MGNIFY_DATABASE_PATH') and config.MGNIFY_DATABASE_PATH:
-            cmd.extend(["--mgnify_database_path", config.MGNIFY_DATABASE_PATH])
-        
-        if hasattr(config, 'TEMPLATE_MMCIF_DIR') and config.TEMPLATE_MMCIF_DIR:
-            cmd.extend(["--template_mmcif_dir", config.TEMPLATE_MMCIF_DIR])
-        
-        if hasattr(config, 'USE_GPU_RELAX') and config.USE_GPU_RELAX and core_type == "gpu":
-            cmd.append("--use_gpu_relax")
-        
-        if additional_options:
-            cmd.extend(additional_options)
+        # this is in principle the same as directly using run_alphafold2. The only difference is the executable name.
+        # this function serve as a place holder for future difference
+        cmd = self._build_alphafold2_native_python_command(
+            fasta_path = fasta_path,
+            out_dir = out_dir,
+            num_relax = num_relax,
+            use_templates = use_templates,
+            model_preset = model_preset,
+            max_template_date = max_template_date,
+            use_precomputed_msas = use_precomputed_msas,
+            random_seed = random_seed,
+            db_preset = db_preset,
+            core_type = core_type,
+            additional_options = additional_options,
+            num_multimer_predictions_per_model = num_multimer_predictions_per_model,
+            benchmark = benchmark,
+        )
         
         return cmd
 
