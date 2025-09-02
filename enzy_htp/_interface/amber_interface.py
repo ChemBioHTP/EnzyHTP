@@ -25,7 +25,8 @@ import numpy as np
 import pandas as pd
 from sympy import sympify
 from collections.abc import Iterable
-import tempfile        
+import tempfile
+import logging
 
 from .base_interface import BaseInterface
 from .handle_types import (
@@ -40,7 +41,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import math_helper as mh
 from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core.exception import AddPDBError, tLEaPError, AmberMDError
-from enzy_htp.core.general import get_interval_str_from_list, load_obj, save_obj
+from enzy_htp.core.general import get_interval_str_from_list, load_obj, save_obj, LogLevel
 from enzy_htp.chemical import QMLevelOfTheory
 from enzy_htp.chemical.force_field import AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
@@ -1589,7 +1590,7 @@ class AmberInterface(BaseInterface):
                 raise e
         else:
             # tleap can also sliently fail, so we need to check the output file
-            tleap_error = self._find_tleap_error(tleap_out_path)
+            tleap_error = self._find_tleap_error(tleap_out_path, warn_on_noerror=False)
         finally:
             fs.clean_temp_file_n_dir(temp_path_list)
 
@@ -1600,7 +1601,7 @@ class AmberInterface(BaseInterface):
         fs.clean_temp_file_n_dir(temp_path_list)
 
     @staticmethod
-    def _find_tleap_error(tleap_out_path: str) -> tLEaPError:
+    def _find_tleap_error(tleap_out_path: str, warn_on_noerror: bool=True) -> tLEaPError:
         """an internal used function that find the text describing the error
         from a tleap output file
         Return a tLEaPError containing all the error information"""
@@ -1608,7 +1609,7 @@ class AmberInterface(BaseInterface):
         with open(tleap_out_path) as f:
             error_info_list = re.findall(error_info_pattern, f.read())
             error_info_list = [i.strip() for i in error_info_list]
-            if not error_info_list:
+            if (not error_info_list) and warn_on_noerror:
                 _LOGGER.warning("did not found any error in tleap out file. Here is the complete output:")
                 _LOGGER.warning(f.read())
 
@@ -2428,7 +2429,8 @@ class AmberInterface(BaseInterface):
             while fs.is_locked(f): # wait if the file is writing by other workflow
                 time.sleep(0.1)
             cache_stru_amber_idx_map_mapper = pickle.load(f)
-        result = cache_stru_amber_idx_map_mapper.get(stru, None)
+        with LogLevel(_LOGGER, logging.ERROR):
+            result = cache_stru_amber_idx_map_mapper.get(stru, None)
         if result:
             return result
 
@@ -2470,7 +2472,8 @@ class AmberInterface(BaseInterface):
         ])
 
         # save cache
-        cache_stru_amber_idx_map_mapper[stru] = result
+        with LogLevel(_LOGGER, logging.ERROR):
+            cache_stru_amber_idx_map_mapper[stru] = result
         with open(cache_file_path, "wb") as of:
             fs.lock(of)
             pickle.dump(cache_stru_amber_idx_map_mapper, of)
