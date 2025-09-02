@@ -22,6 +22,8 @@ Dict related:
         get_copy_of_deleted_dict
 
 Misc:
+    Context Managers:
+        LogLevel
     Decorator:
         timer
 
@@ -335,6 +337,38 @@ class CaptureLogging:
         self.logger.handlers = self.old_handlers
         # set position for read
         self.log_stream.seek(0)
+
+
+class LogLevel:
+    """Temporarily set the logging level for a logger within a context block.
+    
+    This context manager allows you to temporarily change the logging level
+    of a logger and automatically restore it when exiting the context.
+    
+    Args:
+        logger: The logger instance to modify
+        level: The temporary logging level (e.g., logging.DEBUG, logging.INFO, etc.)
+        
+    Example:
+        >>> import logging
+        >>> logger = logging.getLogger(__name__)
+        >>> with LogLevel(logger, logging.DEBUG):
+        ...     logger.debug("This debug message will be shown")
+        >>> # Logger level is automatically restored
+    """
+    
+    def __init__(self, logger: logging.Logger, level: int) -> None:
+        self.logger = logger
+        self.new_level = level
+        self.original_level = None
+    
+    def __enter__(self):
+        self.original_level = self.logger.level
+        self.logger.setLevel(self.new_level)
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.logger.setLevel(self.original_level)
 
 
 @contextmanager

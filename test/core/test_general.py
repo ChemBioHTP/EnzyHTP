@@ -4,6 +4,7 @@ Date: 2023-02-03
 """
 
 import os
+import logging
 import numpy as np
 from enzy_htp.core import general as eg
 from enzy_htp.core import _LOGGER
@@ -120,3 +121,43 @@ def test_save_obj():
     assert answer_obj == test_obj_1
 
     fs.clean_temp_file_n_dir([test_pickle_file])
+
+
+def test_log_level():
+    """test LogLevel context manager"""
+    # Create a test logger
+    test_logger = logging.getLogger("test_logger")
+    original_level = logging.INFO
+    test_logger.setLevel(original_level)
+    
+    # Test that the context manager changes and restores the log level
+    with eg.LogLevel(test_logger, logging.DEBUG):
+        assert test_logger.level == logging.DEBUG
+    
+    # Check that the original level is restored
+    assert test_logger.level == original_level
+    
+    # Test with different level
+    with eg.LogLevel(test_logger, logging.ERROR):
+        assert test_logger.level == logging.ERROR
+    
+    # Check that the original level is restored again
+    assert test_logger.level == original_level
+
+
+def test_log_level_with_exception():
+    """test LogLevel context manager when exception occurs"""
+    test_logger = logging.getLogger("test_logger_exception")
+    original_level = logging.WARNING
+    test_logger.setLevel(original_level)
+    
+    # Test that the original level is restored even when exception occurs
+    try:
+        with eg.LogLevel(test_logger, logging.DEBUG):
+            assert test_logger.level == logging.DEBUG
+            raise ValueError("Test exception")
+    except ValueError:
+        pass
+    
+    # Check that the original level is restored after exception
+    assert test_logger.level == original_level
