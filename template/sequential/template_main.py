@@ -16,7 +16,7 @@ from enzy_htp import interface
 import enzy_htp.structure.structure_constraint as stru_cons
 from enzy_htp.structure import PDBParser
 from enzy_htp.chemical.level_of_theory import QMLevelOfTheory
-from enzy_htp.core.clusters.accre import Accre
+from enzy_htp.core.clusters.accre_r9 import AccreR9
 
 # workflow config
 # I/O path
@@ -26,17 +26,18 @@ ligand_chrg_spin_mapper = {"H5J" : (0,1)} # define the charge spin for ligands a
 
 # HPC job resources
 md_hpc_job_config = {
-    "cluster" : Accre(),
+    "cluster" : AccreR9(),
     "res_keywords" : {
         "account" : "csb_gpu_acc",
-        "partition" : "pascal"
+        "partition" : "batch_gpu",
+        "node_cores" : "nvidia_rtx_a6000:1", # This means 1 * A6000 GPU
     }
 }
 qm_hpc_job_config = {
-    "cluster" : Accre(),
+    "cluster" : AccreR9(),
     "res_keywords" : {
-        "account" : "yang_lab_csb",
-        "partition" : "production",
+        "account" : "yang_lab",
+        "partition" : "batch",
         'walltime' : '1-00:00:00',
     }
 }
@@ -85,6 +86,7 @@ for i, mut in enumerate(mutants):
         job_check_period=10,
         prod_constrain=mut_constraints,
         prod_time= 0.1, #ns
+        record_period=0.01, #ns
         work_dir=f"{mutant_dir}/MD/"
     )
 

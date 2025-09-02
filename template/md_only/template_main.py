@@ -36,6 +36,7 @@ constraints = [
 ]
 # length on MD simulation
 prod_time = 1.0 # unit: ns
+record_period = 0.01 # unit: ns
 # number of replica
 num_rep = 3 
 # temp of MD
@@ -95,6 +96,7 @@ for i, mut in enumerate(mutants):
         job_check_period=30,
         prod_constrain=mut_constraints,
         prod_time= prod_time, #ns
+        record_period= record_period, #ns
         work_dir=f"{mutant_dir}/MD/",
         parallel_runs=num_rep,
         prod_temperature=prod_temperature,
