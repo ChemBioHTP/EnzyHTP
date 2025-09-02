@@ -21,6 +21,6 @@ export KMP_STACKSIZE=200000000
 export Multiwfnpath=/home/shaoq1/bin/Multiwfn_3.7_bin_Linux_noGUI
 export PATH=$PATH:$Multiwfnpath
 # EnzyHTP
-source ~/bin/miniconda3/bin/activate new_EnzyHTP
+source ~/bin/miniconda3/bin/activate new_enzy_htp
 
-exec python -u template_shrapnel_main.py > template_shrapnel_main.py.out 2>&1
+exec python -u enzyhtp_main.py > shrapnel_main.py.out 2>&1

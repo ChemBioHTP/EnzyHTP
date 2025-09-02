@@ -4,29 +4,33 @@ children jobs that each handle part of the given tasks.
 Author: QZ Shao <shaoqz@icloud.com>
 Date: 2024-11-11
 """
+import datetime
 from functools import partial
 import glob
 import itertools
 import os
 from pathlib import Path
+import re
+import sys
 import numpy as np
 import pickle
 import uuid
-from typing import Any, Dict, List, Tuple, Callable
+import signal
+from typing import Any, Dict, Iterable, List, Tuple, Callable, Union
 
-from enzy_htp.analysis import d_ele_field_upon_mutation_coarse, ddg_fold_of_mutants
 from enzy_htp.core.exception import ShrapnelChildError
 from enzy_htp.mutation import assign_mutant
 from enzy_htp.mutation_class import Mutation, get_involved_mutation, generate_from_mutation_flag
 from enzy_htp._config.armer_config import ARMerConfig
 from enzy_htp.structure import Structure, PDBParser, Atom, StructureConstraint
 import enzy_htp.structure.structure_constraint as stru_cons
-from enzy_htp.core.clusters.accre import Accre
+from enzy_htp.core.clusters.accre_r9 import AccreR9
 from enzy_htp.core.job_manager import ClusterJob, ClusterInterface
 from enzy_htp.core import _LOGGER
 from enzy_htp.core.general import save_obj, load_obj, save_func_to_main
 import enzy_htp.core.math_helper as mh
 import enzy_htp.core.file_system as fs
+from enzy_htp import interface as ei
 
 def run_shrapnel(
         tasks: Dict,
@@ -65,7 +69,7 @@ def run_shrapnel(
             "task" in this list:
                 {   
                 "wt" : [wt_path, ...],
-                "mutants" : mutant_pattern,
+                "mutants" : mutant_pattern (or a List[List[Mutation]]),
                 "constraints" : [md_constraint, ...],
                 "ncaa_chrgspin" : {"RES" : (0,1),...},
                 },
@@ -124,12 +128,25 @@ def run_shrapnel(
     child_tasks = []
     for task in tasks:
         wt_pdb_list: str = task["wt"]
-        mutant_pattern: str = task["mutants"]
+        mutant_inp: Union[Iterable, str] = task["mutants"]
         ligand_chrg_spin_mapper: Dict = task["ncaa_chrgspin"]
         md_constraints: List[Callable[[Structure], StructureConstraint]] = task["constraints"]
+        if not isinstance(mutant_inp, str) and len(mutant_inp) > 0 and isinstance(mutant_inp[0][0], Mutation):
+            if len(wt_pdb_list) > 1:
+                _LOGGER.warning(
+                    "mutants are given as list of mutation objects "
+                    "but there is more than one wild type! "
+                    "This will not work unless their protein part is identical"
+                    )
         for wt_pdb in wt_pdb_list:
             stru = PDBParser().get_structure(wt_pdb)
-            mutants = assign_mutant(stru, mutant_pattern, chain_sync_list=chain_sync_list, chain_index_mapper=chain_index_mapper)
+            if isinstance(mutant_inp, str):
+                mutants = assign_mutant(stru, mutant_inp, chain_sync_list=chain_sync_list, chain_index_mapper=chain_index_mapper)
+            elif len(mutant_inp) > 0 and isinstance(mutant_inp[0][0], Mutation):
+                mutants = mutant_inp
+            else:
+                _LOGGER.error(f"mutants in the task can only be str or List[List[Mutation]]. Got {mutant_inp}")
+                raise TypeError
             for mut in mutants:
                 child_tasks.append({
                     "uid" : uuid.uuid4(),
@@ -193,14 +210,22 @@ def run_shrapnel(
         new_child_jobs = []
         # 1. analyze remaining child_jobs (recycle old one) may benefit from having a mimo
         for job in child_jobs:
-            job.retrive_job_id() # BUG multiple submissions of the job causes retriving a wrong job id; consider retrieving using a uid in .log?
+            if not job.job_id: # NOTE after the change @2025/7/4, the job id should be always up to date so long as they are submitted through this script.
+                job.retrive_job_id() # BUG multiple submissions of the job causes retriving a wrong job id; consider retrieving using a uid in .log?
             if (not job.is_submitted()) or (not job.is_complete()):
                 new_child_jobs.append(job)
         child_jobs = new_child_jobs # this will include failing, pending, running jobs
         # 2. update the checkpoint
         save_obj(child_jobs, child_job_checkpoint)
 
+    # signal handling in case hitting the walltime while waiting for child jobs to finish
+    _sig_handler_partial = partial(_sig_handler, child_jobs=child_jobs, child_jobs_checkpoint=child_job_checkpoint)
+    signal.signal(signal.SIGUSR1, _sig_handler_partial)
+    signal.signal(signal.SIGTERM, _sig_handler_partial)
+
     jobs_remain = ClusterJob.wait_to_array_end_plus(child_jobs, shrapnel_check_period, shrapnel_child_array_size)
+    # update child jobs
+    save_obj(child_jobs, child_job_checkpoint)
 
     if jobs_remain:
         _LOGGER.error("some children jobs didn't finish normally. they are:")
@@ -245,7 +270,7 @@ def _child_main(
     from enzy_htp.preparation import protonate_stru, remove_hydrogens
     from enzy_htp.mutation import mutate_stru
     from enzy_htp.geometry import equi_md_sampling
-    from enzy_htp.analysis import ele_field_strength_at_along, ddg_fold_of_mutants
+    from enzy_htp.analysis import ele_field_strength_at_along, ddg_fold_of_mutants, rmsd, binding_energy
     from enzy_htp import interface
     from enzy_htp.mutation_class import Mutation
     from enzy_htp.structure import StructureConstraint, Structure, Atom, StructureEnsemble
@@ -302,15 +327,15 @@ def _child_main(
         # 1. prepare
         prepared_stru = task_result_data.get("prepared_stru", None)
         if prepared_stru is None:
-            remove_hydrogens(wt_stru, polypeptide_only=True)
-            protonate_stru(wt_stru, protonate_ligand=False)
+            prepared_stru = remove_hydrogens(wt_stru, polypeptide_only=True)
+            protonate_stru(prepared_stru, protonate_ligand=False)
             result_dict[task_uid]["prepared_stru"] = prepared_stru
             save_obj(result_dict, result_path)
 
         # 2. mutate
         mutant_stru = task_result_data.get("mutant_stru", None)
         if mutant_stru is None:
-            mutant_stru = mutate_stru(wt_stru, mutant, engine="pymol")
+            mutant_stru = mutate_stru(prepared_stru, mutant, engine="pymol")
             mutant_stru.assign_ncaa_chargespin(ligand_chrg_spin_mapper)
             remove_hydrogens(mutant_stru, polypeptide_only=True)
             protonate_stru(mutant_stru, protonate_ligand=False)
@@ -327,13 +352,13 @@ def _child_main(
                 ncaa_param_lib_path=ncaa_param_lib_path,
                 force_fields=[
                     "leaprc.protein.ff14SB",
-                    "leaprc.gaff2",
+                    "leaprc.gaff",
                     "leaprc.water.tip3p",
                 ],
             )
             gpu_job_config = {
                 "cluster" : gpu_job_config["cluster"],
-                "res_keywords" : gpu_job_config["res_keywords"] | {"partition" : gpu_partition}
+                "res_keywords" : gpu_job_config["res_keywords"] | {"node_cores" : gpu_partition}
             }
             task_constraints = []
             for cons in md_constraints:
@@ -342,6 +367,7 @@ def _child_main(
                 stru = mutant_stru,
                 param_method = param_method,
                 cluster_job_config = gpu_job_config,
+                dont_freeze_bb_in_min=True,
                 prod_constrain=task_constraints,
                 prod_time=md_length,
                 record_period=md_length*0.01,
@@ -353,12 +379,53 @@ def _child_main(
             result_dict[task_uid]["trajs"] = trajs
             save_obj(result_dict, result_path)
 
+        # metrics specific
+        mut_data = {
+            "ef" : [],
+            "rmsd" : [],
+            "mmpbsa" : [],
+        }
+        for replica_esm in trajs:
+            # EF
+            replica_ef = []
+            atom_1 = mutant_stru.get("C.290.C1")
+            atom_2 = mutant_stru.get("C.290.I1")
+            ef_region_pattern = "resi 1-288"
+            for traj_stru in replica_esm.structures(remove_solvent=True):
+                # 5. get dEF
+                field_strength = ele_field_strength_at_along(
+                    traj_stru, atom_1, atom_2, region_pattern=ef_region_pattern)
+                replica_ef.append(field_strength)
+            mut_data["ef"].append(replica_ef)
+
+            # RMSD
+            replica_rmsd = rmsd(
+                replica_esm, 
+                region_pattern="resi 7+11+27+40+41+43+165+168+169+170+199+210+211+289 and (not elem H)",
+            )
+            mut_data["rmsd"].append(replica_rmsd)
+
+            # MMPBSA
+            replica_mmpbsa = binding_energy(
+                replica_esm,
+                ligand="resi 290",
+                method="mmpbsa_amber",
+                cluster_job_config=cpu_job_config,
+            )
+            mut_data["mmpbsa"].append(replica_mmpbsa)
+
+        result_dict[task_uid].update(mut_data)
+        save_obj(result_dict, result_path)
+
     # final san check
     for task in tasks:
         task_uid = task["uid"]
         assert task_uid in result_dict
-        assert "ddg_fold" in result_dict[task_uid]
+        # assert "ddg_fold" in result_dict[task_uid]
         assert "trajs" in result_dict[task_uid]
+        assert "ef" in result_dict[task_uid]
+        assert "rmsd" in result_dict[task_uid]
+        assert "mmpbsa" in result_dict[task_uid]
 
 def _make_child_job(
         grp_id: int,
@@ -400,34 +467,161 @@ def _find_gpu_partition(grp_id, partition_mapper) -> str:
         if l <= grp_id <= h:
             return partition
 
+def _dump_state(child_jobs: list, child_job_checkpoint: str):
+    """dump important information when the script is terminated."""
+    save_obj(child_jobs, child_job_checkpoint)
+    _LOGGER.warning(f"[{datetime.datetime.now():%F %T}] Saved {len(child_jobs)} jobs → {child_job_checkpoint}")
+
+def _sig_handler(signum, frame, *, child_jobs, child_jobs_checkpoint):
+    """handling signals"""
+    _LOGGER.warning(f"Received signal {signum}, dumping state...")
+    _dump_state(child_jobs, child_jobs_checkpoint)
+    sys.exit(0)  
+
+def resubmit_child_jobs(child_job_list: list, child_job_checkpoint: str, 
+                        shrapnel_check_period: int, shrapnel_child_array_size: int):
+    """Resubmit a specific list of children jobs.
+    This function is handy when you have part of the child jobs failed after the main script finishes.
+    Always dump resubmitted child jobs to a new file."""
+    child_jobs: List[ClusterJob] = load_obj(child_job_checkpoint) # NOTE that this will cause source code change in this script cannot effect the content of those existing jobs. (e.g.: partition etc.)
+    child_jobs_mapper = {i.sub_dir.removeprefix("./shrapnel/") : i for i in child_jobs}
+
+    new_child_jobs = [child_jobs_mapper[group_name] for group_name in child_job_list]
+    new_child_job_checkpoint = Path(child_job_checkpoint).with_suffix(".new.pickle")
+    new_child_job_checkpoint = fs.get_valid_temp_name(new_child_job_checkpoint)
+    
+    _sig_handler_partial = partial(_sig_handler, child_jobs=new_child_jobs, child_jobs_checkpoint=new_child_job_checkpoint)
+    signal.signal(signal.SIGUSR1, _sig_handler_partial)
+
+    jobs_remain = ClusterJob.wait_to_array_end_plus(new_child_jobs, shrapnel_check_period, shrapnel_child_array_size)
+    save_obj(new_child_jobs, new_child_job_checkpoint)
+
+    if jobs_remain:
+        _LOGGER.error("some children jobs didn't finish normally. they are:")
+        _LOGGER.error("\n".join([j.sub_dir for j in jobs_remain]))
+        raise ShrapnelChildError
+
+def detect_child_job_progress(
+        md_parallel_runs: int,
+        child_dir_list: list = None, 
+        child_job_checkpoint: str = "shrapnel_child_jobs.pickle",
+        child_result_fname: str = "results.pickle",
+        child_task_fname: str = "tasks.pickle",
+        print_unfinished_only: bool = False,
+        return_unfinished: bool = True):
+    """Detect the progress of all children jobs. Return the jobs that is not finished.
+    Supply child_dir_list or child_job_checkpoint.
+    NOTE only detect for MD finish in this template. You can modify this function to customize it."""
+    if not child_dir_list:
+        if os.path.exists(child_job_checkpoint):
+            child_jobs: List[ClusterJob] = load_obj(child_job_checkpoint)
+            child_dir_list = [i.sub_dir for i in child_jobs]
+        else:
+            _LOGGER.error("please supply {child_dir_list} or {child_job_checkpoint}")
+            raise ValueError
+    unfinished = []
+    for child_dir in child_dir_list:
+        task_file = f"{child_dir}/{child_task_fname}"
+        result_file = f"{child_dir}/{child_result_fname}"
+        tasks = load_obj(task_file)
+        total_num = len(tasks)
+        try:
+            results = load_obj(result_file)
+            finish_num = 0
+            for task in tasks:
+                task_finish = _determine_task_md_finish(task, results, md_parallel_runs)
+                finish_num += task_finish
+        except (pickle.UnpicklingError, EOFError):
+            finish_num = -1
+
+        if not print_unfinished_only:
+            print(f"{child_dir}: {finish_num}/{total_num}")
+        elif finish_num < total_num:
+            print(f"{child_dir}: {finish_num}/{total_num}")
+            unfinished.append(child_dir)
+
+    if return_unfinished:
+        return unfinished
+
+def _determine_task_md_finish(task: dict, results: dict, md_parallel_runs: int,) -> bool:
+    task_id = task["uid"]
+    task_result = results[task_id]
+    trajs = task_result.get("trajs", list())
+    if len(trajs) < md_parallel_runs:
+        return False
+    else:
+        return True
+
+def fix_broken_result_file(
+        target_dirs: List[str], 
+        child_result_fname: str = "results.pickle",
+        child_task_fname: str = "tasks.pickle",
+    ):
+    """fix broken results.pickle file"""
+    for d in target_dirs:
+        result_fname = Path(d) / child_result_fname
+        task_fname = Path(d) / child_task_fname
+        try:
+            load_obj(result_fname)
+        except (pickle.UnpicklingError, EOFError):
+            pass
+        else:
+            _LOGGER.error("try to fix a none broken result pickle. Please exam yourself.")
+            raise ValueError
+        
+        # fix broken ones
+        tasks = load_obj(task_fname)
+        result = {}
+        # find existing trajs
+        task_dir = Path(d).glob("task_*/")
+        for t in task_dir:
+            traj_nc = (t / "MD").glob("rep_0*")
+            traj_nc = sorted(traj_nc, key=lambda x: x.stem)
+            traj_nc = traj_nc[-1]
+            traj_nc_idx = traj_nc.stem.removeprefix("rep_0")
+            traj_nc = traj_nc / "prod_npt.nc"
+            traj_prmtop = t / "MD" / f"amber_parm{traj_nc_idx}.prmtop"
+            task_idx = int(t.stem.removeprefix("task_"))
+            task_info = tasks[task_idx]
+            task_uid = task_info["uid"]
+            print(traj_prmtop, traj_nc)
+            result[task_uid] = {
+                "trajs" : [ei.amber.load_traj(
+                    prmtop_path=traj_prmtop,
+                    traj_path=traj_nc
+                )]
+            }
+        save_obj(result, result_fname)
+
 def main():
-    """shrapnel-like dir creation and submission for"""
+    """shrapnel-like dir creation and submission"""
     # region: Input
     tasks = [
         {   
-        "wt" : ["wt/test_1.pdb", "wt/test_2.pdb"],
-        "mutants" : "WT",
-        "constraints" : [
-            partial(stru_cons.create_distance_constraint,"C.282.N", "B.281.C47", 2.8),
-            partial(stru_cons.create_angle_constraint,"C.282.N", "B.281.C47", "B.281.S7", 180.0),            
+        "wt" : [
+            "wt/aclHMT-IPI-SAH.pdb", 
+            "wt/aclHMT-MEI-SAH.pdb", 
+            "wt/aclHMT-PEI-SAH.pdb", 
+            "wt/aclHMT-PRI-SAH.pdb", 
+            "wt/aclHMT-CPI-SAH.pdb",
+            "wt/aclHMT-ETI-SAH.pdb",
             ],
-        "ncaa_chrgspin" : {"SAM" : (1,1), "SAI" : (1,1)},
-        },
-        {   
-        "wt" : ["wt/test_3.pdb",],
-        "mutants" : "WT, {X###Y}",
-        "constraints" : [],
-        "ncaa_chrgspin" : {"SAM" : (1,1), "SAI" : (1,1)},
+        "mutants" : "WT, {L39H,V11F}, L39H, V11F", # You can also pre-screen mutants and load them by: `load_obj("stable_mutants.pickle")`
+        "constraints" : [
+            partial(stru_cons.create_distance_constraint,"B.289.S1", "C.290.C1", 3.5),
+            partial(stru_cons.create_angle_constraint,"B.289.S1", "C.290.C1", "C.290.I1", 180.0),            
+            ],
+        "ncaa_chrgspin" : {"SAH" : (0,1), "IPI" : (0,1)},
         },
     ]
     # temp (will deprocate)
     chain_sync_list = []
     chain_index_mapper = {}
     # ARMer settings
-    cluster = Accre()
+    cluster = AccreR9()
     yanglab_acc_res_keywords = {
-        "account" : "yang_lab_csb",
-        "partition" : "production",
+        "account" : "yang_lab",
+        "partition" : "batch",
         'walltime' : '10:00:00',
         }
     shrapnel_child_job_config = {
@@ -440,35 +634,98 @@ def main():
         "cluster" : cluster,
         "res_keywords" : yanglab_acc_res_keywords | {
             "account" : "csb_gpu_acc",
-            "walltime" : "5-00:00:00",}}
+            "partition" : "batch_gpu",
+            "walltime" : "3-00:00:00",}}
     # endregion
 
     run_shrapnel(
         tasks = tasks,
         chain_sync_list=chain_sync_list, chain_index_mapper=chain_index_mapper,
         # MD
-        md_length=100.0,
+        md_length=0.1,
         md_parallel_runs=1,
         # ARMer
         shrapnel_child_job_config = shrapnel_child_job_config,
         shrapnel_cpujob_config = shrapnel_cpujob_config,
         shrapnel_gpujob_config = shrapnel_gpujob_config,
         # shrapnel
-        shrapnel_child_array_size = 50,
+        shrapnel_child_array_size = 100,
         shrapnel_groups = 100,
         shrapnel_gpu_partition_mapper = {
-            (0, 10) : "a6000x4",
-            (11, 20) : "turing",
-            (21, 30) : "pascal",
-            (31, 40) : "a6000x4",
-            (41, 50) : "turing",
-            (51, 60) : "pascal",
-            (61, 70) : "a6000x4",
-            (71, 80) : "turing",
-            (81, 90) : "pascal",
-            (91, 100) : "a6000x4",
+            (0, 10) : "nvidia_rtx_a6000:1",
+            (11, 20) : "nvidia_rtx_a6000:1",
+            (21, 60) : "nvidia_titan_x:1",
+            (61, 90) : "nvidia_geforce_rtx_2080_ti:1",
+            (91, 95) : "nvidia_rtx_a6000:1",
+            (96, 100) : "nvidia_rtx_a6000:1",
         },
     )
+
+    # resubmit_child_jobs(
+    #     child_job_list=[
+    #         "group_44",
+    #         "group_47",
+    #         "group_48",
+    #         "group_50",
+    #         "group_51",
+    #         "group_53",
+    #         "group_54",
+    #         "group_55",
+    #         "group_56",
+    #         "group_57",
+    #         "group_58",
+    #         "group_59",
+    #         "group_60",
+    #         "group_61",
+    #         "group_62",
+    #         "group_63",
+    #         "group_64",
+    #         "group_65",
+    #         "group_66",
+    #         "group_67",
+    #         "group_68",
+    #         "group_69",
+    #         "group_70",
+    #         "group_71",
+    #         "group_72",
+    #         "group_73",
+    #         "group_74",
+    #         "group_75",
+    #         "group_76",
+    #         "group_77",
+    #         "group_78",
+    #         "group_79",
+    #         "group_80",
+    #         "group_88",
+    #     ],
+    #     child_job_checkpoint="shrapnel_child_jobs.pickle",
+    #     shrapnel_check_period = 120,
+    #     shrapnel_child_array_size = 50,
+    # )
+
+    # child_jobs: List[ClusterJob] = load_obj("shrapnel_child_jobs.pickle")
+    # for j in child_jobs:
+    #     replaced = j.sub_script_str.replace("nvidia_a100_80gb", "nvidia_rtx_a6000")
+    #     if replaced != j.sub_script_str:
+    #         print(j.sub_dir.removeprefix(""))
+    #         j.sub_script_str = replaced
+    # save_obj(child_jobs, "shrapnel_child_jobs_updated.pickle")
+
+    # unfinished = (detect_child_job_progress(
+    #     md_parallel_runs=1,
+    #     print_unfinished_only=True,
+    # ))
+    # unfinished_idx = set([int(i.removeprefix("./shrapnel/group_")) for i in unfinished])
+    # running_idx = {94}
+    # running_md_idx = {0,1,2,3,4,5,6,7,9,10,11,12,13,14,15,16,17,18,19,20,22,24,25,27,28,29,30,31,36,40,41,45,49,54,59,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,90,91,92,93,94,95,96,97,98,99}
+    # print(unfinished_idx - running_idx)
+    # print(unfinished_idx - running_md_idx)
+
+    # fix_broken_result_file([
+    #     "./shrapnel/group_13",
+    #     "./shrapnel/group_15",
+    #     "./shrapnel/group_18",
+    # ])
 
 if __name__ == "__main__":
     main()
