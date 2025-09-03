@@ -9,7 +9,7 @@ import os
 import re
 import copy
 import json
-from typing import Union, List, Optional, Dict, Tuple
+from typing import Union, List, Optional, Dict, Tuple, Any
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -87,34 +87,39 @@ class AlphafoldInterface(BaseInterface):
         additional_options: Optional[List[str]] = None,
         random_seed: Optional[int] = None,
         **kwargs
-    ) -> Dict[str, Structure]:
+    ) -> Dict[Union[str, Tuple[str, ...]], Dict[str, Any]]:
         """Science API for AlphaFold2 structure prediction.
 
         Args:
-            sequences: Sequences to predict. Can be:
-                      - List[str]: Single sequences [seq1, seq2, seq3, ...]
-                      - List[List[str]]: Multimers [[seq1_chain_A, seq1_chain_B], [seq2_chain_A, seq2_chain_B], ...]
-            out_dir: Output directory for results. If None, creates temporary directory.
-            cluster_job_config: Configuration for cluster job submission
-            core_type: Type of computing core ('gpu' or 'cpu') for cluster jobs
+            sequences: Sequences to predict. Supported forms:
+                      - List[str]: Multiple monomers [seq1, seq2, ...]
+                      - List[List[str]]: Multimers per target [[A_seq, B_seq], [A_seq, B_seq, C_seq], ...]
+            work_dir: Output/work directory. If None, creates a temporary directory.
+            non_armer_core_type: Core type for local execution ("gpu" or "cpu").
+            cluster_job_config: Configuration for cluster job submission.
             array_size: Number of jobs to run simultaneously (for cluster submission)
             job_check_period: Time cycle for job state checking (seconds)
             seq_per_job: Number of sequences per job (for array execution)
             num_models: Number of models to generate
             num_recycles: Number of recycling iterations
+            num_multimer_predictions_per_model: Multimer predictions per model (native AF2)
             num_relax: Number of top ranked structures to relax
             relax_max_iteration: Maximum relaxation iterations
+            db_preset: Database preset (native AF2)
+            use_precomputed_msas: Whether to use precomputed MSAs (native AF2)
+                (NOTE: when native AF2 distribution is used, HHSearch still runs.
+                Details: https://github.com/google-deepmind/alphafold/issues/469)
             use_templates: Whether to use templates
             max_template_date: Maximum template date
             model_preset: Model preset configuration
-            db_preset: Database preset
             additional_options: Additional command-line options
-            use_precomputed_msas: Whether to use precomputed MSAs 
                 (NOTE: when native af2 distribution is used. HHSearch will still be run. Details: https://github.com/google-deepmind/alphafold/issues/469)
             random_seed: Random seed for reproducibility
             
         Returns:
-            Dict mapping sequence identifiers to comprehensive prediction results containing:
+            Dict mapping each original input to comprehensive prediction results.
+            Keys are either the monomer sequence string, or a tuple[str, ...]
+            for multimer inputs. Each value contains:
                 - "best_model": Structure object of the best ranked model
                 - "best_model_plddt": List of pLDDT scores for best model  
                 - "best_model_index": Index (1-based) of the best model
@@ -223,7 +228,7 @@ class AlphafoldInterface(BaseInterface):
         random_seed: Optional[int] = None,
         non_armer_core_type: str = "gpu",
         num_multimer_predictions_per_model: int = 5,
-    ) -> Dict[str, str]:
+    ) -> None:
         """Execute AlphaFold2 prediction locally.
         
         Args:
@@ -243,7 +248,8 @@ class AlphafoldInterface(BaseInterface):
             non_armer_core_type: Type of computing core ('gpu' or 'cpu') for local execution
             
         Returns:
-            None (execution only, results parsed separately)
+            None. Executes the prediction; results are written to disk and
+            parsed later by `_parse_comprehensive_results`.
         """
         config = self.config()
         out_dir = Path(out_dir)
@@ -322,7 +328,7 @@ class AlphafoldInterface(BaseInterface):
 
     def make_job(
         self,
-        sequences: Union[List[str], List[List[str]]],
+        sequences: Dict[str, Union[List[str], List[List[str]]]],
         out_dir: Union[str, Path],
         num_models: int = 5,
         num_recycles: int = 3,
@@ -342,7 +348,10 @@ class AlphafoldInterface(BaseInterface):
         """Create cluster jobs for running AlphaFold2 with array support.
         
         Args:
-            sequences: Input sequences to predict
+            sequences: Mapping of sequence IDs to per-target sequences.
+                Values are either
+                - List[str]: monomer (single sequence)
+                - List[List[str]]: multimer (list of chain sequences)
             out_dir: Output directory for results
             num_models: Number of models to generate
             num_recycles: Number of recycling iterations
@@ -355,7 +364,7 @@ class AlphafoldInterface(BaseInterface):
             additional_options: Additional command-line options
             use_precomputed_msas: Whether to use precomputed MSAs
             random_seed: Random seed for reproducibility
-            cluster_job_config: Configuration for cluster job
+            cluster_job_config: Configuration for cluster job submission
             seq_per_job: Number of sequences per job
             
         Returns:
@@ -396,15 +405,15 @@ class AlphafoldInterface(BaseInterface):
             # Build command for this job            
             if afconfig.INSTALL_TYPE == "colabfold_container":
                 cmd = self._build_colabfold_container_command(
-                    job_fasta_path=job_fasta_path, 
-                    out_dir=out_dir, 
-                    num_models=num_models, 
-                    num_recycles=num_recycles, 
-                    num_relax=num_relax, 
-                    relax_max_iteration=relax_max_iteration, 
-                    use_templates=use_templates, 
-                    model_preset=model_preset, 
-                    additional_options=additional_options, 
+                    fasta_path=job_fasta_path,
+                    out_dir=out_dir,
+                    num_models=num_models,
+                    num_recycles=num_recycles,
+                    num_relax=num_relax,
+                    relax_max_iteration=relax_max_iteration,
+                    use_templates=use_templates,
+                    model_preset=model_preset,
+                    additional_options=additional_options,
                     core_type=core_type
                 )
             elif afconfig.INSTALL_TYPE == "alphafold2_native_container":
@@ -491,7 +500,16 @@ class AlphafoldInterface(BaseInterface):
         """Build command for ColabFold container execution.
         
         Args:
-            non_armer_core_type: Computing core type ('gpu' or 'cpu')
+            fasta_path: Path to input FASTA file.
+            out_dir: Output directory (will be bind-mounted as /work).
+            num_models: Number of models to generate.
+            num_recycles: Number of recycling iterations.
+            num_relax: Number of structures to relax with Amber.
+            relax_max_iteration: Maximum iterations for relaxation.
+            use_templates: Whether to enable template usage.
+            model_preset: ColabFold/AF2 model preset to use.
+            additional_options: Additional CLI options to append.
+            core_type: Computing core type ('gpu' or 'cpu').
         """
         config = self.config_
         
@@ -606,8 +624,20 @@ class AlphafoldInterface(BaseInterface):
         """Build command for AlphaFold2 native Python execution.
         
         Args:
-            non_armer_core_type: Computing core type ('gpu' or 'cpu')
-        """        
+            fasta_path: Comma-separated FASTA paths passed to --fasta_paths.
+            out_dir: Output directory for AlphaFold2 outputs.
+            num_relax: Number of models to relax (0 none, 1 best, >1 all).
+            use_templates: Whether to enable template usage.
+            model_preset: AF2 model preset ('monomer_ptm' or 'multimer').
+            max_template_date: Max template date when templates are used.
+            use_precomputed_msas: Use precomputed MSAs (native AF2).
+            random_seed: Random seed for reproducibility.
+            db_preset: Database preset ('full_dbs' or 'reduced_dbs').
+            core_type: Computing core type ('gpu' or 'cpu').
+            additional_options: Additional CLI options to append.
+            num_multimer_predictions_per_model: Multimer predictions per model.
+            benchmark: Enable benchmarking mode.
+        """
         afconfig = self.config_
         
         cmd = ["python", afconfig.EXECUTABLE_PATH]
@@ -743,11 +773,12 @@ class AlphafoldInterface(BaseInterface):
         """Convert sequences into ColabFold format FASTA file.
         
         Args:
-            sequences: Either single sequences or multimer sequences (seq, id)
-            out_dir: Output directory for the FASTA file
+            sequences: Mapping {seq_id: sequence} or {seq_id: [chain_seqs, ...]}.
+                Accepts monomers (List[str]) or multimers (List[List[str]] per ID).
+            out_dir: Output directory for the FASTA file.
             
         Returns:
-            Path of the generated FASTA file
+            Path to the generated FASTA file (string)
         """
         fasta_path = fs.get_valid_temp_name(f"{out_dir}/input_sequences.fasta")
 
@@ -774,8 +805,10 @@ class AlphafoldInterface(BaseInterface):
         """Create separate FASTA files for native AlphaFold input.
         
         Args:
-            sequences: Dictionary of multimer sequences {seq_id: [seq1, seq2, ...]}
-            out_dir: Output directory for FASTA files
+            sequences: Dictionary mapping seq_id to per-target sequences:
+                - List[str] for monomers
+                - List[str] (multiple chains) for multimers
+            out_dir: Output directory for FASTA files.
             
         Returns:
             List of FASTA file paths created

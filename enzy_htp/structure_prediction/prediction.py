@@ -1,6 +1,11 @@
-"""Science API for structure prediction."""
+"""Science API for structure prediction.
+
+This module exposes a thin wrapper around engine-specific predictors
+such as AlphaFold2. It normalizes various sequence input formats and
+forwards engine-specific options.
+"""
 from __future__ import annotations
-from typing import Dict, Callable, Optional, Union
+from typing import Any, Dict, Callable, Optional, Union, List, Tuple
 from pathlib import Path
 
 from enzy_htp.core.job_manager import ClusterJobConfig
@@ -10,24 +15,57 @@ from enzy_htp.structure import Structure
 from enzy_htp import interface
 
 def predict_structure(
-        sequences: Union[str, list[str], Path], engine: str = "alphafold2", 
-        cluster_job_config: Optional[Union[ClusterJobConfig, Dict]] = None, **kwargs
-    ) -> Dict[str, Structure]:
-    """
-    Predict protein structure(s) for the given amino acid sequence(s) using the specified engine.
+        sequences: Union[str, List[str], List[List[str]], Path],
+        engine: str = "alphafold2",
+        cluster_job_config: Optional[Union[ClusterJobConfig, Dict]] = None,
+        **kwargs: Any,
+    ) -> Dict[Union[str, Tuple[str, ...]], Dict[str, Any]]:
+    """Predict protein structure(s) using the specified engine.
+
+    This function standardizes sequence input and forwards options to the
+    selected prediction engine (currently "alphafold2"). For AlphaFold2,
+    it supports both monomers and multimers and returns comprehensive
+    per-sequence results (best model, per-model structures/scores, etc.).
 
     Args:
-        sequences (str, list[str], or Path): A single amino acid sequence, a list of sequences, 
-                  or a path to a FASTA file containing sequences to predict.
-        engine (str): Name of the prediction engine to use. Supported values are keys of PREDICTION_ENGINES (default: "alphafold2").
-        cluster_job_config (ClusterJobConfig or dict, optional): Configuration for submitting jobs to a cluster. Defaults to None.
-        **kwargs: Engine-specific keyword arguments.
+        sequences: Input sequences to predict. Supported forms:
+          - str: Single amino-acid sequence (monomer)
+          - List[str]: Multiple monomer sequences [seq1, seq2, ...]
+          - List[List[str]]: Multimers [[A_seq, B_seq], [A_seq, B_seq, C_seq], ...]
+          - Path: Path to a FASTA file containing one or more sequences
+        engine: Name of prediction engine. Keys of `PREDICTION_ENGINES`.
+        cluster_job_config: Cluster submission configuration for engine runs.
+        **kwargs: Engine-specific options forwarded as-is. For AlphaFold2
+          (`interface.alphafold.af2_predict`) the commonly used options are:
+          - work_dir (str | Path | None): Output/work directory
+          - non_armer_core_type (str): "gpu" or "cpu" for local runs
+          - cluster_job_config (ClusterJobConfig | dict | None): Cluster config
+          - array_size (int): Max concurrent array jobs (cluster)
+          - job_check_period (int): Seconds between job state checks
+          - seq_per_job (int): Number of sequences per job (array)
+          - model_preset (str | None): AF2 model preset
+          - num_models (int): Number of models to generate
+          - num_recycles (int): Recycling iterations
+          - num_multimer_predictions_per_model (int): Multimer predictions/model
+          - num_relax (int): Top-ranked structures to relax
+          - relax_max_iteration (int): Max relaxation iterations
+          - db_preset (str): Database preset (native AF2)
+          - use_precomputed_msas (bool): Use precomputed MSAs (native AF2)
+          - use_templates (bool): Whether to use templates
+          - max_template_date (str | None): Max template date (native AF2)
+          - additional_options (List[str] | None): Extra CLI flags
+          - random_seed (int | None): Random seed for reproducibility
 
     Returns:
-        dict[str, Structure]: A mapping from each input sequence (or its identifier) to the predicted Structure object.
+        Dict mapping each input (monomer str or multimer tuple[str, ...]) to a
+        comprehensive result dict, typically including (for AlphaFold2):
+          - "best_model": Structure of best-ranked model
+          - "best_model_plddt": List[float] per-residue pLDDT of best model
+          - "best_model_index": int (1-based index of best model)
+          - "model_1", "model_1_plddt", ... for all generated models
 
     Raises:
-        ValueError: If the specified engine is not supported.
+        ValueError: If the specified engine is not supported or inputs invalid.
     """
     if engine not in PREDICTION_ENGINES:
         _LOGGER.error(f"Unsupported prediction engine: {engine}")
@@ -38,14 +76,20 @@ def predict_structure(
     
     return PREDICTION_ENGINES[engine](parsed_sequences, cluster_job_config=cluster_job_config, **kwargs)
 
-def _parse_sequences_input(sequences: Union[str, list[str], Path]) -> list[str]:
-    """Parse sequence input from various formats.
-    
+def _parse_sequences_input(sequences: Union[str, List[str], List[List[str]], Path]) -> List[Union[str, List[str]]]:
+    """Parse and normalize sequence input.
+
     Args:
-        sequences: Input sequences as string, list, or fasta file path
-        
+        sequences: One of
+          - str: a single sequence
+          - List[str]: multiple monomer sequences
+          - List[List[str]]: multimer definitions per target
+          - Path: FASTA file path (.fasta/.fa/.fas)
+
     Returns:
-        List of amino acid sequences
+        List of sequences in normalized form:
+          - List[str] for monomers
+          - List[List[str]] for multimers
     """
     if isinstance(sequences, (str, Path)):
         # Check if it's a file path
@@ -62,7 +106,7 @@ def _parse_sequences_input(sequences: Union[str, list[str], Path]) -> list[str]:
             _LOGGER.error(f"File not found or not a FASTA file: {path}")
             raise ValueError(f"File not found or not a FASTA file: {path}")
     elif isinstance(sequences, list):
-        # List of sequences
+        # Already a list of sequences or list of lists (multimers)
         return sequences
     else:
         _LOGGER.error(f"Unsupported sequences input type: {type(sequences)}")
