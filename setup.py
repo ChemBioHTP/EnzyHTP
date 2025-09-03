@@ -38,6 +38,7 @@ SUB_MODULES=[
         'enzy_htp.mutation_class',
         'enzy_htp.geometry',
         'enzy_htp.analysis',
+        'enzy_htp.structure_prediction',
 ]
 
 if __name__ == '__main__':

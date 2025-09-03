@@ -1,0 +1,10 @@
+Query         seq_0/0-21 
+Match_columns 22
+No_of_seqs    1 out of 1
+Neff          1
+Searched_HMMs 1
+Date          Fri Aug 29 01:57:53 2025
+Command       /sb/apps/alphafold232/miniconda3/envs/af232/bin/hhsearch -i /tmp/tmphfj1uruh/query.a3m -o /tmp/tmphfj1uruh/output.hhr -maxseq 1000000 -d /panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//dummy_af2_template_database/dummydb 
+
+ No Hit                             Prob E-value P-value  Score    SS Cols Query HMM  Template HMM
+

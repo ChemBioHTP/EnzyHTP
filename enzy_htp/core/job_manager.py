@@ -722,6 +722,7 @@ class ClusterJobConfig:
         'mem_per_core',
         'walltime',
         'account',
+        'qos',
     ]
 
     def __init__(self, cluster: ClusterInterface = None, res_keywords: dict = None):
@@ -746,6 +747,10 @@ class ClusterJobConfig:
     @property
     def raw_node_cores(self):
         return self.res_keywords.get("node_cores", None)
+
+    @property
+    def core_type(self):
+        return self.res_keywords.get("core_type", None)
 
     @property
     def mem_per_core(self):

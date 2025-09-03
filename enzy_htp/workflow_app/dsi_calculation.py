@@ -1,5 +1,6 @@
 """calculate DSI of given traj file
-TODO make this into an API under analysis"""
+TODO make this into an API under analysis
+NOTE(2025.8): An API of DSI is made in PR #234"""
 from typing import List
 
 from enzy_htp import interface

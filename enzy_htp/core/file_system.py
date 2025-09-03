@@ -47,7 +47,7 @@ def safe_mv(src: str, dest: str) -> str:
     return str(shutil.move(src, dest))
 
 def safe_cp(src: str, dest: str) -> str:
-    """Robust move method that replicates shell 'cp' command. Creates temporary directories
+    """Robust copy method that replicates shell 'cp' command. Creates temporary directories
     when needed.
     
     Args:
@@ -63,8 +63,23 @@ def safe_cp(src: str, dest: str) -> str:
     if dest.is_dir():
         safe_mkdir(dest)
         dest = dest / src.name
-
     return str(shutil.copy(src, dest))
+
+def safe_cpdir(src: str, dest: str) -> str:
+    """Robust copy method that replicates shell 'cp' command for directories. Creates temporary directories
+    when needed.
+    
+    Args:
+        src: Initial path to file object.
+        dest: Where the src will be placed. Either a new filename or destination directory.
+
+    Returns:
+        Path to the final location of the src file object.        
+    """
+    src = Path(src)
+    dest = Path(dest)
+
+    return str(shutil.copytree(src, dest, dirs_exist_ok=True))
 
 # == dir ==
 def is_empty_dir(dir_path: str) -> bool:
