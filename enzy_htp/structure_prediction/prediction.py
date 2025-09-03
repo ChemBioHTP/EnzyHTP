@@ -79,17 +79,22 @@ def predict_structure(
 def _parse_sequences_input(sequences: Union[str, List[str], List[List[str]], Path]) -> List[Union[str, List[str]]]:
     """Parse and normalize sequence input.
 
+    Supports monomers and multimers. In FASTA or raw strings, a colon
+    ":" within a sequence denotes multimer chains (e.g., "A:B:C"). When
+    any multimer is detected, all entries are normalized to multimer form
+    (List[List[str]]), with monomers wrapped as single-item lists.
+
     Args:
         sequences: One of
-          - str: a single sequence
-          - List[str]: multiple monomer sequences
+          - str: a single sequence (use ":" to separate chains for multimer)
+          - List[str]: multiple monomer sequences, or strings with ":" for multimers
           - List[List[str]]: multimer definitions per target
-          - Path: FASTA file path (.fasta/.fa/.fas)
+          - Path: FASTA file path (.fasta/.fa/.fas); sequences may include ":"
 
     Returns:
         List of sequences in normalized form:
-          - List[str] for monomers
-          - List[List[str]] for multimers
+          - List[str] for pure monomers
+          - List[List[str]] for multimers (or when any ":" is present)
     """
     if isinstance(sequences, (str, Path)):
         # Check if it's a file path
@@ -97,9 +102,16 @@ def _parse_sequences_input(sequences: Union[str, List[str], List[List[str]], Pat
         if path.exists() and path.suffix.lower() in ['.fasta', '.fa', '.fas']:
             # Parse FASTA file
             fasta_sequences = parse_fasta_file(str(path))
-            return [seq for _, seq in fasta_sequences]
+            # Normalize all to multimer form; wrap monomers as single-item lists
+            sequences = []
+            for _, seq in fasta_sequences:
+                chains = seq.split(':') if ':' in seq else [seq]
+                sequences.append(chains)
+            return sequences
         elif isinstance(sequences, str):
             # Single sequence string
+            if ':' in sequences:
+                return [sequences.split(':')]
             return [sequences]
         else:
             # Path doesn't exist or isn't a FASTA file
