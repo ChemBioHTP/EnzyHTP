@@ -28,11 +28,11 @@ class AlphafoldConfig(BaseConfig):
     Options: 'docker', 'apptainer', 'singularity'
     """
     
-    CONTAINER_PATH: str = "~/bin/colabfold_1.5.5-cuda12.2.2.sif"
+    CONTAINER_PATH: str = "/home/shaoq1/bin/colabfold_1.5.5-cuda12.2.2.sif"
     """Path to the container image file."""
     
     CONTAINER_BIND_PATHS: dict = {
-        "/cache": "~/bin/colabfold/cache"
+        "/cache": "/home/shaoq1/bin/colabfold/cache"
     }
     """Bind paths for container mounting.
     Maps container paths to host paths. Work directory is handled dynamically.
