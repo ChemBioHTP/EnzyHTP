@@ -1869,7 +1869,16 @@ class AmberInterface(BaseInterface):
         cmd_args = f"-i {in_prmtop} -p {ref_pdb} -o {out_path}"
         if guess:
             cmd_args = f"{cmd_args} -guess"
-        self.env_manager_.run_command("add_pdb", cmd_args)
+
+        result = self.env_manager_.run_command("add_pdb", cmd_args)
+
+        # error check. NOTE: add_pdb will not return error code when failed. The only sign is the output prmtop is empty.
+        if not fs.is_path_exist(out_path) or os.path.getsize(out_path) == 0:
+            # decode error information from stdout and stderr
+            error_info = f"stdout: \n{result.stdout.decode() if isinstance(result.stdout, bytes) else str(result.stdout)}\n"
+            error_info += f"stderr: \n{result.stderr.decode() if isinstance(result.stderr, bytes) else str(result.stderr)}\n"
+            _LOGGER.error(f"Empty output .prmtop found. add_pdb seems failed.\n {error_info}.")
+            raise AddPDBError("add_pdb failed. Please check the input files.")
 
     def clean_up_add_pdb_info(self, in_prmtop: str, out_path: str):
         """remove add_pdb info in prmtop"""
