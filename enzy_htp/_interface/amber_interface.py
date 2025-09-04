@@ -51,6 +51,7 @@ from enzy_htp.structure.structure_constraint import (
     CartesianFreeze,
     merge_cartesian_freeze)
 from enzy_htp.structure.structure_region import create_region_from_residues
+import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp.structure import StruSelection
 from enzy_htp.structure import (
     Structure,
@@ -217,6 +218,13 @@ class AmberParameterizer(MolDynParameterizer):
         temp_prmtop = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm_missing_pdb_info.prmtop")
         temp_ref_pdb = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm_ref_pdb.pdb")
         fs.safe_mkdir(self.parameterizer_temp_dir)
+
+        # 0. san check
+        if stru.contain_solvent():
+            _LOGGER.warning("The input structure contains solvent. tleap will ignore them and re-solvate the system. "
+                            "If you want to keep original solvent, please given them a different name other than WAT or HOH.")
+            stru = copy.deepcopy(stru)
+            stru_oper.remove_solvent(stru)
 
         # 1. check stru diversity
         diversity = stru.chemical_diversity
@@ -1869,7 +1877,16 @@ class AmberInterface(BaseInterface):
         cmd_args = f"-i {in_prmtop} -p {ref_pdb} -o {out_path}"
         if guess:
             cmd_args = f"{cmd_args} -guess"
-        self.env_manager_.run_command("add_pdb", cmd_args)
+
+        result = self.env_manager_.run_command("add_pdb", cmd_args)
+
+        # error check. NOTE: add_pdb will not return error code when failed. The only sign is the output prmtop is empty.
+        if not fs.is_path_exist(out_path) or os.path.getsize(out_path) == 0:
+            # decode error information from stdout and stderr
+            error_info = f"stdout: \n{result.stdout.decode() if isinstance(result.stdout, bytes) else str(result.stdout)}\n"
+            error_info += f"stderr: \n{result.stderr.decode() if isinstance(result.stderr, bytes) else str(result.stderr)}\n"
+            _LOGGER.error(f"Empty output .prmtop found. add_pdb seems failed.\n {error_info}.")
+            raise AddPDBError("add_pdb failed. Please check the input files.")
 
     def clean_up_add_pdb_info(self, in_prmtop: str, out_path: str):
         """remove add_pdb info in prmtop"""
