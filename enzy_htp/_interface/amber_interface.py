@@ -51,6 +51,7 @@ from enzy_htp.structure.structure_constraint import (
     CartesianFreeze,
     merge_cartesian_freeze)
 from enzy_htp.structure.structure_region import create_region_from_residues
+import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp.structure import StruSelection
 from enzy_htp.structure import (
     Structure,
@@ -217,6 +218,13 @@ class AmberParameterizer(MolDynParameterizer):
         temp_prmtop = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm_missing_pdb_info.prmtop")
         temp_ref_pdb = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm_ref_pdb.pdb")
         fs.safe_mkdir(self.parameterizer_temp_dir)
+
+        # 0. san check
+        if stru.contain_solvent():
+            _LOGGER.warning("The input structure contains solvent. tleap will ignore them and re-solvate the system. "
+                            "If you want to keep original solvent, please given them a different name other than WAT or HOH.")
+            stru = copy.deepcopy(stru)
+            stru_oper.remove_solvent(stru)
 
         # 1. check stru diversity
         diversity = stru.chemical_diversity
