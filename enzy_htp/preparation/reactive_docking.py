@@ -757,7 +757,7 @@ def create_rosetta_opts(
     stub_parent: str = os.path.expandvars(
         f"${config['rosetta.ROSETTA3']}/database/chemical/residue_type_sets/fa_standard/residue_types/protonation_states/")
     
-    for stub in "GLU_P1 GLU_P2 LYS_D ASP_P1 TYR_D HIS_P ASP_P2".split():
+    for stub in "GLU_P1 GLU_P2 LYS_D ASP_P1 TYR_D HIS_P ASP_P2 CYS_D".split():
         opts.add_extra_res_fa(  f"{stub_parent}/{stub}.params" )
     
     if structure.data['rosetta_params']:

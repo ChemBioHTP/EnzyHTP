@@ -57,7 +57,13 @@ class RosettaTranslator(TranslatorBase):
             else:
                 new_name = 'ASP'
             res.name = new_name
+        elif res.name == 'CYS':
+            atom_names = [aa.name for aa in res.atoms]
+            has_hg:bool = 'HG' in atom_names
 
+            if not has_hg:
+                res.name='CYM'
+             
         else:
             super().to_standard(res)    
 
@@ -77,6 +83,8 @@ class RosettaTranslator(TranslatorBase):
                                 'ASP', ['1HB', '2HB', '1H', '2H', '3H'])
 
         self.register_mapping('CYS', ['HB3', 'HB2', 'H1', 'H2', 'H3'],
+                                'CYS', ['1HB', '2HB', '1H', '2H', '3H'])
+        self.register_mapping('CYM', ['HB3', 'HB2', 'H1', 'H2', 'H3'],
                                 'CYS', ['1HB', '2HB', '1H', '2H', '3H'])
         self.register_mapping('GLN', ['HB3', 'HB2', 'HG3', 'HG2', 'HE21', 'HE22', 'H1', 'H2', 'H3'], 
                                 'GLN', ['1HB', '2HB', '1HG', '2HG', '1HE2', '2HE2', '1H', '2H', '3H'])
