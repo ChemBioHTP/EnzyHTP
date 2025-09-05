@@ -269,6 +269,29 @@ class Atom(DoubleLinkedNode):
         else:
             return check_pass
 
+    @classmethod 
+    def clone_connectivity(cls, atom_mapping: Dict[Atom, Atom]) -> None:
+        """Clone connectivity between atoms using the provided mapping.
+        
+        Args:
+            atom_mapping: Dictionary mapping old atoms to new atoms
+        """        
+        for old_atom, new_atom in atom_mapping.items():
+            if not old_atom.is_connected():
+                continue
+                
+            new_connections = []
+            for connected_old_atom, bond_type in old_atom.connect:
+                if connected_old_atom in atom_mapping:
+                    connected_new_atom = atom_mapping[connected_old_atom] 
+                    new_connections.append((connected_new_atom, bond_type))
+                else:
+                    # Log debug info about missing connection (expected for partial cloning)
+                    _LOGGER.debug(f"Skipping connection from {old_atom.key} to {connected_old_atom.key} - target not in cloned structure")
+            
+            # Always set connections for atoms that were originally connected
+            new_atom.connect = new_connections
+
     @property
     def key(self) -> str: # TODO change the name to key_str
         """Gets the Atom()'s key which can be used in conjuection with the Structure.get_atom method.
