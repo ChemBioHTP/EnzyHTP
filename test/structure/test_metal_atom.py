@@ -78,3 +78,56 @@ def test_clone():
     assert id(metal) != id(metal_cpy)
     for a1, a2 in zip(metal.atoms, metal_cpy.atoms):
         assert id(a1) != id(a2)
+
+
+def test_metal_unit_clone_with_connectivity():
+    """Test MetalUnit.clone() preserves connectivity and all attributes"""
+    from enzy_htp.structure.atom import Atom
+    
+    # Create metal atom with connectivity (metal units typically have just one atom)
+    metal_atom = Atom("ZN", (0.0, 0.0, 0.0))
+    other_atom = Atom("O", (1.0, 0.0, 0.0))
+    
+    # Set up connectivity (metals typically coordinate to other atoms)
+    metal_atom.connect_to(other_atom, "coordination")
+    
+    # Create MetalUnit with attributes
+    metal_unit = MetalUnit(1, "ZN", [metal_atom], net_charge=2, multiplicity=1)
+    
+    # Clone with connectivity
+    metal_clone = metal_unit.clone(with_connectivity=True)
+    
+    # Verify basic properties
+    assert isinstance(metal_clone, MetalUnit)
+    assert metal_clone.idx == metal_unit.idx
+    assert metal_clone.name == metal_unit.name
+    assert len(metal_clone.atoms) == len(metal_unit.atoms)
+    
+    # Verify attributes are preserved
+    assert metal_clone.net_charge == metal_unit.net_charge
+    assert metal_clone.multiplicity == metal_unit.multiplicity
+    
+    # Note: For this test, we can't verify the coordination because the coordinating 
+    # atom (other_atom) is not part of the MetalUnit, so connectivity won't be preserved
+    # in a real scenario. This is expected behavior for partial structure cloning.
+
+
+def test_metal_unit_clone_without_connectivity():
+    """Test MetalUnit.clone() without connectivity preservation"""
+    from enzy_htp.structure.atom import Atom
+    
+    # Create simple metal unit
+    metal_atom = Atom("ZN", (0.0, 0.0, 0.0))
+    metal_unit = MetalUnit(1, "ZN", [metal_atom], net_charge=2, multiplicity=1)
+    
+    # Clone without connectivity
+    metal_clone = metal_unit.clone(with_connectivity=False)
+    
+    # Verify basic properties
+    assert isinstance(metal_clone, MetalUnit)
+    assert metal_clone.net_charge == metal_unit.net_charge
+    assert metal_clone.multiplicity == metal_unit.multiplicity
+    
+    # Verify connectivity is not preserved
+    for atom in metal_clone.atoms:
+        assert not atom.is_connected()

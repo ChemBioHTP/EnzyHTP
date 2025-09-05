@@ -45,8 +45,6 @@ class Ligand(NonCanonicalBase):
         self.rtype = chem.ResidueType.LIGAND
 
         self.bonds = kwargs.get('bonds', list())  # TODO change this to a more general represetation
-        self.conformer_coords = list() # TODO change this to StructureEnsemble (we can leave a reference_var here tho)
-        self.placement_method_ = None
         # TODO: The idea for Structure and Ligand is to only have the math model recorded. 
         # But I see there is not really a better place to record the source of placement. 
         # Would a self.mimo attribute a good idea for these? So that we can distinguish those
@@ -56,9 +54,17 @@ class Ligand(NonCanonicalBase):
     # === Getter-Attr ===
 
     # === Getter-Prop ===
-    def clone(self) -> Ligand:
-        """Creates deecopy of self."""
-        return deepcopy(self)
+    def clone(self, parent=None, with_connectivity: bool = True, is_clone_root: bool = True) -> Ligand:
+        """Create a fast clone of the Ligand by cloning as Residue and converting back."""
+        # Clone as base Residue first
+        cloned_residue = super().clone(parent, with_connectivity, is_clone_root)
+        
+        # Convert back to Ligand preserving all attributes
+        cloned_ligand = residue_to_ligand(cloned_residue, self.net_charge)
+        cloned_ligand.multiplicity = self.multiplicity
+        cloned_ligand.bonds = self.bonds.copy() if self.bonds else []
+        
+        return cloned_ligand
 
     @property
     def placement_method(self) -> str:
@@ -90,52 +96,6 @@ class Ligand(NonCanonicalBase):
     # === Special ===
     def __str__(self) -> str:
         return f"Ligand({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})"
-
-    #region == TODO (move to StructureEnsemble) ==
-    def add_conformer(self, points:List[Tuple[float,float,float]] ) -> int:
-        """Add the coordinates of a conformer to the Ligand(). Performs checks that the number of points matches the
-        number of atoms in the Ligand. Also checks that each point is a tuple of size 3.
-        
-        Args:
-            points: A List[Tuple[float,float,float]] containing the points of a new conformer.
-
-        Returns:
-            The number of conformers the Ligand has.
-        """
-        if len(points) != len(self.atoms):
-            _LOGGER.error(f"A total of {len(points)} were supplied. Was expecting {len(self.atoms)}. Exiting...")
-            exit( 1 )
-
-        for row in points:
-            if len(row) != 3:
-                _LOGGER.error(f"The supplied point {row} is of the wrong dimension (expecting 3 elements). Exiting...")
-                exit( 1 )
-
-        self.conformer_coords.append( points )
-
-        return self.n_conformers()
-
-    def get_ligand_conformer(self, idx:int) -> Ligand:
-        """TODO(CJ): This will become a part of StructureEnseble someday. """
-        if idx == 0:
-            return self
-
-        idx -= 1
-        if idx >= len(self.conformer_coords):
-            #TODO(CJ): put an error here
-            pass
-
-        result = deepcopy( self )
-
-        for aidx, coord in enumerate( self.conformer_coords[idx] ):
-            result.atoms[aidx].coord = coord
-
-        return result
-
-    def n_conformers(self) -> int:
-        """How many conformers does this Ligand have?"""
-        return len(self.conformer_coords) + 1
-    #endregion
 
 def residue_to_ligand(residue: Residue, net_charge: float = None) -> Ligand:
     """Convenience function that converts Residue to ligand."""

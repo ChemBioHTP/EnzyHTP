@@ -60,3 +60,72 @@ def test_clone():
     assert id(lig) != id(lig_cpy)
     for a1, a2 in zip(lig.atoms, lig_cpy.atoms):
         assert id(a1) != id(a2)
+
+
+def test_ligand_clone_with_connectivity():
+    """Test Ligand.clone() preserves connectivity and all attributes"""
+    from enzy_htp.structure.atom import Atom
+    
+    # Create atoms with connectivity
+    atom1 = Atom("C1", (0.0, 0.0, 0.0))
+    atom2 = Atom("C2", (1.0, 0.0, 0.0))
+    atom3 = Atom("O1", (0.0, 1.0, 0.0))
+    
+    # Set up connectivity
+    atom1.connect_to(atom2, "single")
+    atom1.connect_to(atom3, "double")
+    
+    # Create Ligand with attributes
+    lig = Ligand(1, "LIG", [atom1, atom2, atom3], net_charge=-1, multiplicity=2)
+    lig.bonds = [{"type": "single"}, {"type": "double"}]
+    lig.placement_method = "docking"
+    
+    # Clone with connectivity
+    lig_clone = lig.clone(with_connectivity=True)
+    
+    # Verify basic properties
+    assert isinstance(lig_clone, Ligand)
+    assert lig_clone.idx == lig.idx
+    assert lig_clone.name == lig.name
+    assert len(lig_clone.atoms) == len(lig.atoms)
+    
+    # Verify attributes are preserved
+    assert lig_clone.net_charge == lig.net_charge
+    assert lig_clone.multiplicity == lig.multiplicity
+    assert lig_clone.bonds == lig.bonds
+    assert lig_clone.placement_method == lig.placement_method
+    
+    # Verify connectivity is preserved
+    cloned_atoms = {atom.name: atom for atom in lig_clone.atoms}
+    assert cloned_atoms["C1"].is_connected()
+    assert len(cloned_atoms["C1"].connect) == 2
+    
+    # Check specific connections
+    c1_connections = {atom.name: bond for atom, bond in cloned_atoms["C1"].connect}
+    assert "C2" in c1_connections and c1_connections["C2"] == "single"
+    assert "O1" in c1_connections and c1_connections["O1"] == "double"
+
+
+def test_ligand_clone_without_connectivity():
+    """Test Ligand.clone() without connectivity preservation"""
+    from enzy_htp.structure.atom import Atom
+    
+    # Create atoms with connectivity
+    atom1 = Atom("C1", (0.0, 0.0, 0.0))
+    atom2 = Atom("C2", (1.0, 0.0, 0.0))
+    atom1.connect_to(atom2, "single")
+    
+    # Create Ligand
+    lig = Ligand(1, "LIG", [atom1, atom2], net_charge=0, multiplicity=1)
+    
+    # Clone without connectivity
+    lig_clone = lig.clone(with_connectivity=False)
+    
+    # Verify basic properties
+    assert isinstance(lig_clone, Ligand)
+    assert lig_clone.net_charge == lig.net_charge
+    assert lig_clone.multiplicity == lig.multiplicity
+    
+    # Verify connectivity is not preserved
+    for atom in lig_clone.atoms:
+        assert not atom.is_connected()

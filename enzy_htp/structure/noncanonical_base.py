@@ -35,7 +35,7 @@ class NonCanonicalBase(Residue):
         self._net_charge = kwargs.get("net_charge", None)
         self._multiplicity = kwargs.get("multiplicity", None)
         Residue.__init__(self, residue_idx, residue_name, atoms, parent)
-        self.rtype = chem.ResidueType.LIGAND
+        self.rtype = chem.ResidueType.UNKNOWN
 
     # === Getter-Attr ===
     @property
@@ -46,7 +46,7 @@ class NonCanonicalBase(Residue):
             err_msg = (f"NCAA does not have charge."  
                       " ALWAYS check and explicit assign it using"  
                       " Structure.assign_ncaa_chargespin()")
-            _LOGGER.error()  
+            _LOGGER.error(err_msg)  
             raise AttributeError(err_msg)
         
         return self._net_charge
@@ -64,7 +64,7 @@ class NonCanonicalBase(Residue):
             err_msg = (f"NCAA does not have spin."  
                        " ALWAYS check and explicit assign it using"  
                        " Structure.assign_ncaa_chargespin()")
-            _LOGGER.error (err_msg)
+            _LOGGER.error(err_msg)
             raise AttributeError(err_msg)
 
         return self._multiplicity
