@@ -52,8 +52,8 @@ class ModifiedResidue(NonCanonicalBase):
         cloned_residue = super().clone(parent, with_connectivity, is_clone_root)
         
         # Convert back to ModifiedResidue preserving all attributes
-        cloned_modified = residue_to_modified_residue(cloned_residue, self.net_charge)
-        cloned_modified.multiplicity = self.multiplicity
+        cloned_modified = residue_to_modified_residue(cloned_residue, self._net_charge)
+        cloned_modified.multiplicity = self._multiplicity
         
         # Preserve mainchain atoms by mapping them to the new atoms
         if hasattr(self, '_mainchain_atoms') and self._mainchain_atoms:

@@ -60,9 +60,9 @@ class Ligand(NonCanonicalBase):
         cloned_residue = super().clone(parent, with_connectivity, is_clone_root)
         
         # Convert back to Ligand preserving all attributes
-        cloned_ligand = residue_to_ligand(cloned_residue, self.net_charge)
-        cloned_ligand.multiplicity = self.multiplicity
-        cloned_ligand.bonds = self.bonds.copy() if self.bonds else []
+        cloned_ligand = residue_to_ligand(cloned_residue, self._net_charge)
+        cloned_ligand.multiplicity = self._multiplicity
+        cloned_ligand.bonds = deepcopy(self.bonds)
         
         return cloned_ligand
 
