@@ -19,6 +19,7 @@ from enzy_htp.core.logger import _LOGGER
 from enzy_htp.structure.atom import Atom
 from enzy_htp.structure.structure_io import PDBParser
 from enzy_htp.structure.structure_enchantment import init_connectivity
+from enzy_htp.structure import Residue, Chain
 
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f"{CURR_DIR}/data/"
@@ -190,3 +191,88 @@ def test_connect_to(caplog):
 
     assert atom2 in atom1.connect_atoms
     assert atom1 in atom2.connect_atoms
+
+
+def test_clone_connectivity_basic():
+    """Test Atom.clone_connectivity() with basic connectivity mapping"""
+    # Create original atoms
+    atom1 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'CA'})
+    atom2 = Atom.from_biopandas({'x_coord': 1, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'CB'})
+    atom3 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 1, 'z_coord': 0, 'atom_name': 'N'})
+    
+    # Set up connectivity
+    atom1.connect_to(atom2, "single")
+    atom1.connect_to(atom3, "single")
+    
+    # Create new atoms (clones)
+    new_atom1 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'CA'})
+    new_atom2 = Atom.from_biopandas({'x_coord': 1, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'CB'})
+    new_atom3 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 1, 'z_coord': 0, 'atom_name': 'N'})
+    
+    # Create mapping
+    atom_mapping = {
+        atom1: new_atom1,
+        atom2: new_atom2,
+        atom3: new_atom3
+    }
+    
+    # Clone connectivity
+    Atom.clone_connectivity(atom_mapping)
+    
+    # Verify connectivity was cloned correctly
+    assert len(new_atom1.connect) == 2
+    assert len(new_atom2.connect) == 1
+    assert len(new_atom3.connect) == 1
+    
+    # Check specific connections
+    new_atom1_connections = {atom: bond for atom, bond in new_atom1.connect}
+    assert new_atom2 in new_atom1_connections
+    assert new_atom3 in new_atom1_connections
+    assert new_atom1_connections[new_atom2] == "single"
+    assert new_atom1_connections[new_atom3] == "single"
+    
+    # Check bidirectional connections
+    assert new_atom1 in [atom for atom, bond in new_atom2.connect]
+    assert new_atom1 in [atom for atom, bond in new_atom3.connect]
+
+
+def test_clone_connectivity_partial_mapping(caplog):
+    """Test Atom.clone_connectivity() with partial mapping (some connections missing)"""
+    _LOGGER.setLevel(logging.DEBUG)
+    
+    # Create original atoms  
+    atom1 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'CA'})
+    atom2 = Atom.from_biopandas({'x_coord': 1, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'CB'})
+    atom3 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 1, 'z_coord': 0, 'atom_name': 'N'})
+    
+    # Set parent info for better key representation
+    residue = Residue(1, "ALA", [atom1, atom2, atom3])
+    chain = Chain("A", [residue])
+    
+    # Set up connectivity
+    atom1.connect_to(atom2, "single")
+    atom1.connect_to(atom3, "single") 
+    
+    # Create new atoms (only partial - missing atom3)
+    new_atom1 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'CA'})
+    new_atom2 = Atom.from_biopandas({'x_coord': 1, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'CB'})
+    
+    # Create partial mapping (atom3 is not mapped)
+    atom_mapping = {
+        atom1: new_atom1,
+        atom2: new_atom2
+    }
+    
+    # Clone connectivity
+    Atom.clone_connectivity(atom_mapping)
+    
+    # Verify partial connectivity was cloned
+    assert len(new_atom1.connect) == 1  # Only connection to atom2, not atom3
+    assert len(new_atom2.connect) == 1
+    
+    # Check that connection to atom2 was preserved
+    assert new_atom2 in [atom for atom, bond in new_atom1.connect]
+    assert new_atom1 in [atom for atom, bond in new_atom2.connect]
+    
+    # Check that debug message was logged for missing connection
+    assert "Skipping connection" in caplog.text

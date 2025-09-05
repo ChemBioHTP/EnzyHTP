@@ -4,6 +4,7 @@ Author: QZ Shao <shaoqz@icloud.com>
 Date: 2022-04-03
 """
 import os
+import time
 import pytest
 import numpy as np
 from copy import deepcopy
@@ -160,6 +161,77 @@ def test_deepcopy():
                 assert atom.parent is res
 
 
+def test_deepcopy_profiling():
+    """Test the performance and correctness of deepcopy on Structure objects.
+    
+    This test evaluates the time cost of deepcopy operation on a large solvated structure
+    and verifies that the deep copy maintains correct parent-child relationships.
+    """
+    # Load a relatively large structure for performance testing
+    stru = PDBParser().get_structure(f"{DATA_DIR}test_pdb_parser_solvated.pdb")
+    
+    # Record structure statistics before copying
+    num_atoms = len(stru.atoms)
+    
+    # Perform deepcopy with timing
+    start_time = time.perf_counter()
+    new_stru = deepcopy(stru)
+    end_time = time.perf_counter()
+    
+    deepcopy_time = end_time - start_time
+    print(deepcopy_time)
+
+    max_time_per_1000_atoms = 0.2  # 200ms per 1000 atoms (generous threshold)
+    expected_max_time = (num_atoms / 1000) * max_time_per_1000_atoms
+    assert deepcopy_time < expected_max_time, f"Deepcopy took too long: {deepcopy_time:.4f}s > {expected_max_time:.4f}s (expected < {expected_max_time:.4f}s)"
+
+
+def test_clone():
+    """test the behavior of clone on Structure() context"""
+    stru = PDBParser().get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    new_stru = stru.clone()
+    # ensure the list is new
+    assert id(stru) != id(new_stru)
+    # ensure children are pointing to the parent
+    for ch in new_stru.chains:
+        assert ch.parent is new_stru
+        for res in ch:
+            assert res.parent is ch
+            for atom in res:
+                assert atom.parent is res
+    # ensure there are no shared objects but the same topology
+    for och, nch in zip(stru.chains, new_stru.chains):
+        assert och.name == nch.name
+        assert id(och) != id(nch)
+        for ores, nres in zip(och.residues, nch.residues):
+            assert ores.idx == nres.idx
+            assert id(ores) != id(nres)
+            for oatom, natom in zip(ores.atoms, nres.atoms):
+                assert oatom.name == natom.name
+                assert id(oatom) != id(natom)
+
+
+def test_clone_profile():
+    """test the behavior of clone on Structure() context"""
+    # Load a relatively large structure for performance testing
+    stru = PDBParser().get_structure(f"{DATA_DIR}test_pdb_parser_solvated.pdb")
+    
+    # Record structure statistics before copying
+    num_atoms = len(stru.atoms)
+    
+    # Perform deepcopy with timing
+    start_time = time.perf_counter()
+    new_stru = stru.clone()
+    end_time = time.perf_counter()
+    
+    deepcopy_time = end_time - start_time
+    print(deepcopy_time)
+
+    max_time_per_1000_atoms = 0.2  # 200ms per 1000 atoms (generous threshold)
+    expected_max_time = (num_atoms / 1000) * max_time_per_1000_atoms
+    assert deepcopy_time < expected_max_time, f"Deepcopy took too long: {deepcopy_time:.4f}s > {expected_max_time:.4f}s (expected < {expected_max_time:.4f}s)"
+
+
 def test_find_residue_with_key(caplog): # TODO caplog does not work when logger is not propagate. fix them by a context manager.
     """test function works as expected"""
     pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
@@ -261,3 +333,68 @@ def test_amino_acids():
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     
     assert len(test_stru.amino_acids) == 253
+
+
+def test_is_topology_subset_atomic_identical():
+    """Test is_topology_subset_atomic with identical structures"""
+    test_stru = sp.get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    cloned_stru = test_stru.clone(with_connectivity=False)  # Clone without connectivity for clean test
+    
+    # Identical structure should be a subset of itself
+    assert test_stru.is_topology_subset_atomic(test_stru)
+    
+    # Cloned structure should be a subset of original (same topology)
+    assert test_stru.is_topology_subset_atomic(cloned_stru)
+    assert cloned_stru.is_topology_subset_atomic(test_stru)
+
+
+def test_is_topology_subset_atomic_partial():
+    """Test is_topology_subset_atomic with partial structures"""
+    test_stru = sp.get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    
+    # Create a smaller structure with just the first chain
+    first_chain = test_stru.chains[0]
+    partial_stru = Structure([first_chain.clone(is_clone_root=True)])
+    
+    # Partial structure should be a subset of full structure
+    assert test_stru.is_topology_subset_atomic(partial_stru)
+    
+    # Full structure should NOT be a subset of partial structure
+    assert not partial_stru.is_topology_subset_atomic(test_stru)
+
+
+def test_create_atom_mapping_identical():
+    """Test create_atom_mapping with identical structures"""
+    test_stru = sp.get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    cloned_stru = test_stru.clone(with_connectivity=False)
+    
+    # Create mapping between identical structures
+    mapping = test_stru.create_atom_mapping(cloned_stru)
+    
+    # Should have mapping for every atom
+    assert len(mapping) == len(cloned_stru.atoms)
+    assert len(mapping) == len(test_stru.atoms)
+    
+    # Verify mapping is correct by checking atom keys
+    for cloned_atom, original_atom in mapping.items():
+        assert cloned_atom.key == original_atom.key
+
+
+def test_create_atom_mapping_partial():
+    """Test create_atom_mapping with partial structure"""
+    test_stru = sp.get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    
+    # Create partial structure with first chain only
+    first_chain = test_stru.chains[0]
+    partial_stru = Structure([first_chain.clone(is_clone_root=False)])
+    
+    # Create mapping from partial to full structure
+    mapping = test_stru.create_atom_mapping(partial_stru)
+    
+    # Should have mapping for every atom in partial structure
+    assert len(mapping) == len(partial_stru.atoms)
+    assert len(mapping) < len(test_stru.atoms)
+    
+    # Verify mapping correctness
+    for partial_atom, original_atom in mapping.items():
+        assert partial_atom.key == original_atom.key

@@ -288,6 +288,52 @@ class Residue(DoubleLinkedNode):
         for idx in atom_idx_list:
             result.append(atom_mapper[idx])
         return result
+    
+    def connectivity_str(self) -> str:
+        """return a string representation of the connectivity of the residue"""
+        result = []
+        for atom in self.atoms:
+            conn_str = atom.connectivity_str()
+            result.append(f"{atom.name}: {conn_str}")
+        return "\n".join(result)
+
+    def create_atom_mapping(self, other: Residue) -> Dict[Atom, Atom]:
+        """Create a mapping from other's atoms to self's atoms based on atom names.
+        
+        Args:
+            other: The source residue to map from
+            
+        Returns:
+            Dictionary mapping other's atoms to self's atoms
+        """
+        # Create mapping by atom names (within same residue, names should be unique)
+        self_atom_name_mapper = {atom.name: atom for atom in self.atoms}
+        atom_mapping = {}
+        
+        for other_atom in other.atoms:
+            if other_atom.name in self_atom_name_mapper:
+                atom_mapping[other_atom] = self_atom_name_mapper[other_atom.name]
+            else:
+                _LOGGER.warning(f"Cannot find matching atom for {other_atom.name} in residue {self.key()}")
+                
+        return atom_mapping
+
+    def clone(self, parent = None, with_connectivity: bool = True, is_clone_root: bool = True) -> Residue:
+        """Create a fast copy of the Residue and its Atoms without using deepcopy.
+
+        This base implementation preserves rtype and intra-residue connectivity.
+        Subclasses with additional attributes should override appropriately.
+        """
+        new_atoms = [a.clone() for a in self.atoms] # new atoms without connectivity
+        new_res = Residue(self._idx, self._name, new_atoms, parent)
+        new_res.rtype = self._rtype
+
+        # If this is the root of cloning operation, clone connectivity
+        if is_clone_root and with_connectivity:
+            atom_mapping = new_res.create_atom_mapping(self)
+            Atom.clone_connectivity(atom_mapping)
+
+        return new_res
     #endregion
 
     #region === Checker ===

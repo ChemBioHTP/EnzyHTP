@@ -168,3 +168,46 @@ def test_is_solvent_chain():
     structure: Structure = sp.get_structure(pdb_file)
     print(structure.residues)
     assert structure.chains[0].is_solvent_chain()
+
+
+def test_chain_create_atom_mapping():
+    """Test Chain.create_atom_mapping() method"""
+    pdb_file = f"{DATA_DIR}/12E8_small_four_chain.pdb"
+    structure: Structure = sp.get_structure(pdb_file)
+    
+    # Get first chain
+    original_chain = structure.chains[0]
+    cloned_chain = original_chain.clone(is_clone_root=False)
+    
+    # Create atom mapping
+    mapping = original_chain.create_atom_mapping(cloned_chain)
+    
+    # Should have mapping for every atom in the cloned chain
+    assert len(mapping) == len(cloned_chain.atoms)
+    assert len(mapping) == len(original_chain.atoms)
+    
+    # Verify mapping correctness
+    for cloned_atom, original_atom in mapping.items():
+        assert cloned_atom.key == original_atom.key
+
+
+def test_chain_create_atom_mapping_partial():
+    """Test Chain.create_atom_mapping() with partial chain"""
+    pdb_file = f"{DATA_DIR}/12E8_small_four_chain.pdb"
+    structure: Structure = sp.get_structure(pdb_file)
+    
+    # Get first chain and create partial version (first residue only)
+    original_chain = structure.chains[0]
+    first_residue = original_chain.residues[0]
+    partial_chain = Chain(original_chain.name, [first_residue.clone(is_clone_root=False)])
+    
+    # Create atom mapping from partial to full chain
+    mapping = original_chain.create_atom_mapping(partial_chain)
+    
+    # Should have mapping for atoms in first residue only
+    assert len(mapping) == len(partial_chain.atoms)
+    assert len(mapping) < len(original_chain.atoms)
+    
+    # Verify mapping correctness
+    for partial_atom, original_atom in mapping.items():
+        assert partial_atom.key == original_atom.key

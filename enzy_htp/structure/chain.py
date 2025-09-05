@@ -8,7 +8,7 @@ from __future__ import annotations
 from copy import deepcopy
 import math
 import sys
-from typing import Iterable, List, Tuple, Union
+from typing import Dict, Iterable, List, Tuple, Union
 
 from enzy_htp.core import _LOGGER
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
@@ -162,6 +162,8 @@ class Chain(DoubleLinkedNode):
         chain_type = []
         if self.is_polypeptide():
             return "polypeptide"
+        if self.is_capped_polypeptide():
+            return "capped_peptide"
         if self.has_metal():
             chain_type.append("metal")
         if self.has_ligand():
@@ -184,6 +186,38 @@ class Chain(DoubleLinkedNode):
             result += res.sequence_name
         return result.strip()
 
+    def create_atom_mapping(self, other: Chain) -> Dict[Atom, Atom]:
+        """Create a mapping from other's atoms to self's atoms based on atom keys.
+        
+        Args:
+            other: The source chain to map from
+            
+        Returns:
+            Dictionary mapping other's atoms to self's atoms
+        """
+        # Create mapping by atom keys
+        self_atom_key_mapper = {atom.key: atom for atom in self.atoms}
+        atom_mapping = {}
+        
+        for other_atom in other.atoms:
+            if other_atom.key in self_atom_key_mapper:
+                atom_mapping[other_atom] = self_atom_key_mapper[other_atom.key]
+            else:
+                _LOGGER.warning(f"Cannot find matching atom for {other_atom.key} in chain {self.name}")
+                
+        return atom_mapping
+
+    def clone(self, parent = None, is_clone_root: bool = True, with_connectivity: bool = True) -> Chain:
+        """a fast clone of the Chain. The parent is not cloned and set to None by default."""
+        cloned_residues = [res.clone(is_clone_root=False) for res in self._residues]
+        new_chain = Chain(self._name, cloned_residues, parent)
+
+        # If this is the root of cloning operation, clone connectivity
+        if is_clone_root and with_connectivity:
+            atom_mapping = new_chain.create_atom_mapping(self)
+            Atom.clone_connectivity(atom_mapping)
+
+        return new_chain
     #endregion
 
     #region === Checker ===
@@ -192,6 +226,21 @@ class Chain(DoubleLinkedNode):
         if there is any non-aminoacid part in chain
         """
         return not sum(list(map(lambda rr: (not rr.is_canonical()) and (not rr.is_modified()), self._residues)))
+
+    def is_capped_polypeptide(self) -> bool:
+        """
+        if there is only "caps" as non-aminoacid part in chain
+        """
+        return not sum(
+            list(
+                map(
+                    lambda rr: (not rr.is_canonical()) 
+                    and (not rr.is_modified()) 
+                    and (not rr.is_residue_cap()), 
+                    self._residues
+                    )
+                )
+            )
 
     def is_solvent_chain(self) -> bool:
         """

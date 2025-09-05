@@ -119,9 +119,17 @@ class MetalUnit(NonCanonicalBase):
         """
         return list(self.get_donor_mapper(method, check_radius).keys())
 
-    def clone(self) -> MetalUnit:
-        """Creates deepcopy of self."""
-        return deepcopy(self)
+    def clone(self, parent=None, with_connectivity: bool = True, is_clone_root: bool = True) -> MetalUnit:
+        """Create a fast clone of the MetalUnit by cloning as Residue and converting back."""
+        # Clone as base Residue first
+        cloned_residue = super().clone(parent, with_connectivity, is_clone_root)
+        
+        # Convert back to MetalUnit preserving all attributes
+        cloned_metal = residue_to_metal(cloned_residue)
+        cloned_metal._net_charge = self._net_charge
+        cloned_metal._multiplicity = self._multiplicity
+        
+        return cloned_metal
 
     def radius(self, method: str = "ionic") -> float:
         return self.atom.radius(method)

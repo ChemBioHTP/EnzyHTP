@@ -28,6 +28,8 @@ from .capping import capping_with_residue_terminals
 
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.math_helper import round_by, is_integer
+# TODO: need to change connectivity after capping if the structure is connected.
+# TODO: need to store connectivity in caps (add connectivity in get_nterm_atoms/get_cterm_atoms)
 
 def create_region_from_selection_pattern(
         stru: Structure,

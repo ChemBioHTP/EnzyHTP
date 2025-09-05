@@ -269,6 +269,29 @@ class Atom(DoubleLinkedNode):
         else:
             return check_pass
 
+    @classmethod 
+    def clone_connectivity(cls, atom_mapping: Dict[Atom, Atom]) -> None:
+        """Clone connectivity between atoms using the provided mapping.
+        
+        Args:
+            atom_mapping: Dictionary mapping old atoms to new atoms
+        """        
+        for old_atom, new_atom in atom_mapping.items():
+            if not old_atom.is_connected():
+                continue
+                
+            new_connections = []
+            for connected_old_atom, bond_type in old_atom.connect:
+                if connected_old_atom in atom_mapping:
+                    connected_new_atom = atom_mapping[connected_old_atom] 
+                    new_connections.append((connected_new_atom, bond_type))
+                else:
+                    # Log debug info about missing connection (expected for partial cloning)
+                    _LOGGER.debug(f"Skipping connection from {old_atom.key} to {connected_old_atom.key} - target not in cloned structure")
+            
+            # Always set connections for atoms that were originally connected
+            new_atom.connect = new_connections
+
     @property
     def key(self) -> str: # TODO change the name to key_str
         """Gets the Atom()'s key which can be used in conjuection with the Structure.get_atom method.
@@ -351,6 +374,29 @@ class Atom(DoubleLinkedNode):
         """get all atom names of connection."""
         return [atom.name for atom in self.connect_atoms]
 
+    def connectivity_str(self) -> str:
+        """return a string representation of the connectivity of the atom"""
+        if not self.is_connected():
+            _LOGGER.error(f"There are no connection info for {self}. "
+                            "Please initiate it use structure.structure_operation.init_connectivity()")
+            raise AttributeError
+        return ", ".join([f"{a[0].key}({a[1]})" for a in self.connect])
+
+    def clone(self, parent = None) -> Atom:
+        """Create a fast copy of the Atom without using deepcopy.
+
+        Connectivity is not copied here and should be rebuilt by the owning Residue.
+        """
+        return Atom(
+            name=self._name,
+            coord=self._coord,
+            parent=parent,
+            idx=self._idx,
+            b_factor=self._b_factor,
+            element=self._element,
+            charge=self._charge,
+            atom_type=self._atom_type,
+        )
     #endregion
 
     #region === Checker ===

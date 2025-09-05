@@ -3,6 +3,7 @@ Author: Sebastian Stull <sebastian.l.stull@vanderbilt.edu>
 Date: 2025-02-13
 """
 
+from collections import defaultdict
 import os
 import copy
 import pytest
@@ -32,8 +33,32 @@ def test_connectivity_maa():
     connectivity.init_connectivity(test_stru)
 
     fs.safe_rm(f"{NCAA_LIB}/LLP_any.prepin")
-
-    assert test_stru.modified_residue[0].is_connected()
+    maa = test_stru.modified_residue[0]
+    assert maa.is_connected()
+    assert maa.connectivity_str() == """N: A.288.CA(None), A.287.C(None)
+CA: A.288.C(None), A.288.N(None), A.288.CB(None)
+C: A.288.O(None), A.288.CA(None), A.289.N(None)
+O: A.288.C(None)
+CB: A.288.CA(None), A.288.CG(None)
+CG: A.288.CB(None), A.288.CD(None)
+CD: A.288.CG(None), A.288.CE(None)
+CE: A.288.CD(None), A.288.NZ(None)
+NZ: A.288.CE(None), A.288.C4'(None)
+P: A.288.OP4(None), A.288.OP2(None), A.288.OP3(None), A.288.OP1(None)
+C5': A.288.C5(None), A.288.OP4(None)
+C4': A.288.NZ(None), A.288.C4(None)
+C2': A.288.C2(None)
+N1: A.288.C2(None), A.288.C6(None)
+C2: A.288.C3(None), A.288.C2'(None), A.288.N1(None)
+C3: A.288.C4(None), A.288.O3(None), A.288.C2(None)
+O3: A.288.C3(None)
+C4: A.288.C4'(None), A.288.C3(None), A.288.C5(None)
+C5: A.288.C6(None), A.288.C5'(None), A.288.C4(None)
+C6: A.288.N1(None), A.288.C5(None)
+OP1: A.288.P(None)
+OP2: A.288.P(None)
+OP3: A.288.P(None)
+OP4: A.288.C5'(None), A.288.P(None)""" # make sure N side C side are connected
 
 
 def test_connected_structure_deepcopy():
@@ -94,3 +119,48 @@ def test_connected_structure_deepcopy():
             copied_connections = len(copied_atom.connect_atoms)
             assert original_connections == copied_connections, \
                 f"Atom {atom_name} should have same number of connections ({original_connections}) in copy, got {copied_connections}"
+
+def test_connected_structure_deepcopy_ref_leak():
+    """Test to make sure deepcopy works on connected structures and there are no reference to the original structure in the copied structure."""
+    # Load the same structure that causes the error in integration tests
+    test_stru = struct.PDBParser().get_structure(f"{DATA_DIR}/3FCR_modified.pdb")
+    test_stru.assign_ncaa_chargespin({"LLP": (-2, 1), "RLP": (-2, 1)})
+    remove_solvent(test_stru)
+    # Now initialize connectivity (this creates the circular references)
+    connectivity.init_connectivity(test_stru)
+    
+    # Test deepcopy AFTER connectivity initialization
+    copied_stru = copy.deepcopy(test_stru)
+
+    original_atom_ids = set()
+
+    for atom in test_stru.atoms:
+        original_atom_ids.add(id(atom))
+
+    assert original_atom_ids
+
+    copied_atom_ids = set()
+
+    for atom in copied_stru.atoms:
+        copied_atom_ids.add(id(atom))
+
+    assert not (original_atom_ids & copied_atom_ids)
+
+    leaked_refs = defaultdict(list)
+    for atom in copied_stru.atoms:
+        connect_list = atom.connect_atoms
+        for nb_atom in connect_list:
+            if id(nb_atom) in original_atom_ids:
+                leaked_refs[atom.key].append(nb_atom.key)
+    leak_msg = (
+        f"found {len(leaked_refs)} connections still pointing to original structure atoms.\n"
+        "Example:"
+        )
+    for i, (atom_key, nb_atom_keys) in enumerate(leaked_refs.items()):
+        if i >= 5:
+            break
+        leak_msg += f"\n    {atom_key} -cnt->"
+        for nb_atom_key in nb_atom_keys:
+            leak_msg += f"\n        {nb_atom_key} (Old)"
+    assert not leaked_refs, leak_msg
+

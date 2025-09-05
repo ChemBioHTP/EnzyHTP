@@ -141,11 +141,11 @@ class Structure(DoubleLinkedNode):
                              'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
                              'U', 'V', 'W', 'X', 'Y', 'Z',] + [str(x) for x in range(50000)]
 
-    def __init__(self, chains: List[Chain], pbc_box_shape: Tuple[float] = None):
+    def __init__(self, chains: List[Chain], pbc_box_shape: Tuple[float] = None, chain_san_check: bool = True):
         """Constructor that takes just a list of Chain() objects as input."""
         self.set_children(chains)
         self.set_ghost_parent()
-        if self.has_duplicate_chain_name():
+        if chain_san_check and self.has_duplicate_chain_name():
             self.resolve_duplicated_chain_name()
         # PBC
         self._pbc_box_shape = pbc_box_shape
@@ -625,6 +625,44 @@ class Structure(DoubleLinkedNode):
 
         return result
 
+    def clone(self, with_connectivity: bool=True) -> Structure: # always clone root if called
+        """Create a fast clone of the Structure by delegating to Chain.clone()."""
+        cloned_chains = [ch.clone(is_clone_root=False) for ch in self._chains]
+        new_struct = Structure(chains=cloned_chains, pbc_box_shape=self._pbc_box_shape, chain_san_check=False) # turn chain check off to save time
+        if with_connectivity and self.has_connection():
+            atom_mapping = new_struct.create_atom_mapping(self)
+            Atom.clone_connectivity(atom_mapping)
+
+        return new_struct
+
+    def create_atom_mapping(self, other: Structure) -> Dict[Atom, Atom]:
+        """Create a mapping from other's atoms to self's atoms based on atom keys.
+        
+        Args:
+            other: The source structure to map from
+            
+        Returns:
+            Dictionary mapping other's atoms to self's atoms
+            
+        Raises:
+            ValueError: If other is not a topology subset of self
+        """
+        if not self.is_topology_subset_atomic(other):
+            _LOGGER.error("Cannot create atom mapping: other structure is not a topology subset of self")
+            raise ValueError("other structure is not a topology subset of self")
+        
+        # Create mapping by atom keys
+        self_atom_key_mapper = {atom.key: atom for atom in self.atoms}
+        atom_mapping = {}
+        
+        for other_atom in other.atoms:
+            if other_atom.key in self_atom_key_mapper:
+                atom_mapping[other_atom] = self_atom_key_mapper[other_atom.key]
+            else:
+                _LOGGER.error(f"Cannot find matching atom for {other_atom.key}")
+                raise ValueError(f"Cannot find matching atom for {other_atom.key}")
+                
+        return atom_mapping
     # endregion
 
     #region === Checker ===
@@ -755,6 +793,13 @@ class Structure(DoubleLinkedNode):
                 return False
         return True
 
+    def is_topology_subset_atomic(self, other: Structure) -> bool:
+        """check whether other is in a subset topology of self at atomic level.
+        i.e.: all atoms in other exist in self with the same keys"""
+        self_atom_keys = set(atom.key for atom in self.atoms)
+        other_atom_keys = set(atom.key for atom in other.atoms)
+        return other_atom_keys.issubset(self_atom_keys)
+
     def is_topology_subset(self, other: Structure) -> bool:
         """determine whether other is in a subset topology
         of self"""
@@ -794,6 +839,13 @@ class Structure(DoubleLinkedNode):
                 _LOGGER.debug(f"found different sequence between {schain} and {ochain}")
                 return False
         return True
+
+    def has_connection(self) -> bool:
+        """check if the structure is connected"""
+        for atom in self.atoms:
+            if atom.is_connected():
+                return True
+        return False
 
     #endregion
 

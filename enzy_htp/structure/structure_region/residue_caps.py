@@ -181,6 +181,12 @@ class ResidueCap(Residue, ABC):
         pass
 
     @property
+    @abstractmethod
+    def name(self) -> str:
+        """The unique residue name of the cap"""
+        pass
+
+    @property
     def idx(self) -> int:
         """Gets the index of the link_residue."""
         return self.link_residue.idx
@@ -191,10 +197,10 @@ class ResidueCap(Residue, ABC):
         return self.link_residue.parent
 
     @property
-    def name(self) -> str:
+    def link_residue_name(self) -> str:
         """Gets the residue name of the link_residue."""
         return self.link_residue.name
-    
+
     @property
     def term_type(self) -> str:
         """What type of capping is this? n-term, c-term, etc."""
@@ -324,6 +330,11 @@ class HCap(ResidueCap):
         """hard coded net charge"""
         return 0
 
+    @property
+    def name(self) -> str:
+        """The unique residue name of the cap"""
+        return "KP0"
+
     def anchor(self) -> None:
         """Straightforward anchoring that is identical for both n-terminal and c-terminal capping."""
         p0 = np.array(self.link_atom.coord)
@@ -398,6 +409,11 @@ class CH3Cap(ResidueCap):
     def net_charge(self) -> str:
         """hard coded net charge"""
         return 0
+
+    @property
+    def name(self) -> str:
+        """The unique residue name of the cap"""
+        return "KP1"
 
     def anchor(self) -> None:
         """Straightforward anchoring that is identical for both n-terminal and c-terminal capping."""
@@ -500,6 +516,11 @@ class NHCH3Cap(ResidueCap):
         """This is the NHCH3/methylamide ResidueCap."""
         return "NHCH3"
 
+    @property
+    def name(self) -> str:
+        """The unique residue name of the cap"""
+        return "KP2"
+
 
 class COCH3Cap(ResidueCap):
     """A ResidueCap() which uses a -COCH3 (acetyl) as a cap. Adds a total of 6 atoms, with the 
@@ -595,6 +616,12 @@ class COCH3Cap(ResidueCap):
             Atom(name='HP33', coord=[ 1.871 ,   0.890,  -0.514], element= 'H'),
         ]
 
+    @property
+    def name(self) -> str:
+        """The unique residue name of the cap"""
+        return "KP3"
+
+
 class OHCap(ResidueCap):
     """A ResidueCap() which uses a -OH (hydroxyl) as a cap. Adds a total of 2 atoms, with the 
     
@@ -623,6 +650,11 @@ class OHCap(ResidueCap):
     def cap_type(self) -> str:
         """This is the OH/hydroxyl ResidueCap."""
         return "OH"
+
+    @property
+    def name(self) -> str:
+        """The unique residue name of the cap"""
+        return "KP4"
 
     def align_rigid_atoms(self, atoms:List[Atom], d0 : npt.NDArray, p0 : npt.NDArray, bd:float=None) -> None:
         """Method that aligns a rigid List[Atom] to the supplied distance (d0) and from the given point (p0). There are overall 
@@ -690,7 +722,7 @@ class OHCap(ResidueCap):
     def net_charge(self) -> int:
         return 0
 
-    def get_nterm_atoms(self) -> List[Atom]:
+    def get_nterm_atoms(self) -> List[Atom]: # TODO: also put connectivity here
         """Create the default n-terminal version of the OHCap with appropriate names."""
         return [
             Atom(name='OXT',  coord=[ 0.000 ,   0.000,  0.000], element= 'O'),

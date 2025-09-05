@@ -46,9 +46,27 @@ class ModifiedResidue(NonCanonicalBase):
 
     # === Getter-Attr ===
     # === Getter-Prop ===
-    def clone(self) -> ModifiedResidue:
-        """Creates deecopy of self."""
-        return deepcopy(self)
+    def clone(self, parent=None, with_connectivity: bool = True, is_clone_root: bool = True) -> ModifiedResidue:
+        """Create a fast clone of the ModifiedResidue by cloning as Residue and converting back."""
+        # Clone as base Residue first
+        cloned_residue = super().clone(parent, with_connectivity, is_clone_root)
+        
+        # Convert back to ModifiedResidue preserving all attributes
+        cloned_modified = residue_to_modified_residue(cloned_residue, self._net_charge)
+        cloned_modified.multiplicity = self._multiplicity
+        
+        # Preserve mainchain atoms by mapping them to the new atoms
+        if hasattr(self, '_mainchain_atoms') and self._mainchain_atoms:
+            new_mainchain_atoms = []
+            for old_mainchain_atom in self._mainchain_atoms:
+                # Find corresponding atom in cloned residue by name
+                new_atom = cloned_modified.find_atom_name(old_mainchain_atom.name)
+                new_mainchain_atoms.append(new_atom)
+            cloned_modified._mainchain_atoms = new_mainchain_atoms
+        else:
+            cloned_modified._mainchain_atoms = []
+        
+        return cloned_modified
 
     @property
     def mainchain_atoms(self) -> List[Atom]:
