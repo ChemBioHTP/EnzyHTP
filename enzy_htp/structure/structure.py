@@ -629,7 +629,7 @@ class Structure(DoubleLinkedNode):
         """Create a fast clone of the Structure by delegating to Chain.clone()."""
         cloned_chains = [ch.clone(is_clone_root=False) for ch in self._chains]
         new_struct = Structure(chains=cloned_chains, pbc_box_shape=self._pbc_box_shape, chain_san_check=False) # turn chain check off to save time
-        if self.has_connection() and with_connectivity:
+        if with_connectivity and self.has_connection():
             atom_mapping = new_struct.create_atom_mapping(self)
             Atom.clone_connectivity(atom_mapping)
 

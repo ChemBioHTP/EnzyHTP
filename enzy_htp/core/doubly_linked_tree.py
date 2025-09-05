@@ -116,7 +116,7 @@ class DoubleLinkedNode():
         """
         delete_base_on_id(self.parent.children, id(self))
 
-    def __deepcopy__(self, memo: Union[Dict[int, Any], None] = None, _nil=[]):
+    def __deepcopy__(self, memo: Union[Dict[int, Any], None] = None, _nil=[]): # NOTE if this is too slow in profiling, try Structure().clone()
         """
         Support deepcopy of DoublyLinkedNode that donot copy any parent and siblings.
         (Implemtation inspired by https://stackoverflow.com/a/40484215)

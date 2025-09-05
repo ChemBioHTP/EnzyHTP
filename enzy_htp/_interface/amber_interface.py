@@ -223,7 +223,7 @@ class AmberParameterizer(MolDynParameterizer):
         if stru.contain_solvent():
             _LOGGER.warning("The input structure contains solvent. tleap will ignore them and re-solvate the system. "
                             "If you want to keep original solvent, please given them a different name other than WAT or HOH.")
-            stru = copy.deepcopy(stru)
+            stru = stru.clone(with_connectivity=False)
             stru_oper.remove_solvent(stru)
 
         # 1. check stru diversity
