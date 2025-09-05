@@ -3,6 +3,7 @@ Author: Sebastian Stull <sebastian.l.stull@vanderbilt.edu>
 Date: 2025-02-13
 """
 
+from collections import defaultdict
 import os
 import copy
 import pytest
@@ -55,6 +56,7 @@ def test_connected_structure_deepcopy():
     
     # Test deepcopy AFTER connectivity initialization
     copied_stru_after = copy.deepcopy(test_stru)
+    import pdb;pdb.set_trace()
 
     # Verify the copied structure maintains connectivity
     # Test that the modified residue is still connected in the copied structure
@@ -94,3 +96,48 @@ def test_connected_structure_deepcopy():
             copied_connections = len(copied_atom.connect_atoms)
             assert original_connections == copied_connections, \
                 f"Atom {atom_name} should have same number of connections ({original_connections}) in copy, got {copied_connections}"
+
+def test_connected_structure_deepcopy_ref_leak():
+    """Test to make sure deepcopy works on connected structures and there are no reference to the original structure in the copied structure."""
+    # Load the same structure that causes the error in integration tests
+    test_stru = struct.PDBParser().get_structure(f"{DATA_DIR}/3FCR_modified.pdb")
+    test_stru.assign_ncaa_chargespin({"LLP": (-2, 1), "RLP": (-2, 1)})
+    remove_solvent(test_stru)
+    # Now initialize connectivity (this creates the circular references)
+    connectivity.init_connectivity(test_stru)
+    
+    # Test deepcopy AFTER connectivity initialization
+    copied_stru = copy.deepcopy(test_stru)
+
+    original_atom_ids = set()
+
+    for atom in test_stru.atoms:
+        original_atom_ids.add(id(atom))
+
+    assert original_atom_ids
+
+    copied_atom_ids = set()
+
+    for atom in copied_stru.atoms:
+        copied_atom_ids.add(id(atom))
+
+    assert not (original_atom_ids & copied_atom_ids)
+
+    leaked_refs = defaultdict(list)
+    for atom in copied_stru.atoms:
+        connect_list = atom.connect_atoms
+        for nb_atom in connect_list:
+            if id(nb_atom) in original_atom_ids:
+                leaked_refs[atom.key].append(nb_atom.key)
+    leak_msg = (
+        f"found {len(leaked_refs)} connections still pointing to original structure atoms.\n"
+        "Example:"
+        )
+    for i, (atom_key, nb_atom_keys) in enumerate(leaked_refs.items()):
+        if i >= 5:
+            break
+        leak_msg += f"\n    {atom_key} -cnt->"
+        for nb_atom_key in nb_atom_keys:
+            leak_msg += f"\n        {nb_atom_key} (Old)"
+    assert not leaked_refs, leak_msg
+
