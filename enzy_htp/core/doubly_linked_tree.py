@@ -172,12 +172,14 @@ class DoubleLinkedNode():
                 if isinstance(entry, tuple):
                     neighbor = entry[0]
                     tag = entry[1] if len(entry) > 1 else None
-                    # map original neighbor -> copied neighbor via memo
-                    copied_neighbor = memo.get(id(neighbor), neighbor)
-                    new_list.append((copied_neighbor, tag))
+                    # map original neighbor -> copied neighbor via memo (if the neighbor is not in the new tree, ignore it)
+                    copied_neighbor = memo.get(id(neighbor), "None_") # use "None_" str to avoid NoneType in the list
+                    if copied_neighbor != "None_":
+                        new_list.append((copied_neighbor, tag))
                 else:
-                    copied_neighbor = memo.get(id(entry), entry)
-                    new_list.append(copied_neighbor)
+                    copied_neighbor = memo.get(id(entry), "None_")
+                    if copied_neighbor != "None_":
+                        new_list.append(copied_neighbor)
             setattr(new_self, _name, new_list)
     
         return new_self
