@@ -141,11 +141,11 @@ class Structure(DoubleLinkedNode):
                              'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
                              'U', 'V', 'W', 'X', 'Y', 'Z',] + [str(x) for x in range(50000)]
 
-    def __init__(self, chains: List[Chain], pbc_box_shape: Tuple[float] = None):
+    def __init__(self, chains: List[Chain], pbc_box_shape: Tuple[float] = None, chain_san_check: bool = True):
         """Constructor that takes just a list of Chain() objects as input."""
         self.set_children(chains)
         self.set_ghost_parent()
-        if self.has_duplicate_chain_name():
+        if chain_san_check and self.has_duplicate_chain_name():
             self.resolve_duplicated_chain_name()
         # PBC
         self._pbc_box_shape = pbc_box_shape
@@ -831,6 +831,13 @@ class Structure(DoubleLinkedNode):
                 return False
         return True
 
+    def has_connection(self) -> bool:
+        """check if the structure is connected"""
+        for atom in self.atoms:
+            if atom.is_connected():
+                return True
+        return False
+
     #endregion
 
     #region === Editor ===
@@ -1037,8 +1044,8 @@ class Structure(DoubleLinkedNode):
     def clone(self, with_connectivity: bool=True) -> Structure: # always clone root if called
         """Create a fast clone of the Structure by delegating to Chain.clone()."""
         cloned_chains = [ch.clone(is_clone_root=False) for ch in self._chains]
-        new_struct = Structure(chains=cloned_chains, pbc_box_shape=self._pbc_box_shape)
-        if with_connectivity:
+        new_struct = Structure(chains=cloned_chains, pbc_box_shape=self._pbc_box_shape, chain_san_check=False) # turn chain check off to save time
+        if self.has_connection() and with_connectivity:
             atom_mapping = new_struct.create_atom_mapping(self)
             Atom.clone_connectivity(atom_mapping)
 
