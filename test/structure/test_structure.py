@@ -199,6 +199,16 @@ def test_clone():
             assert res.parent is ch
             for atom in res:
                 assert atom.parent is res
+    # ensure there are no shared objects but the same topology
+    for och, nch in zip(stru.chains, new_stru.chains):
+        assert och.name == nch.name
+        assert id(och) != id(nch)
+        for ores, nres in zip(och.residues, nch.residues):
+            assert ores.idx == nres.idx
+            assert id(ores) != id(nres)
+            for oatom, natom in zip(ores.atoms, nres.atoms):
+                assert oatom.name == natom.name
+                assert id(oatom) != id(natom)
 
 
 def test_clone_profile():
@@ -323,3 +333,68 @@ def test_amino_acids():
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     
     assert len(test_stru.amino_acids) == 253
+
+
+def test_is_topology_subset_atomic_identical():
+    """Test is_topology_subset_atomic with identical structures"""
+    test_stru = sp.get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    cloned_stru = test_stru.clone(with_connectivity=False)  # Clone without connectivity for clean test
+    
+    # Identical structure should be a subset of itself
+    assert test_stru.is_topology_subset_atomic(test_stru)
+    
+    # Cloned structure should be a subset of original (same topology)
+    assert test_stru.is_topology_subset_atomic(cloned_stru)
+    assert cloned_stru.is_topology_subset_atomic(test_stru)
+
+
+def test_is_topology_subset_atomic_partial():
+    """Test is_topology_subset_atomic with partial structures"""
+    test_stru = sp.get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    
+    # Create a smaller structure with just the first chain
+    first_chain = test_stru.chains[0]
+    partial_stru = Structure([first_chain.clone(is_clone_root=True)])
+    
+    # Partial structure should be a subset of full structure
+    assert test_stru.is_topology_subset_atomic(partial_stru)
+    
+    # Full structure should NOT be a subset of partial structure
+    assert not partial_stru.is_topology_subset_atomic(test_stru)
+
+
+def test_create_atom_mapping_identical():
+    """Test create_atom_mapping with identical structures"""
+    test_stru = sp.get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    cloned_stru = test_stru.clone(with_connectivity=False)
+    
+    # Create mapping between identical structures
+    mapping = test_stru.create_atom_mapping(cloned_stru)
+    
+    # Should have mapping for every atom
+    assert len(mapping) == len(cloned_stru.atoms)
+    assert len(mapping) == len(test_stru.atoms)
+    
+    # Verify mapping is correct by checking atom keys
+    for cloned_atom, original_atom in mapping.items():
+        assert cloned_atom.key == original_atom.key
+
+
+def test_create_atom_mapping_partial():
+    """Test create_atom_mapping with partial structure"""
+    test_stru = sp.get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    
+    # Create partial structure with first chain only
+    first_chain = test_stru.chains[0]
+    partial_stru = Structure([first_chain.clone(is_clone_root=False)])
+    
+    # Create mapping from partial to full structure
+    mapping = test_stru.create_atom_mapping(partial_stru)
+    
+    # Should have mapping for every atom in partial structure
+    assert len(mapping) == len(partial_stru.atoms)
+    assert len(mapping) < len(test_stru.atoms)
+    
+    # Verify mapping correctness
+    for partial_atom, original_atom in mapping.items():
+        assert partial_atom.key == original_atom.key

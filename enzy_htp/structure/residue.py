@@ -297,6 +297,26 @@ class Residue(DoubleLinkedNode):
             result.append(f"{atom.name}: {conn_str}")
         return "\n".join(result)
 
+    def create_atom_mapping(self, other: Residue) -> Dict[Atom, Atom]:
+        """Create a mapping from other's atoms to self's atoms based on atom names.
+        
+        Args:
+            other: The source residue to map from
+            
+        Returns:
+            Dictionary mapping other's atoms to self's atoms
+        """
+        # Create mapping by atom names (within same residue, names should be unique)
+        self_atom_name_mapper = {atom.name: atom for atom in self.atoms}
+        atom_mapping = {}
+        
+        for other_atom in other.atoms:
+            if other_atom.name in self_atom_name_mapper:
+                atom_mapping[other_atom] = self_atom_name_mapper[other_atom.name]
+            else:
+                _LOGGER.warning(f"Cannot find matching atom for {other_atom.name} in residue {self.key()}")
+                
+        return atom_mapping
 
     def clone(self, parent = None, with_connectivity: bool = True, is_clone_root: bool = True) -> Residue:
         """Create a fast copy of the Residue and its Atoms without using deepcopy.
@@ -310,17 +330,8 @@ class Residue(DoubleLinkedNode):
 
         # If this is the root of cloning operation, clone connectivity
         if is_clone_root and with_connectivity:
-            for new_atom in new_atoms:
-                old_atom = self.find_atom_name(new_atom.name)
-                new_connect = [] 
-                for old_cnt_atom in old_atom.connect:
-                    if old_cnt_atom in self.atoms: # only clone the connect within the residue
-                        new_connect.append((new_res.find_atom_name(old_cnt_atom[0].name), old_cnt_atom[1]))
-                new_atom.connect = new_connect
-            # TODO refactor - the idea is:
-            # 1. create a map between old atom and new atom (make a new method in Residue)
-            # 2. for each atom in new residue, clone connectivity from old atom
-            #       if any connecting atom from an atom from the old residue does not have a mapped new atom in the new residue, give warning and ignore it
+            atom_mapping = new_res.create_atom_mapping(self)
+            Atom.clone_connectivity(atom_mapping)
 
         return new_res
     #endregion

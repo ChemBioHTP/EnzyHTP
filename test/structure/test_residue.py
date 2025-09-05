@@ -177,3 +177,40 @@ def test_is_connected():
     test_residue.parent = RESIDUES[2].parent
     init_connectivity(test_residue)
     assert test_residue.is_connected()
+
+
+def test_residue_create_atom_mapping():
+    """Test Residue.create_atom_mapping() method"""
+    original_residue = copy.deepcopy(RESIDUES[1])
+    cloned_residue = original_residue.clone(is_clone_root=False)
+    
+    # Create atom mapping
+    mapping = original_residue.create_atom_mapping(cloned_residue)
+    
+    # Should have mapping for every atom
+    assert len(mapping) == len(cloned_residue.atoms)
+    assert len(mapping) == len(original_residue.atoms)
+    
+    # Verify mapping correctness by atom names
+    for cloned_atom, original_atom in mapping.items():
+        assert cloned_atom.name == original_atom.name
+
+
+def test_residue_create_atom_mapping_partial():
+    """Test Residue.create_atom_mapping() with partial residue (missing atoms)"""
+    original_residue = copy.deepcopy(RESIDUES[1])
+    
+    # Create partial residue with only first 3 atoms
+    partial_atoms = [atom.clone() for atom in original_residue.atoms[:3]]
+    partial_residue = Residue(original_residue.idx, original_residue.name, partial_atoms)
+    
+    # Create atom mapping from partial to full residue (using caplog for warnings)
+    mapping = original_residue.create_atom_mapping(partial_residue)
+    
+    # Should have mapping for partial atoms only
+    assert len(mapping) == len(partial_residue.atoms)
+    assert len(mapping) < len(original_residue.atoms)
+    
+    # Verify mapping correctness
+    for partial_atom, original_atom in mapping.items():
+        assert partial_atom.name == original_atom.name

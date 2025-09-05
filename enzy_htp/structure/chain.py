@@ -8,7 +8,7 @@ from __future__ import annotations
 from copy import deepcopy
 import math
 import sys
-from typing import Iterable, List, Tuple, Union
+from typing import Dict, Iterable, List, Tuple, Union
 
 from enzy_htp.core import _LOGGER
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
@@ -186,6 +186,27 @@ class Chain(DoubleLinkedNode):
             result += res.sequence_name
         return result.strip()
 
+    def create_atom_mapping(self, other: Chain) -> Dict[Atom, Atom]:
+        """Create a mapping from other's atoms to self's atoms based on atom keys.
+        
+        Args:
+            other: The source chain to map from
+            
+        Returns:
+            Dictionary mapping other's atoms to self's atoms
+        """
+        # Create mapping by atom keys
+        self_atom_key_mapper = {atom.key: atom for atom in self.atoms}
+        atom_mapping = {}
+        
+        for other_atom in other.atoms:
+            if other_atom.key in self_atom_key_mapper:
+                atom_mapping[other_atom] = self_atom_key_mapper[other_atom.key]
+            else:
+                _LOGGER.warning(f"Cannot find matching atom for {other_atom.key} in chain {self.name}")
+                
+        return atom_mapping
+
     def clone(self, parent = None, is_clone_root: bool = True, with_connectivity: bool = True) -> Chain:
         """a fast clone of the Chain. The parent is not cloned and set to None by default."""
         cloned_residues = [res.clone(is_clone_root=False) for res in self._residues]
@@ -193,12 +214,8 @@ class Chain(DoubleLinkedNode):
 
         # If this is the root of cloning operation, clone connectivity
         if is_clone_root and with_connectivity:
-            for new_res in new_chain.residues:
-                pass 
-            # TODO the idea is:
-            # 1. create a map between old atom and new atom (make a new method in Chain)
-            # 2. for each atom in new chain, clone connectivity from old atom
-            #       if any connecting atom from an atom from the old chain does not have a mapped new atom in the new chain, give warning and ignore it
+            atom_mapping = new_chain.create_atom_mapping(self)
+            Atom.clone_connectivity(atom_mapping)
 
         return new_chain
     #endregion
