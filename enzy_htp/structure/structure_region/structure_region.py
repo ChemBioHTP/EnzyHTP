@@ -346,7 +346,9 @@ class StructureRegion:
         Returns:
             The corresponding Structure of the structure region"""
 
-        residue_mapper = self.involved_residue_atom_mapper(cap_as_residue=cap_as_residue, is_deepcopy=is_deepcopy)
+        residue_mapper = self.involved_residue_atom_mapper(
+            cap_as_residue=cap_as_residue, is_deepcopy=is_deepcopy
+        ) # {residue (not copy): [atom_cpy, ...], ...}
         old_to_new_res_mapper = {res: None for res in residue_mapper.keys()}
 
         residues: List[Residue] = []
@@ -368,7 +370,7 @@ class StructureRegion:
                 new_res = deepcopy(res)
                 new_res.atoms = residue_mapper[res]
 
-                new_res.parent = res.link_residue.parent
+                new_res.parent = res.link_residue.parent # this is problematic but resolved in Chain construction later
                 new_res.link_residue = old_to_new_res_mapper[res.link_residue]
                 if res.link_atom.name in new_res.link_residue.atom_name_list:
                     new_res.link_atom = new_res.link_residue.find_atom_name(res.link_atom.name)
@@ -376,8 +378,7 @@ class StructureRegion:
                 new_res.renumber_atoms(range(1, new_res.num_atoms + 1))
                 residues.append(new_res)
 
-
-        chain_mapper: {Chain, List[Residue]} = defaultdict(list)
+        chain_mapper: Dict[Chain, List[Residue]] = defaultdict(list)
         for res in residues:
             chain_mapper[res.parent].append(res)
         

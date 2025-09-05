@@ -260,7 +260,7 @@ def _mol_desc_based_ncaa_method(ncaa: Union[NonCanonicalBase, StructureRegion], 
 
     # 1. make mol describing file for ncaa
     if not mol_desc_path:
-        if isinstance(ncaa, StructureRegion):
+        if isinstance(ncaa, StructureRegion): # NOTE(qz) will this ever be used???
             mol_desc_path = f"{ncaa_lib}/{ncaa.involved_residues[0].name}_any.prepin"
         else:
             mol_desc_path = f"{ncaa_lib}/{ncaa.name}_any.prepin"  # swicth to mol2 after finish all unit tests of mol2_io

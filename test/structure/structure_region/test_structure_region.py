@@ -12,7 +12,8 @@ import enzy_htp.core.file_system as fs
 import enzy_htp.structure.structure_region as stru_regi
 from enzy_htp.structure.structure_region.residue_caps import ResidueCap
 import enzy_htp.structure.structure_selection as stru_sele
-from enzy_htp.structure.structure_enchantment import init_charge
+from enzy_htp.structure.structure_enchantment import init_charge, init_connectivity
+from enzy_htp.structure.structure import Structure
 
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)
@@ -152,7 +153,7 @@ def test_topology():
     test_stru_2 = test_stru_region.topology
     assert test_stru.is_same_topology(test_stru_2)
 
-def test_convert_to_structure():
+def test_convert_to_structure(): # TODO this test dont make sense
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     test_stru.assign_ncaa_chargespin({"H5J": (0,1)})
     test_stru_region = stru_regi.create_region_from_selection_pattern(
@@ -163,7 +164,7 @@ def test_convert_to_structure():
     assert test_stru.is_same_topology(test_stru_2)
 
     # assert that original atoms point back to own residues
-    for residue in test_stru.residues:
+    for residue in test_stru.residues: # ???
         for aa in residue:
             assert aa.parent == residue
 
@@ -191,3 +192,56 @@ def test_convert_to_structure():
         if isinstance(res, ResidueCap):
             assert res.link_residue.name == test_stru_5.modified_residue[0].name
             assert res.link_atom.name in [atom.name for atom in test_stru_5.modified_residue[0].atoms]
+
+def test_convert_to_structure_correct_assert():
+    test_stru = sp.get_structure(f"{DATA_DIR}3FCR_modified.pdb")
+    test_stru.assign_ncaa_chargespin({"LLP": (-2, 1)})
+    test_stru_region = stru_regi.create_region_from_residues(
+        [test_stru.modified_residue[0]], nterm_cap="H", cterm_cap="OH"
+    )
+
+    result = test_stru_region.convert_to_structure()
+    # 1. result should be a new Structure instance
+    assert isinstance(result, Structure)
+    assert result.num_atoms == 27
+    assert result.num_residues == 3
+    # 2. residues in result should not be the same objects as in the original structure
+    orig_residues = test_stru.residues
+    # 3. atoms in result should not reference any original atoms
+    orig_atoms = [atom for res in orig_residues for atom in res.atoms]
+    for res in result.residues:
+        assert all(res is not orig for orig in orig_residues)
+        for atom in res.atoms:
+            assert all(atom is not orig_atom for orig_atom in orig_atoms)
+        if isinstance(res, ResidueCap):
+            assert res.link_residue.name == result.modified_residue[0].name
+            assert res.link_atom.name in [atom.name for atom in result.modified_residue[0].atoms]
+
+def test_convert_to_structure_connected():
+    test_stru = sp.get_structure(f"{DATA_DIR}3FCR_modified.pdb")
+    test_stru.assign_ncaa_chargespin({"LLP": (-2, 1)})
+    init_connectivity(test_stru)
+    test_stru_region = stru_regi.create_region_from_residues(
+        [test_stru.modified_residue[0]], nterm_cap="H", cterm_cap="OH"
+    )
+
+    result = test_stru_region.convert_to_structure()
+
+    # 1. result should be a new Structure instance
+    assert isinstance(result, Structure)
+    assert result.num_atoms == 27
+    assert result.num_residues == 3
+    # 2. residues in result should not be the same objects as in the original structure
+    orig_residues = test_stru.residues
+    # 3. atoms in result should not reference any original atoms
+    orig_atoms = test_stru.atoms
+    for res in result.residues:
+        assert all(res is not orig for orig in orig_residues)
+        for atom in res.atoms:
+            assert all(atom is not orig_atom for orig_atom in orig_atoms)
+            if atom.is_connected():
+                assert all(cnt_atom not in orig_atoms for cnt_atom in atom.connect)
+        if isinstance(res, ResidueCap):
+            assert res.link_residue.name == result.modified_residue[0].name
+            assert res.link_atom.name in [atom.name for atom in result.modified_residue[0].atoms]
+
