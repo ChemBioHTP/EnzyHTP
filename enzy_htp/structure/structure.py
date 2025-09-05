@@ -998,6 +998,18 @@ class Structure(DoubleLinkedNode):
             for atom, source_atom in zip(self.atoms, source.atoms):
                 atom.coord = source_atom.coord
 
+    def clone(self, with_connectivity: bool=True) -> Structure: # always clone root if called
+        """Create a fast clone of the Structure by delegating to Chain.clone()."""
+        cloned_chains = [ch.clone(is_clone_root=False) for ch in self._chains] # this make chain aware of parent during clone. This is important for cloning connectivity
+        new_struct = Structure(chains=cloned_chains, pbc_box_shape=self._pbc_box_shape)
+        if with_connectivity:
+            pass
+            # TODO the idea is:
+            # 1. create a map between old atom and new atom (make a new method in Structure)
+            # 2. for each atom in new structure, clone connectivity from old atom
+            #       if any connecting atom from an atom from the old structure does not have a mapped new atom in the new structure, give warning and ignore it
+        return new_struct
+
     def update_pbc_box_edges(self, pbc_box_edges: Tuple[float]):
         """update the pbc box edges and keep the original angles. This is common in a
         NPT simulation."""

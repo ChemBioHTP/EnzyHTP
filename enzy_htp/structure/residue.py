@@ -288,6 +288,41 @@ class Residue(DoubleLinkedNode):
         for idx in atom_idx_list:
             result.append(atom_mapper[idx])
         return result
+    
+    def connectivity_str(self) -> str:
+        """return a string representation of the connectivity of the residue"""
+        result = []
+        for atom in self.atoms:
+            conn_str = atom.connectivity_str()
+            result.append(f"{atom.name}: {conn_str}")
+        return "\n".join(result)
+
+
+    def clone(self, parent = None, with_connectivity: bool = True, is_clone_root: bool = True) -> Residue:
+        """Create a fast copy of the Residue and its Atoms without using deepcopy.
+
+        This base implementation preserves rtype and intra-residue connectivity.
+        Subclasses with additional attributes should override appropriately.
+        """
+        new_atoms = [a.clone() for a in self.atoms] # new atoms without connectivity
+        new_res = Residue(self._idx, self._name, new_atoms, parent)
+        new_res.rtype = self._rtype
+
+        # If this is the root of cloning operation, clone connectivity
+        if is_clone_root and with_connectivity:
+            for new_atom in new_atoms:
+                old_atom = self.find_atom_name(new_atom.name)
+                new_connect = [] 
+                for old_cnt_atom in old_atom.connect:
+                    if old_cnt_atom in self.atoms: # only clone the connect within the residue
+                        new_connect.append((new_res.find_atom_name(old_cnt_atom[0].name), old_cnt_atom[1]))
+                new_atom.connect = new_connect
+            # TODO refactor - the idea is:
+            # 1. create a map between old atom and new atom (make a new method in Residue)
+            # 2. for each atom in new residue, clone connectivity from old atom
+            #       if any connecting atom from an atom from the old residue does not have a mapped new atom in the new residue, give warning and ignore it
+
+        return new_res
     #endregion
 
     #region === Checker ===

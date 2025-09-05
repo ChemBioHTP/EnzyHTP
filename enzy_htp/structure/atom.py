@@ -351,6 +351,14 @@ class Atom(DoubleLinkedNode):
         """get all atom names of connection."""
         return [atom.name for atom in self.connect_atoms]
 
+    def connectivity_str(self) -> str:
+        """return a string representation of the connectivity of the atom"""
+        if not self.is_connected():
+            _LOGGER.error(f"There are no connection info for {self}. "
+                            "Please initiate it use structure.structure_operation.init_connectivity()")
+            raise AttributeError
+        return ", ".join([f"{a[0].key}({a[1]})" for a in self.connect])
+
     #endregion
 
     #region === Checker ===
@@ -397,3 +405,19 @@ class Atom(DoubleLinkedNode):
         dummy method for dispatch
         """
         pass
+
+    def clone(self, parent = None) -> Atom:
+        """Create a fast copy of the Atom without using deepcopy.
+
+        Connectivity is not copied here and should be rebuilt by the owning Residue.
+        """
+        return Atom(
+            name=self._name,
+            coord=self._coord,
+            parent=parent,
+            idx=self._idx,
+            b_factor=self._b_factor,
+            element=self._element,
+            charge=self._charge,
+            atom_type=self._atom_type,
+        )

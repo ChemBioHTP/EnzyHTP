@@ -162,6 +162,8 @@ class Chain(DoubleLinkedNode):
         chain_type = []
         if self.is_polypeptide():
             return "polypeptide"
+        if self.is_capped_polypeptide():
+            return "capped_peptide"
         if self.has_metal():
             chain_type.append("metal")
         if self.has_ligand():
@@ -184,6 +186,21 @@ class Chain(DoubleLinkedNode):
             result += res.sequence_name
         return result.strip()
 
+    def clone(self, parent = None, is_clone_root: bool = True, with_connectivity: bool = True) -> Chain:
+        """a fast clone of the Chain. The parent is not cloned and set to None by default."""
+        cloned_residues = [res.clone(is_clone_root=False) for res in self._residues]
+        new_chain = Chain(self._name, cloned_residues, parent)
+
+        # If this is the root of cloning operation, clone connectivity
+        if is_clone_root and with_connectivity:
+            for new_res in new_chain.residues:
+                pass 
+            # TODO the idea is:
+            # 1. create a map between old atom and new atom (make a new method in Chain)
+            # 2. for each atom in new chain, clone connectivity from old atom
+            #       if any connecting atom from an atom from the old chain does not have a mapped new atom in the new chain, give warning and ignore it
+
+        return new_chain
     #endregion
 
     #region === Checker ===
@@ -192,6 +209,21 @@ class Chain(DoubleLinkedNode):
         if there is any non-aminoacid part in chain
         """
         return not sum(list(map(lambda rr: (not rr.is_canonical()) and (not rr.is_modified()), self._residues)))
+
+    def is_capped_polypeptide(self) -> bool:
+        """
+        if there is only "caps" as non-aminoacid part in chain
+        """
+        return not sum(
+            list(
+                map(
+                    lambda rr: (not rr.is_canonical()) 
+                    and (not rr.is_modified()) 
+                    and (not rr.is_residue_cap()), 
+                    self._residues
+                    )
+                )
+            )
 
     def is_solvent_chain(self) -> bool:
         """
