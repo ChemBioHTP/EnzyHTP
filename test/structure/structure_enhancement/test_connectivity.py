@@ -33,8 +33,32 @@ def test_connectivity_maa():
     connectivity.init_connectivity(test_stru)
 
     fs.safe_rm(f"{NCAA_LIB}/LLP_any.prepin")
-
-    assert test_stru.modified_residue[0].is_connected()
+    maa = test_stru.modified_residue[0]
+    assert maa.is_connected()
+    assert maa.connectivity_str() == """N: A.288.CA(None), A.287.C(None)
+CA: A.288.C(None), A.288.N(None), A.288.CB(None)
+C: A.288.O(None), A.288.CA(None), A.289.N(None)
+O: A.288.C(None)
+CB: A.288.CA(None), A.288.CG(None)
+CG: A.288.CB(None), A.288.CD(None)
+CD: A.288.CG(None), A.288.CE(None)
+CE: A.288.CD(None), A.288.NZ(None)
+NZ: A.288.CE(None), A.288.C4'(None)
+P: A.288.OP4(None), A.288.OP2(None), A.288.OP3(None), A.288.OP1(None)
+C5': A.288.C5(None), A.288.OP4(None)
+C4': A.288.NZ(None), A.288.C4(None)
+C2': A.288.C2(None)
+N1: A.288.C2(None), A.288.C6(None)
+C2: A.288.C3(None), A.288.C2'(None), A.288.N1(None)
+C3: A.288.C4(None), A.288.O3(None), A.288.C2(None)
+O3: A.288.C3(None)
+C4: A.288.C4'(None), A.288.C3(None), A.288.C5(None)
+C5: A.288.C6(None), A.288.C5'(None), A.288.C4(None)
+C6: A.288.N1(None), A.288.C5(None)
+OP1: A.288.P(None)
+OP2: A.288.P(None)
+OP3: A.288.P(None)
+OP4: A.288.C5'(None), A.288.P(None)""" # make sure N side C side are connected
 
 
 def test_connected_structure_deepcopy():

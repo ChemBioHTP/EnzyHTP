@@ -242,7 +242,32 @@ def _connect_maa(maa: ModifiedResidue, method: str, ncaa_lib: str) -> None:
     """initiate connectivity for modified residue"""
     support_method_list = ["antechamber"]
     if method in MOL_DESC_METHODS:
+        # connectivity within the maa
         _mol_desc_based_ncaa_method(maa, method, ncaa_lib)
+
+        # connectivity to neighbor residues
+        n_atom = maa.find_atom_name("N") # --> -1C
+        n_side_res = maa.n_side_residue()
+        c_atom = maa.find_atom_name("C") # --> +1N
+        c_side_res = maa.c_side_residue()
+        if n_side_res:
+            try:
+                n_side_c = n_side_res.find_atom_name("C")
+                n_atom.connect.append((n_side_c, None))
+            except ResidueDontHaveAtom as e:
+                _LOGGER.warning(f"missing connecting atom {e.atom_name} of {n_atom}. Structure maybe incomplete.")
+        else:
+            _LOGGER.debug(f"no n-side residue for {maa}, treat as n-terminal")
+
+        if c_side_res:
+            try:
+                c_side_n = c_side_res.find_atom_name("N")
+                c_atom.connect.append((c_side_n, None))
+            except ResidueDontHaveAtom as e:
+                _LOGGER.warning(f"missing connecting atom {e.atom_name} of {c_atom}. Structure maybe incomplete.")
+        else:
+            _LOGGER.debug(f"no c-side residue for {maa}, treat as c-terminal")
+
         return
 
     if method not in support_method_list:
