@@ -145,16 +145,23 @@ class DoubleLinkedNode():
                 memo[id(self.parent)] = None
             # parent in memo -> this is part of the recursive copying initiated from the parent: default
 
-        # Stash original connectivity refs and place placeholders into memo
-        _conn_attrs = []
+        # Deferred connectivity handling: do not rebuild on each node.
+        # Rebuild once at the subtree root to avoid referencing neighbors that are not copied yet.
+        # Collect attributes that should be deferred (currently only _connect)
+        pending_key = "__pending_connectivity__"
+        if pending_key not in memo:
+            memo[pending_key] = []  # list[ (new_node, attr_name, original_list) ]
+
+        captured_conn = []  # list of (attr_name, original_list)
         for _name in ("_connect",):
             lst = getattr(self, _name, None)
             if isinstance(lst, list):
-                _conn_attrs.append((_name, lst))
-                # Tell deepcopy to reuse this placeholder instead of recursing into neighbors
-                memo.setdefault(id(lst), [])  # minimal: empty list as placeholder
+                captured_conn.append((_name, lst))
+                # Put a placeholder in memo to prevent deep recursion through connectivity graph
+                memo.setdefault(id(lst), [])
 
-        # mask current method to use original deepcopy
+        # Temporarily remove custom __deepcopy__ to leverage default copying of the object's own fields
+        # (without descending into connectivity neighbors)
         self.__deepcopy__ = None
 
         new_self = copy.deepcopy(self, memo)
@@ -164,24 +171,38 @@ class DoubleLinkedNode():
         delattr(self, "__deepcopy__")
         delattr(new_self, "__deepcopy__")
 
-        # deal with _connect
-        for _name, lst in _conn_attrs:
-            new_list = []
-            for entry in lst:
-                # expected shape: (neighbor_atom, tag) or just neighbor_atom
-                if isinstance(entry, tuple):
-                    neighbor = entry[0]
-                    tag = entry[1] if len(entry) > 1 else None
-                    # map original neighbor -> copied neighbor via memo (if the neighbor is not in the new tree, ignore it)
-                    copied_neighbor = memo.get(id(neighbor), "None_") # use "None_" str to avoid NoneType in the list
-                    if copied_neighbor != "None_":
-                        new_list.append((copied_neighbor, tag))
-                else:
-                    copied_neighbor = memo.get(id(entry), "None_")
-                    if copied_neighbor != "None_":
-                        new_list.append(copied_neighbor)
-            setattr(new_self, _name, new_list)
-    
+        # For captured connectivity lists set empty placeholders; actual mapping rebuilt at the root stage
+        for _name, _ in captured_conn:
+            setattr(new_self, _name, list())
+
+        # Record pending fix items (store original list for later old-id -> new-object mapping)
+        for _name, orig_list in captured_conn:
+            memo[pending_key].append((new_self, _name, orig_list))
+
+        # Only when copying the subtree root (parent is None) rebuild all deferred connectivity.
+        # At that point all nodes are copied so memo contains the full original -> copy mapping.
+        if self.parent is None:
+            fixups = memo.get(pending_key, list())
+            for new_node, attr_name, orig_list in fixups:
+                rebuilt = []
+                for entry in orig_list:
+                    if isinstance(entry, tuple):
+                        neighbor = entry[0]
+                        tag = entry[1] if len(entry) > 1 else None
+                        copied_neighbor = memo.get(id(neighbor))
+                        if copied_neighbor is None:  # Neighbor outside this copied subtree -> safely skip
+                            continue
+                        rebuilt.append((copied_neighbor, tag))
+                    else:
+                        neighbor = entry
+                        copied_neighbor = memo.get(id(neighbor))
+                        if copied_neighbor is None:
+                            continue
+                        rebuilt.append(copied_neighbor)
+                setattr(new_node, attr_name, rebuilt)
+            # Clean up the marker to avoid repeated rebuild attempts
+            memo.pop(pending_key, None)
+
         return new_self
 
     # def deepcopy_complete_tree(self, memo=None, _nil=[]):
