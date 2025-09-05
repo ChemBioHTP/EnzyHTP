@@ -722,7 +722,7 @@ class OHCap(ResidueCap):
     def net_charge(self) -> int:
         return 0
 
-    def get_nterm_atoms(self) -> List[Atom]:
+    def get_nterm_atoms(self) -> List[Atom]: # TODO: also put connectivity here
         """Create the default n-terminal version of the OHCap with appropriate names."""
         return [
             Atom(name='OXT',  coord=[ 0.000 ,   0.000,  0.000], element= 'O'),
