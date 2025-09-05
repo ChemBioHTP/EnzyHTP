@@ -4,6 +4,7 @@ Author: QZ Shao <shaoqz@icloud.com>
 Date: 2022-04-03
 """
 import os
+import time
 import pytest
 import numpy as np
 from copy import deepcopy
@@ -158,6 +159,67 @@ def test_deepcopy():
             assert res.parent is ch
             for atom in res:
                 assert atom.parent is res
+
+
+def test_deepcopy_profiling():
+    """Test the performance and correctness of deepcopy on Structure objects.
+    
+    This test evaluates the time cost of deepcopy operation on a large solvated structure
+    and verifies that the deep copy maintains correct parent-child relationships.
+    """
+    # Load a relatively large structure for performance testing
+    stru = PDBParser().get_structure(f"{DATA_DIR}test_pdb_parser_solvated.pdb")
+    
+    # Record structure statistics before copying
+    num_atoms = len(stru.atoms)
+    
+    # Perform deepcopy with timing
+    start_time = time.perf_counter()
+    new_stru = deepcopy(stru)
+    end_time = time.perf_counter()
+    
+    deepcopy_time = end_time - start_time
+    print(deepcopy_time)
+
+    max_time_per_1000_atoms = 0.2  # 200ms per 1000 atoms (generous threshold)
+    expected_max_time = (num_atoms / 1000) * max_time_per_1000_atoms
+    assert deepcopy_time < expected_max_time, f"Deepcopy took too long: {deepcopy_time:.4f}s > {expected_max_time:.4f}s (expected < {expected_max_time:.4f}s)"
+
+
+def test_clone():
+    """test the behavior of clone on Structure() context"""
+    stru = PDBParser().get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    new_stru = stru.clone()
+    # ensure the list is new
+    assert id(stru) != id(new_stru)
+    # ensure children are pointing to the parent
+    for ch in new_stru.chains:
+        assert ch.parent is new_stru
+        for res in ch:
+            assert res.parent is ch
+            for atom in res:
+                assert atom.parent is res
+
+
+def test_clone_profile():
+    """test the behavior of clone on Structure() context"""
+    # Load a relatively large structure for performance testing
+    stru = PDBParser().get_structure(f"{DATA_DIR}test_pdb_parser_solvated.pdb")
+    
+    # Record structure statistics before copying
+    num_atoms = len(stru.atoms)
+    
+    # Perform deepcopy with timing
+    start_time = time.perf_counter()
+    new_stru = stru.clone()
+    end_time = time.perf_counter()
+    
+    deepcopy_time = end_time - start_time
+    print(deepcopy_time)
+
+    max_time_per_1000_atoms = 0.2  # 200ms per 1000 atoms (generous threshold)
+    expected_max_time = (num_atoms / 1000) * max_time_per_1000_atoms
+    assert deepcopy_time < expected_max_time, f"Deepcopy took too long: {deepcopy_time:.4f}s > {expected_max_time:.4f}s (expected < {expected_max_time:.4f}s)"
 
 
 def test_find_residue_with_key(caplog): # TODO caplog does not work when logger is not propagate. fix them by a context manager.
