@@ -625,6 +625,44 @@ class Structure(DoubleLinkedNode):
 
         return result
 
+    def clone(self, with_connectivity: bool=True) -> Structure: # always clone root if called
+        """Create a fast clone of the Structure by delegating to Chain.clone()."""
+        cloned_chains = [ch.clone(is_clone_root=False) for ch in self._chains]
+        new_struct = Structure(chains=cloned_chains, pbc_box_shape=self._pbc_box_shape, chain_san_check=False) # turn chain check off to save time
+        if self.has_connection() and with_connectivity:
+            atom_mapping = new_struct.create_atom_mapping(self)
+            Atom.clone_connectivity(atom_mapping)
+
+        return new_struct
+
+    def create_atom_mapping(self, other: Structure) -> Dict[Atom, Atom]:
+        """Create a mapping from other's atoms to self's atoms based on atom keys.
+        
+        Args:
+            other: The source structure to map from
+            
+        Returns:
+            Dictionary mapping other's atoms to self's atoms
+            
+        Raises:
+            ValueError: If other is not a topology subset of self
+        """
+        if not self.is_topology_subset_atomic(other):
+            _LOGGER.error("Cannot create atom mapping: other structure is not a topology subset of self")
+            raise ValueError("other structure is not a topology subset of self")
+        
+        # Create mapping by atom keys
+        self_atom_key_mapper = {atom.key: atom for atom in self.atoms}
+        atom_mapping = {}
+        
+        for other_atom in other.atoms:
+            if other_atom.key in self_atom_key_mapper:
+                atom_mapping[other_atom] = self_atom_key_mapper[other_atom.key]
+            else:
+                _LOGGER.error(f"Cannot find matching atom for {other_atom.key}")
+                raise ValueError(f"Cannot find matching atom for {other_atom.key}")
+                
+        return atom_mapping
     # endregion
 
     #region === Checker ===
@@ -761,35 +799,6 @@ class Structure(DoubleLinkedNode):
         self_atom_keys = set(atom.key for atom in self.atoms)
         other_atom_keys = set(atom.key for atom in other.atoms)
         return other_atom_keys.issubset(self_atom_keys)
-
-    def create_atom_mapping(self, other: Structure) -> Dict[Atom, Atom]:
-        """Create a mapping from other's atoms to self's atoms based on atom keys.
-        
-        Args:
-            other: The source structure to map from
-            
-        Returns:
-            Dictionary mapping other's atoms to self's atoms
-            
-        Raises:
-            ValueError: If other is not a topology subset of self
-        """
-        if not self.is_topology_subset_atomic(other):
-            _LOGGER.error("Cannot create atom mapping: other structure is not a topology subset of self")
-            raise ValueError("other structure is not a topology subset of self")
-        
-        # Create mapping by atom keys
-        self_atom_key_mapper = {atom.key: atom for atom in self.atoms}
-        atom_mapping = {}
-        
-        for other_atom in other.atoms:
-            if other_atom.key in self_atom_key_mapper:
-                atom_mapping[other_atom] = self_atom_key_mapper[other_atom.key]
-            else:
-                _LOGGER.error(f"Cannot find matching atom for {other_atom.key}")
-                raise ValueError(f"Cannot find matching atom for {other_atom.key}")
-                
-        return atom_mapping
 
     def is_topology_subset(self, other: Structure) -> bool:
         """determine whether other is in a subset topology
@@ -1040,16 +1049,6 @@ class Structure(DoubleLinkedNode):
         else:
             for atom, source_atom in zip(self.atoms, source.atoms):
                 atom.coord = source_atom.coord
-
-    def clone(self, with_connectivity: bool=True) -> Structure: # always clone root if called
-        """Create a fast clone of the Structure by delegating to Chain.clone()."""
-        cloned_chains = [ch.clone(is_clone_root=False) for ch in self._chains]
-        new_struct = Structure(chains=cloned_chains, pbc_box_shape=self._pbc_box_shape, chain_san_check=False) # turn chain check off to save time
-        if self.has_connection() and with_connectivity:
-            atom_mapping = new_struct.create_atom_mapping(self)
-            Atom.clone_connectivity(atom_mapping)
-
-        return new_struct
 
     def update_pbc_box_edges(self, pbc_box_edges: Tuple[float]):
         """update the pbc box edges and keep the original angles. This is common in a
