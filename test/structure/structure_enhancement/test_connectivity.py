@@ -56,7 +56,6 @@ def test_connected_structure_deepcopy():
     
     # Test deepcopy AFTER connectivity initialization
     copied_stru_after = copy.deepcopy(test_stru)
-    import pdb;pdb.set_trace()
 
     # Verify the copied structure maintains connectivity
     # Test that the modified residue is still connected in the copied structure
