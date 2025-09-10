@@ -337,7 +337,7 @@ def test_amber_parameterizer_run_lv_5():
     # Assign charge/spin to all non-canonical residues in the structure
     test_stru.assign_ncaa_chargespin({"LLP": (-2, 1), "RLP": (-2, 1)})  # RLP is another ligand in the structure
     remove_solvent(test_stru)
-    connectivity.init_connectivity(test_stru)
+    connectivity.init_connectivity(test_stru, ncaa_lib=test_ncaa_lib)
     
     # Create parameterizer with empty library to force parameterization
     test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
