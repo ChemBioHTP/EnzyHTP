@@ -88,7 +88,28 @@ class Mol2Parser(StructureParserInterface):
             atoms[-1].idx = aa['atom_id']
             atoms[-1].element = aa['atom_type'].split('.')[0]
 
-        return Ligand(residue_idx=residue_idx, residue_name=residue_name, atoms=atoms, bonds=file_info['BOND'])            
+        bonds = file_info.get('BOND', [])
+        cls._connect_atoms(atoms, bonds)
+
+        return Ligand(residue_idx=residue_idx, residue_name=residue_name, atoms=atoms, bonds=bonds)
+
+    @classmethod
+    def _connect_atoms(cls, atoms: List[Atom], bonds: List[Dict]):
+        """connect {atoms} using information from {bonds}.
+        connectivities are written to {atom.connect} of each {atom}"""
+        if not bonds:
+            return
+
+        # init connectivity
+        for atom in atoms:
+            atom.connect = []
+
+        atom_map = {atom.idx: atom for atom in atoms}
+        for bond in bonds:
+            id1 = bond['origin_atom_id']
+            id2 = bond['target_atom_id']
+            if id1 in atom_map and id2 in atom_map:
+                atom_map[id1].connect_to(atom_map[id2])
 
     @classmethod
     def save_ligand(cls, outfile:str, ligand:Ligand) -> str:
@@ -279,9 +300,10 @@ class Mol2Parser(StructureParserInterface):
             error = True
             _LOGGER.error(f"The number of atoms {len(result['ATOM'])} in {path} is not consistent with the expected amount number {result['MOLECULE']['num_atoms']}")
 
-        if result['MOLECULE']['num_bond'] != len(result['BOND']):
+        num_bonds_in_file = len(result.get('BOND', []))
+        if result['MOLECULE']['num_bond'] != num_bonds_in_file:
             error = True
-            _LOGGER.error(f"The number of bonds {len(result['BOND'])} in {path} is not consistent with the expected amount number {result['MOLECULE']['num_bond']}")
+            _LOGGER.error(f"The number of bonds {num_bonds_in_file} in {path} is not consistent with the expected amount number {result['MOLECULE']['num_bond']}")
 
 
         if error:
