@@ -1413,17 +1413,7 @@ class AmberInterface(BaseInterface):
         
         # Source all force fields
         for ff in force_fields:
-            # Handle both "leaprc.protein.ff14SB" and "ff14SB" formats
-            if ff.lower().startswith("leaprc.protein."):
-                # Force field already has full prefix, use as is
-                leaprc_name = ff
-            elif ff.lower().startswith("protein."):
-                # Already has protein prefix, use as is
-                leaprc_name = f"leaprc.{ff}"
-            else:
-                # Add protein prefix for bare force field names
-                leaprc_name = f"leaprc.protein.{ff}"
-            tleap_input_lines.append(f"source {leaprc_name}")
+            tleap_input_lines.append(f"source {ff}")
         
         # Test the residue by creating a sequence
         tleap_input_lines.extend([
