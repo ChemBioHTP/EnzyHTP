@@ -63,7 +63,7 @@ def test_num_ele_2d():
     ]
     assert eg.num_ele_2d(test_list_2d) == 9
 
-def test_capture_logging(capfd):
+def test_capture_logging_eh_logger(capfd):
     """as name"""
     with eg.CaptureLogging(_LOGGER) as log_str:
         _LOGGER.error("redirect test")
@@ -74,7 +74,40 @@ def test_capture_logging(capfd):
 
     captured = capfd.readouterr()
     assert "redirect" not in captured.err
-    assert "restore" in captured.err
+    assert "restore" in captured.err, "make sure you are using -s to run pytest for this one. If the test still fails, there is a bug. (an improved version of this test is test_capture_logging) "
+
+def test_capture_logging():
+    """Test CaptureLogging context manager without relying on capfd"""
+    from io import StringIO
+    
+    # Create a test logger with a StringIO handler to avoid pytest capture conflicts
+    test_logger = logging.getLogger("test_capture_logging_logger")
+    test_logger.setLevel(logging.ERROR)
+    
+    # Clear any existing handlers
+    test_logger.handlers.clear()
+    
+    # Add a StringIO handler to capture normal output
+    normal_output = StringIO()
+    normal_handler = logging.StreamHandler(normal_output)
+    normal_handler.setFormatter(logging.Formatter('%(message)s'))
+    test_logger.addHandler(normal_handler)
+    
+    # Test the CaptureLogging functionality
+    with eg.CaptureLogging(test_logger) as log_str:
+        test_logger.error("redirect test")
+    
+    # Verify that output was captured in the context manager
+    assert log_str.getvalue() == "redirect test\n"
+    
+    # Verify that normal output was NOT captured during context (handlers were replaced)
+    assert normal_output.getvalue() == ""
+    
+    # Test that handlers are restored after context manager
+    test_logger.error("restore test")
+    
+    # Verify that output goes to normal handler after restoration
+    assert "restore test" in normal_output.getvalue()
 
 def test_split_but_brackets():
     """as name"""

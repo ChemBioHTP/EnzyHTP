@@ -41,7 +41,13 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import math_helper as mh
 from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core.exception import AddPDBError, tLEaPError, AmberMDError
-from enzy_htp.core.general import get_interval_str_from_list, load_obj, save_obj, LogLevel
+from enzy_htp.core.general import (
+    get_interval_str_from_list, 
+    load_obj, 
+    save_obj, 
+    LogLevel,
+    CaptureLogging,
+)
 from enzy_htp.chemical import QMLevelOfTheory
 from enzy_htp.chemical.force_field import AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
@@ -1432,12 +1438,12 @@ class AmberInterface(BaseInterface):
                 out_path = out_file.name
             
             # Run tleap and capture any errors
-            self.run_tleap(
-                tleap_in_str=tleap_input_str,
-                if_ignore_start_up=True,
-                tleap_out_path=out_path
-            )
-            
+            with CaptureLogging(_LOGGER) as log_capture:
+                self.run_tleap(
+                    tleap_in_str=tleap_input_str,
+                    if_ignore_start_up=True,
+                    tleap_out_path=out_path
+                )
             # If we get here without exception, check output for success patterns
             with open(out_path, 'r') as f:
                 output = f.read()
@@ -1448,9 +1454,10 @@ class AmberInterface(BaseInterface):
             else:
                 return False
                 
-        except Exception as e:
+        except (CalledProcessError, tLEaPError) as e:
             # tleap failed or other error - residue not supported
             _LOGGER.debug(f"tleap failed for residue {res_code}: {e}")
+            _LOGGER.debug(f"full info: {log_capture.getvalue()}")
             return False
         finally:
             # Clean up output file
