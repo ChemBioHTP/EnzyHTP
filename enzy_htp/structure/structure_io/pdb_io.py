@@ -58,7 +58,8 @@ class PDBParser(StructureParserInterface):
                       add_ligand_list: List = None,
                       remove_trash: bool = True,
                       give_idx_map: bool = False,
-                      allow_multichain_in_atom: bool = False) -> Union[Structure, tuple]:
+                      allow_multichain_in_atom: bool = False,
+                      alt_loc_keep: int = "first",) -> Union[Structure, tuple]:
         """
         Converting a PDB file (as its path) into the Structure()
         Arg:
@@ -109,7 +110,7 @@ class PDBParser(StructureParserInterface):
         # a workaround is to add them back after Amber process
         idx_change_mapper = cls._resolve_missing_chain_id(
             target_model_df, target_model_ter_df, allow_multichain_in_atom=allow_multichain_in_atom)  # add missing chain id in place
-        cls._resolve_alt_loc(target_model_df)  # resolve alt loc record in place by delele redundant df rows
+        cls._resolve_alt_loc(target_model_df, keep=alt_loc_keep)  # resolve alt loc record in place by delele redundant df rows
         #endregion (Add here to address more problem related to the PDB file format here)
 
         # target_model_df below should be "standard" --> start building
@@ -561,9 +562,10 @@ class PDBParser(StructureParserInterface):
         """
         Resolves atoms with the alt_loc records
         Optional argument "keep" specifies the resolution method. Default
-        is "first" which forces keeping atoms in the frist residue (earlist 
-        in the file) out of multiple ones. Otherwise, keeps the specific 
-        alt_loc identifier (e.g.: B), assuming it exists.
+        is "first" which keeps atoms with the lexicographically smallest
+        alt_loc identifier (e.g., A before B) for each residue, independent
+        of DataFrame row order. Otherwise, if a specific alt_loc identifier
+        is provided (e.g., "B"), it keeps that identifier, assuming it exists.
 
         Only one record out of multiple alt_loc is allowed. Delete rest 
         df lines in place. 
@@ -580,16 +582,19 @@ class PDBParser(StructureParserInterface):
         # treat in residues
         alt_loc_residues = alt_loc_atoms_df.groupby(["residue_number", "chain_id"], sort=False)
         for r_id_c_id, res_df in alt_loc_residues:
+            # group by alt_loc values
             alt_res_dfs = res_df.groupby("alt_loc", sort=False)
             if len(alt_res_dfs) == 1:
                 _LOGGER.debug(f"Only 1 alt_loc id found in residue {r_id_c_id[1], r_id_c_id[0]}. No need to resolve")
                 continue
             _LOGGER.debug(f"Dealing with alt_loc residue: {r_id_c_id[1], r_id_c_id[0]}")
             if keep == "first":
-                delele_res_df_locs = list(alt_res_dfs.groups.values())
-                del delele_res_df_locs[0]
-                for delete_lines in delele_res_df_locs:
-                    delete_loc_list.extend(list(delete_lines))
+                # choose lexicographically smallest alt_loc id (case-sensitive, spaces stripped)
+                alt_ids = sorted([k.strip() for k in alt_res_dfs.groups.keys()])
+                chosen = alt_ids[0]
+                for alt_id, lines in alt_res_dfs.groups.items():
+                    if alt_id.strip() != chosen:
+                        delete_loc_list.extend(list(lines))
             else:
                 delele_res_dfs_mapper = alt_res_dfs.groups
                 assert keep in delele_res_dfs_mapper
