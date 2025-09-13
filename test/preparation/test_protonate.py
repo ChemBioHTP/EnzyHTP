@@ -19,6 +19,7 @@ from enzy_htp.preparation import protonate as prot
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)
 DATA_DIR = f"{CURR_DIR}/data/"
+STRU_DATA_DIR = f"{CURR_DIR}/../structure/data/"
 WORK_DIR = f"{CURR_DIR}/work_dir/"
 config["system.SCRATCH_DIR"] = WORK_DIR
 sp = struct.PDBParser()
@@ -331,3 +332,9 @@ def test_protonate_stru_imputed():
     prot.protonate_stru(stru)
 
     assert stru
+
+def test_protonate_stru_with_mod_aa():
+    """Testing the protonate_stru() method for a structure that has modified amino acids."""
+    pdb_file = f"{DATA_DIR}/3FCR.pdb"
+    stru = sp.get_structure(pdb_file, alt_loc_keep="A")
+    prot.protonate_stru(stru)
