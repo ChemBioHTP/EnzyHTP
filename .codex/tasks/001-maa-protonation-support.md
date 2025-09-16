@@ -1,11 +1,11 @@
 # Task: Modified Amino Acid Protonation Support in `protonate_stru`
 
 Owner: preparation/protonation
-Status: Planning
+Status: In Progress
 
 ## Goals
 - Keep mode: allow users to preserve existing protonation of modified amino acids (mod-AAs) while protonating canonical residues via PDB2PQR.
-- Auto mode: provide an autonomous path to protonate mod-AAs robustly without breaking peptide connectivity.
+- PyBel mode: provide pH-aware protonation of mod-AAs with name-preserving merge.
 
 ## Scope
 - Only alter mod-AA protonation behavior in `enzy_htp/preparation/protonate.py::protonate_stru` and related helpers.
@@ -25,7 +25,7 @@ Status: Planning
 - Default (`mod_aa_strategy='keep'`):
   - Write full structure to PDB2PQR so PROPKA3 can consider ligands; update only canonical residues back into the structure using existing peptide-only update (`remove_non_peptide`, `clone_residue_keys(amino_acid_only=True)`, `update_residues`). Mod-AAs remain unchanged.
 - `pybel`:
-  - Per mod-AA residue: generate a capped fragment (N-term H, C-term OH); use PyBel at given pH to generate hydrogens; merge sidechain hydrogens back while protecting backbone heavy atoms and their peptide-bond connectivity.
+  - Per mod-AA residue: use PyBel at given pH to generate hydrogens; merge hydrogens back while preserving backbone heavy atoms and peptide-bond connectivity.
 
 ## Implementation Plan
 
@@ -50,9 +50,8 @@ Status: Planning
   - Run `pybel_protonate_pdb_ligand()` at target pH; provide `ref_name_path` to `_fix_pybel_output` to preserve heavy-atom names.
   - Read back the protonated residue.
   - Merge:
-    - Identify and protect backbone atoms.
-    - Remove original sidechain hydrogens.
-    - From PyBel result, collect hydrogens attached to sidechain heavy atoms (name-based mapping), add to original residue.
+    - Preserve all original heavy atoms.
+    - Replace mod-AA hydrogens with those from the PyBel result.
   - Reindex atoms and maintain parent links; handle errors by logging and skipping the residue.
 
 5) Integrate and log
@@ -63,15 +62,13 @@ Status: Planning
 
 6) Tests (pytest; targeted only)
 - KEEP mode: canonical residues change; mod-AA unchanged (atom set, H count, coordinates).
-- PyBel mode: simple mod-AA missing sidechain H gains hydrogens; backbone unchanged.
-- Antechamber mode: conditional test (skip if AmberTools not available); residue becomes hydrogen-complete and peptide connectivity intact.
+- PyBel mode: simple mod-AA missing hydrogens gains hydrogens; backbone unchanged.
 - PDB2PQR behavior: confirm mod-AA not updated by peptide-only update; residue-key cloning remains valid.
 
 7) Docs and examples
 - Update `protonate_stru` docstring and prep docs:
-  - Explain `mod_aa_strategy` options and trade-offs (pH-aware vs robustness).
-  - Note antechamber requirements (charge/spin) and non-pH-aware nature.
-  - Provide minimal usage examples for KEEP and AUTO modes.
+  - Explain `mod_aa_strategy` options and trade-offs.
+  - Provide minimal usage examples for KEEP and PyBel modes.
 
 ## Risks and Mitigations
 - Name alignment failures for complex mod-AAs in PyBel output: mitigate by `_fix_pybel_output` and name-based mapping; otherwise log and skip.
