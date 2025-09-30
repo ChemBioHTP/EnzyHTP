@@ -516,7 +516,7 @@ class AlphafoldInterface(BaseInterface):
         # Expand user paths
         container_path = os.path.expanduser(config.CONTAINER_PATH)
         
-        cmd = [config.CONTAINER_TYPE, "run"]
+        cmd = [config.CONTAINER_TYPE, "run", "--cleanenv"]
         
         # Add GPU support if available and core type is GPU
         if core_type == "gpu" and config.CONTAINER_TYPE in ["docker", "apptainer", "singularity"]:
