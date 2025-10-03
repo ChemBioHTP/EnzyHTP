@@ -185,7 +185,7 @@ class Atom(DoubleLinkedNode):
         """getter for _charge"""
         if not self.has_init_charge():
             _LOGGER.debug(f"There are no charge info for {self}. "
-                            "Please initiate it use structure.structure_operation.init_charge()")
+                            "Please initiate it use structure.structure_enchantment.init_charge()")
         return self._charge
 
     @charge.setter
@@ -197,7 +197,7 @@ class Atom(DoubleLinkedNode):
         """getter for _connect, the list for (atoms, bond_type) it connects"""
         if not self.is_connected():
             _LOGGER.error(f"There are no connection info for {self}. "
-                            "Please initiate it use structure.structure_operation.init_connectivity()")
+                            "Please initiate it use structure.structure_enchantment.init_connectivity()")
             raise AttributeError
         return self._connect
 
@@ -365,7 +365,7 @@ class Atom(DoubleLinkedNode):
         """get all atoms of connection without the bond info"""
         if not self.is_connected():
             _LOGGER.error(f"There are no connection info for {self}. "
-                            "Please initiate it use structure.structure_operation.init_connectivity()")
+                            "Please initiate it use structure.structure_enchantment.init_connectivity()")
             raise AttributeError
         return [atom for atom, bond in self._connect]
     
@@ -378,7 +378,7 @@ class Atom(DoubleLinkedNode):
         """return a string representation of the connectivity of the atom"""
         if not self.is_connected():
             _LOGGER.error(f"There are no connection info for {self}. "
-                            "Please initiate it use structure.structure_operation.init_connectivity()")
+                            "Please initiate it use structure.structure_enchantment.init_connectivity()")
             raise AttributeError
         return ", ".join([f"{a[0].key}({a[1]})" for a in self.connect])
 
