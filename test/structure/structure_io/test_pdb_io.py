@@ -711,4 +711,8 @@ def test_get_structure_alt_loc():
     alt_loc_pdb = f"{DATA_DIR}/3FCR.pdb"
     stru: Structure = sp.get_structure(alt_loc_pdb, alt_loc_keep="first")
     assert stru.get("A.288").name == "LLP"
+    assert "PLP" not in stru.get("B").sequence
 
+    stru: Structure = sp.get_structure(alt_loc_pdb, alt_loc_keep="B")
+    assert stru.get("A.288").name == "LYS"
+    assert "PLP" in stru.get("B").sequence

@@ -571,11 +571,15 @@ class PDBParser(StructureParserInterface):
         df lines in place. 
         TODO support residue specific keep strageties
         """
-        alt_loc_atoms_df = df[df["alt_loc"].str.strip() != ""]
+        alt_loc_atoms_df = df[df["alt_loc"].str.strip() != ""]        
         # san check
         if len(alt_loc_atoms_df) == 0:
             _LOGGER.debug("No alt_loc to resolve.")
             return
+        # determine wanted alt loc
+        if keep == "first":
+            all_alt_locs = list(set(map(lambda s: s.strip(), alt_loc_atoms_df["alt_loc"])))
+            keep = sorted(all_alt_locs)[0]
         # solve
         # get a list of "loc" for deleting in the original df
         delete_loc_list = []
@@ -584,23 +588,15 @@ class PDBParser(StructureParserInterface):
         for r_id_c_id, res_df in alt_loc_residues:
             # group by alt_loc values
             alt_res_dfs = res_df.groupby("alt_loc", sort=False)
-            if len(alt_res_dfs) == 1:
-                _LOGGER.debug(f"Only 1 alt_loc id found in residue {r_id_c_id[1], r_id_c_id[0]}. No need to resolve")
-                continue
+            # if len(alt_res_dfs) == 1:
+            #     _LOGGER.debug(f"Only 1 alt_loc id found in residue {r_id_c_id[1], r_id_c_id[0]}. No need to resolve")
+            #     continue
             _LOGGER.debug(f"Dealing with alt_loc residue: {r_id_c_id[1], r_id_c_id[0]}")
-            if keep == "first":
-                # choose lexicographically smallest alt_loc id (case-sensitive, spaces stripped)
-                alt_ids = sorted([k.strip() for k in alt_res_dfs.groups.keys()])
-                chosen = alt_ids[0]
-                for alt_id, lines in alt_res_dfs.groups.items():
-                    if alt_id.strip() != chosen:
-                        delete_loc_list.extend(list(lines))
-            else:
-                delele_res_dfs_mapper = alt_res_dfs.groups
-                assert keep in delele_res_dfs_mapper
-                del delele_res_dfs_mapper[keep]
-                for delete_lines in list(delele_res_dfs_mapper.values()):
-                    delete_loc_list.extend(list(delete_lines))
+            delele_res_dfs_mapper = alt_res_dfs.groups
+            if keep in delele_res_dfs_mapper:
+                del delele_res_dfs_mapper[keep] # so that we keep this "keep" alt loc
+            for delete_lines in list(delele_res_dfs_mapper.values()):
+                delete_loc_list.extend(list(delete_lines))
 
         # delete in original df
         _LOGGER.debug(f"deleting df row: {delete_loc_list}")
