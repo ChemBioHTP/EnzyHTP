@@ -326,6 +326,9 @@ def protonate_modified_residues_with_pybel(stru: Structure, ph: float = 7.0, int
     Returns:
         stru (a reference to the changed structure)
     """
+    CAP_H_DISTANCE_CUTOFF = 1.35
+    """Å, threshold to identify hydrogens attached to temporary caps"""
+    
     sp = PDBParser()
 
     if int_modaa_file_dir is None:
@@ -338,7 +341,7 @@ def protonate_modified_residues_with_pybel(stru: Structure, ph: float = 7.0, int
         int_pybel_file_path = fs.get_valid_temp_name(f"{int_resi_file_path.removesuffix('.pdb')}_pybel.pdb")
 
         # cap the maa
-        maa_region = create_region_from_residues(residues=[maa], nterm_cap="H", cterm_cap="OH")  
+        maa_region = create_region_from_residues(residues=[maa], nterm_cap="H", cterm_cap="OH")
         maa_capped = maa_region.convert_to_structure(cap_as_residue=False)
 
         if maa.has_hydrogens():
@@ -360,15 +363,27 @@ def protonate_modified_residues_with_pybel(stru: Structure, ph: float = 7.0, int
 
         ref_maa_capped = ref_stru.residues[0]
 
-        # Merge: keep all original heavy atoms; replace all hydrogens with PyBel hydrogens (use update residues?)
+        # Merge: keep all original heavy atoms; replace all hydrogens with PyBel hydrogens
         kept_atoms = [a for a in maa.atoms if a.element != 'H']
-        added_hs = [a for a in ref_maa_capped.atoms if (a.element == 'H')] # TODO: we also dont want Hs on the cap
+        added_hs = []
+        removed_hs = 0
+        atom_n = ref_maa_capped.find_atom_name("N") # NOTE this couples with the cap type. Will to very over engineering if trying to decouple.
+        for atom in ref_maa_capped.atoms:
+            if atom.element != 'H':
+                continue
+            if atom.distance_to(atom_n) <= CAP_H_DISTANCE_CUTOFF:
+                removed_hs += 1
+                continue
+            added_hs.append(atom)
+        if removed_hs > 3:
+            _LOGGER.error(f"Removed {removed_hs} hydrogen(s) attached to N. This is a hint that the structure may be corrupted.")
+            raise RuntimeError(f"Removed {removed_hs} hydrogen(s) attached to N in modified residue {maa.key(if_name=True)}. This is a hint that the structure may be corrupted.")
 
         new_atoms = [a.clone() for a in kept_atoms]
         new_atoms.extend(a.clone() for a in added_hs)
         maa.atoms = new_atoms  # parent will be set by setter
 
-        # Cleanup per-residue temp files
+       # Cleanup per-residue temp files
         fs.clean_temp_file_n_dir([int_resi_file_path, int_pybel_file_path])
 
     # Cleanup folder
