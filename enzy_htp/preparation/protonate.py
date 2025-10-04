@@ -387,7 +387,7 @@ def protonate_modified_residues_with_pybel(stru: Structure, ph: float = 7.0, int
         if (not maa.is_n_terminal()):
             maa.add_peptide_h()
 
-       # Cleanup per-residue temp files
+        # Cleanup per-residue temp files
         fs.clean_temp_file_n_dir([int_resi_file_path, int_pybel_file_path])
 
     # Cleanup folder
