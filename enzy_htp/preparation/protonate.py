@@ -26,6 +26,7 @@ from enzy_htp.structure import (Structure, Ligand, Chain, PDBParser)
 from enzy_htp.structure.metal_atom import MetalUnit
 import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp.structure.structure_enchantment import init_connectivity
+from enzy_htp.structure.structure_region import create_region_from_residues
 
 from pdb2pqr.main import main_driver as run_pdb2pqr
 from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
@@ -36,8 +37,10 @@ from .pdb_line import read_pdb_lines
 def protonate_stru(stru: Structure,
                    ph: float = 7.0,
                    protonate_ligand: bool = False,
+                   protonate_maa: bool = False,
                    engine: str = "pdb2pqr",
                    ligand_engine: str = "pybel",
+                   mod_aa_engine: str = "pybel",
                    **kwargs) -> Structure:
     """
     This science API solves the protein protonation problem.
@@ -47,10 +50,14 @@ def protonate_stru(stru: Structure,
         stru: the input structure
         ph: the pH value for determining the protonation state
         protonate_ligand: if also protonate ligand
+        protonate_maa: whether to protonate modified amino acids (mod-AAs)
         engine: engine for determining the pKa and adding hydrogens to the protein peptide part
             (current available keywords):
             pdb2pqr
         ligand_engine: engine for adding hydrogens to ligands
+            (current available keywords):
+            pybel
+        mod_aa_engine: engine for protonating mod-AAs when `protonate_maa` is True
             (current available keywords):
             pybel
         **kwarg: setting/option related to specific engine. TODO figure out a better way to doc this
@@ -104,7 +111,18 @@ def protonate_stru(stru: Structure,
         - MCCE2 (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2735604/) TODO
         - Protonate3D (http://www.ccl.net/cca/documents/proton/proton.htm) TODO
     """
-    PEPTIDE_PROTONATION_METHODS[engine](stru, ph, **kwargs)
+    if protonate_maa:
+        _LOGGER.debug(f"Modified amino acid protonation enabled with engine '{mod_aa_engine}'.")
+    else:
+        _LOGGER.debug("Modified amino acid protonation disabled; preserving existing mod-AA hydrogens.")
+
+    PEPTIDE_PROTONATION_METHODS[engine](
+        stru,
+        ph,
+        protonate_maa=protonate_maa,
+        mod_aa_engine=mod_aa_engine,
+        **kwargs,
+    )
     if protonate_ligand:
         LIGAND_PROTONATION_METHODS[ligand_engine](stru, ph, **kwargs)
 
@@ -114,6 +132,8 @@ def protonate_peptide_with_pdb2pqr(stru: Structure,
                                    int_pdb_path: Union[str, None] = None,
                                    int_pqr_path: Union[str, None] = None,
                                    metal_fix_method: str = "deprotonate_all",
+                                   protonate_maa: bool = False,
+                                   mod_aa_engine: str = "pybel",
                                    **kwargs):
     """
     Add missing hydrogens and determine protonation state of the peptide part of protein
@@ -123,8 +143,10 @@ def protonate_peptide_with_pdb2pqr(stru: Structure,
     Args:
         stru: the target Structure()
         ph: the target pH
-        int_pqr_path: path for intermediate pqr file (not this will be changed to pdb extension)
+        int_pqr_path: path for intermediate pqr file (note this will be changed to pdb extension)
         int_pdb_path: path for intermediate pdb file
+        protonate_maa: whether to protonate modified amino acids after peptide protonation
+        mod_aa_engine: engine identifier used when protonating modified amino acids
     Returns:
         stru: a reference of the changed original structure
     """
@@ -154,9 +176,20 @@ def protonate_peptide_with_pdb2pqr(stru: Structure,
     peptide_protonated_stru = sp.get_structure(int_pqr_path) 
 
     stru_oper.remove_non_peptide(peptide_protonated_stru)  # keep the peptide only (sometime it has solvent)
-    peptide_protonated_stru.clone_residue_keys(stru, amino_acid_only=True)
+
+    peptide_protonated_stru.clone_chain_names(stru, amino_acid_only=True)
 
     stru_oper.update_residues(stru, peptide_protonated_stru)
+    
+    # Protonate modified amino acids if requested
+    if protonate_maa:
+        if stru.modified_residue:
+            _LOGGER.debug("Protonating modified amino acids with PyBel while preserving backbone heavy atoms.")
+            MODAA_PROTONATION_METHODS[mod_aa_engine](stru, ph=ph, **kwargs)
+        else:
+            _LOGGER.debug("Requested mod-AA protonation but structure contains no modified residues; skipping.")
+
+    # Fix metal donor states after peptide/mod-AA protonation
     protonate_peptide_fix_metal_donor(stru, method=metal_fix_method)
 
     # clean up temp files
@@ -279,6 +312,69 @@ def protonate_ligand_with_pybel(stru: Structure, ph: float = 7.0, int_ligand_fil
 
     return stru
 
+def protonate_modified_residues_with_pybel(stru: Structure, ph: float = 7.0, int_modaa_file_dir=None, **kwargs) -> Structure:
+    """
+    Protonate all modified amino acids (mod-AAs) in {stru} using PyBel at a given pH.
+    Preserves backbone heavy atoms (N, CA, C, O, OXT) by merging only hydrogens from the
+    PyBel result back into the original residue.
+
+    Args:
+        stru: The target Structure to modify in-place.
+        ph: Target pH for PyBel hydrogenation.
+        int_modaa_file_dir: Directory for intermediate files per mod-AA.
+
+    Returns:
+        stru (a reference to the changed structure)
+    """
+    sp = PDBParser()
+
+    if int_modaa_file_dir is None:
+        int_modaa_file_dir = eh_config["system.SCRATCH_DIR"]
+    fs.safe_mkdir(int_modaa_file_dir)
+
+    for maa in stru.modified_residue:
+        # Prepare paths
+        int_resi_file_path = fs.get_valid_temp_name(f"{int_modaa_file_dir}/modaa_{maa.chain.name}_{maa.idx}_{maa.name}.pdb")
+        int_pybel_file_path = fs.get_valid_temp_name(f"{int_resi_file_path.removesuffix('.pdb')}_pybel.pdb")
+
+        # cap the maa
+        maa_region = create_region_from_residues(residues=[maa], nterm_cap="H", cterm_cap="OH")  
+        maa_capped = maa_region.convert_to_structure(cap_as_residue=False)
+
+        if maa.has_hydrogens():
+            _LOGGER.info(f"Hydrogens detected in modified residue {maa.key(if_name=True)}. Removing for PyBel input...")
+        stru_oper.remove_hydrogens(maa_capped)
+
+        # Write the residue PDB (reference for name fixing)
+        with open(int_resi_file_path, "w") as of:
+            of.write(sp.get_file_str(maa_capped, if_renumber=False))
+
+        # Run PyBel to add hydrogens and fix names using the reference file
+        pybel_protonate_pdb_ligand(int_resi_file_path, int_pybel_file_path, ph=ph)
+
+        # Read back the protonated residue (type may be Ligand/Residue; we only need atoms)
+        ref_stru = sp.get_structure(int_pybel_file_path)
+        if not len(ref_stru.residues):
+            _LOGGER.error(f"PyBel returned no residues for {maa.key(if_name=True)}.")
+            raise RuntimeError(f"PyBel returned no residues for {maa.key(if_name=True)}.")
+
+        ref_maa_capped = ref_stru.residues[0]
+
+        # Merge: keep all original heavy atoms; replace all hydrogens with PyBel hydrogens (use update residues?)
+        kept_atoms = [a for a in maa.atoms if a.element != 'H']
+        added_hs = [a for a in ref_maa_capped.atoms if (a.element == 'H')] # TODO: we also dont want Hs on the cap
+
+        new_atoms = [a.clone() for a in kept_atoms]
+        new_atoms.extend(a.clone() for a in added_hs)
+        maa.atoms = new_atoms  # parent will be set by setter
+
+        # Cleanup per-residue temp files
+        fs.clean_temp_file_n_dir([int_resi_file_path, int_pybel_file_path])
+
+    # Cleanup folder
+    fs.clean_temp_file_n_dir([int_modaa_file_dir])
+
+    return stru
 
 # PYBEL interface
 def pybel_protonate_pdb_ligand(in_path: str, out_path: str, ph: float = 7.0) -> str:
@@ -370,25 +466,6 @@ def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -
     target_ligand.df["ATOM"] = target_ligand_df
     target_ligand.to_pdb(out_path, records=["ATOM", "OTHERS"])
 
-
 LIGAND_PROTONATION_METHODS = {"pybel": protonate_ligand_with_pybel}
 
-
-# below TODO
-def _ob_pdb_charge(pdb_path: str) -> int:
-    # TODO(CJ): add tests for this function
-    """
-    extract net charge from openbabel exported pdb file
-    """
-    pdb_ls = read_pdb_lines(pdb_path)
-    net_charge = 0
-    for pdb_l in pdb_ls:
-        if pdb_l.is_HETATM() or pdb_l.is_ATOM():
-            raw: str = pdb_l.get_charge()
-            raw = raw.strip()
-            if not len(raw):
-                continue
-            charge = pdb_l.charge[::-1]
-            core._LOGGER.info(f"Found formal charge: {pdb_l.atom_name} {charge}")  # TODO make this more intuitive/make sense
-            net_charge += int(charge)
-    return net_charge
+MODAA_PROTONATION_METHODS = {"pybel": protonate_modified_residues_with_pybel}

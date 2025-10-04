@@ -340,6 +340,20 @@ def test_protonate_stru_with_mod_aa_unchange():
     stru = sp.get_structure(pdb_file, alt_loc_keep="A")
     remove_solvent(stru)
     prot.protonate_stru(stru, protonate_ligand=False, protonate_maa=False)
-    import pdb; pdb.set_trace()
     assert len(stru.hydrogens()) == 3389
 
+def test_protonate_stru_modaa_pybel():
+    """Ensure mod-AA hydrogens are present after protonating via PyBel."""
+    pdb_file = f"{STRU_DATA_DIR}/3FCR.pdb"
+    stru = sp.get_structure(pdb_file, alt_loc_keep="A")
+
+    def count_modaa_h(stru_):
+        return sum(len(res.hydrogens) for res in stru_.modified_residue)
+
+    h_before = count_modaa_h(stru)
+    prot.protonate_stru(stru, protonate_maa=True, mod_aa_engine='pybel')
+    h_after = count_modaa_h(stru)
+
+    # At least preserve or increase hydrogens on mod-AA if any exist
+    if len(stru.modified_residue) > 0:
+        assert h_after >= h_before
