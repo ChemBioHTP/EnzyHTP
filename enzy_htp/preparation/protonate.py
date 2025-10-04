@@ -371,7 +371,7 @@ def protonate_modified_residues_with_pybel(stru: Structure, ph: float = 7.0, int
         for atom in ref_maa_capped.atoms:
             if atom.element != 'H':
                 continue
-            if atom.distance_to(atom_n) <= CAP_H_DISTANCE_CUTOFF:
+            if atom.distance_to(atom_n) <= CAP_H_DISTANCE_CUTOFF and not maa.is_n_terminal(): # keep the Hs on N-ter
                 removed_hs += 1
                 continue
             added_hs.append(atom)
@@ -382,6 +382,10 @@ def protonate_modified_residues_with_pybel(stru: Structure, ph: float = 7.0, int
         new_atoms = [a.clone() for a in kept_atoms]
         new_atoms.extend(a.clone() for a in added_hs)
         maa.atoms = new_atoms  # parent will be set by setter
+
+        # After merging, the backbone N is bare. Add the correct H.
+        if (not maa.is_n_terminal()):
+            maa.add_peptide_h()
 
        # Cleanup per-residue temp files
         fs.clean_temp_file_n_dir([int_resi_file_path, int_pybel_file_path])
