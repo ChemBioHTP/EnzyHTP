@@ -12,6 +12,7 @@ from enzy_htp import config
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import EnablePropagate
 import logging
+from enzy_htp.preparation.clean import remove_solvent
 import enzy_htp.structure as struct
 import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp.preparation import protonate as prot
@@ -333,8 +334,12 @@ def test_protonate_stru_imputed():
 
     assert stru
 
-def test_protonate_stru_with_mod_aa():
+def test_protonate_stru_with_mod_aa_unchange():
     """Testing the protonate_stru() method for a structure that has modified amino acids."""
-    pdb_file = f"{DATA_DIR}/3FCR.pdb"
+    pdb_file = f"{STRU_DATA_DIR}/3FCR.pdb"
     stru = sp.get_structure(pdb_file, alt_loc_keep="A")
-    prot.protonate_stru(stru)
+    remove_solvent(stru)
+    prot.protonate_stru(stru, protonate_ligand=False, protonate_maa=False)
+    import pdb; pdb.set_trace()
+    assert len(stru.hydrogens()) == 3389
+
