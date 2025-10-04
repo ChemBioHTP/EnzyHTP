@@ -346,7 +346,15 @@ class StructureRegion:
         Returns:
             The corresponding Structure of the structure region"""
 
-        residue_mapper = self.involved_residue_atom_mapper(
+        residue_mapper = self.involved_residue_atom_mapper( 
+            #BUG: this should not use involved_residue_atom_mapper, because involved residue means 
+            # if one atom in the residue is in the region, the whole residue is involved. 
+            # Here we only want atoms in the region.
+            # TODO(qz): 
+            # 1. check if there is incomplete residues in the region give warning because 
+            # they will be incomplete in the returning structure
+            # 2. rename involved_residue_atom_mapper to atoms_by_residue, and make it
+            # only return atoms in the region in a mapper with the residue as key.
             cap_as_residue=cap_as_residue, is_deepcopy=is_deepcopy
         ) # {residue (not copy): [atom_cpy, ...], ...}
         old_to_new_res_mapper = {res: None for res in residue_mapper.keys()}
