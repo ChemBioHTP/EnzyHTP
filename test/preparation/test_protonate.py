@@ -348,9 +348,9 @@ def test_protonate_stru_with_mod_aa_pybel():
     stru = sp.get_structure(pdb_file, alt_loc_keep="A")
     remove_solvent(stru)
 
-    h_before = len(stru.get("A.288").hydrogens)
+    target_res = stru.get("A.288")
+    assert set(target_res.atom_name_list) == {'N1', 'C2', "C2'", 'C3', 'O3', 'C4', "C4'", 'C5', 'C6', "C5'", 'OP4', 'P', 'OP1', 'OP2', 'OP3', 'N', 'CA', 'CB', 'CG', 'CD', 'CE', 'NZ', 'C', 'O'}
     prot.protonate_stru(stru, protonate_maa=True, mod_aa_engine='pybel')
-    h_after = len(stru.get("A.288").hydrogens)
-
-    # At least preserve or increase hydrogens on mod-AA if any exist
-    assert h_after >= h_before
+    assert set(target_res.atom_name_list) == {'N1', 'C2', "C2'", 'C3', 'O3', 'C4', "C4'", 'C5', 'C6', "C5'", 'OP4', 'P', 'OP1', 'OP2', 'OP3', 'N', 'CA', 'CB', 'CG', 'CD', 'CE', 'NZ', 'C', 'O', 
+    'H9', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'H7', 'H8', 'H12', 'H13', 'H14', 'H15', 'H16', 'H17', 'H18', 'H19', 'H20', 'H21', 'H22', 'H'}    
+    sp.save_structure("test.pdb", stru)
