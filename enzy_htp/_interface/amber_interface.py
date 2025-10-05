@@ -278,7 +278,8 @@ class AmberParameterizer(MolDynParameterizer):
 
         # 4. run tleap
         self.parent_interface.run_tleap(tleap_content, keep_in_file=self.keep_tleap_in)
-
+        if os.path.getsize(temp_prmtop) == 0:
+            raise tLEaPError(["tleap failed to generate prmtop file. Please check the tleap input and the log above for details."])
         # 5. run add_pdb
         PDBParser().save_structure(temp_ref_pdb, stru, if_renumber=False, if_fix_atomname=False)
         self.parent_interface.run_add_pdb(temp_prmtop, result_prmtop, temp_ref_pdb)
@@ -402,12 +403,28 @@ class AmberParameterizer(MolDynParameterizer):
             # 5. Run antechamber on prepin to get mol2
             mol_desc_path = fs.get_valid_temp_name(
                 f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.mol2")
-            self.parent_interface.run_antechamber(in_file=prepin_path,
+            self.parent_interface.run_antechamber(in_file=prepin_path, 
+            # BUG This is not a good way to convert a prepin to mol2. This changes the atom type. 
+            # The reason we want mol2 is MCPB.py only take mol2 files. (make a file format conversion method in AmberInterface?)
                                                 out_file=mol_desc_path,
                                                 net_charge=maa.net_charge,
                                                 spin=maa.multiplicity,
                                                 charge_method=self.charge_method,
                                                 res_name=maa.name)
+        # mol2 requires bond command in tleap.in
+        import pdb;pdb.set_trace()
+        if self.parent_interface.get_file_format(mol_desc_path) == "mol2":
+            n_side_res = maa.n_side_residue()
+            c_side_res = maa.c_side_residue()
+            idx_mapper = self.parent_interface.get_amber_index_mapper(maa.root())["residue"]
+            maa_amber_chain, maa_amber_idx = idx_mapper[maa.key()]
+            n_side_amber_chain, n_side_amber_idx = idx_mapper[n_side_res.key()]
+            c_side_amber_chain, c_side_amber_idx = idx_mapper[c_side_res.key()]
+            bond_lines = [
+                f"bond a.{maa_amber_idx}.C a.{c_side_amber_idx}.N",
+                f"bond a.{maa_amber_idx}.N a.{n_side_amber_idx}.C",
+            ]
+            self.additional_tleap_lines.extend(bond_lines) # NOTE use additional_tleap_lines for now. It is also in the right location in tleap.in.
 
         # 6. Run parmchk2 twice on prepin to get frcmod files
         frcmod_path = fs.get_valid_temp_name(
@@ -573,7 +590,7 @@ class AmberParameterizer(MolDynParameterizer):
             lines.append(f"source {ff}")
 
         # support for custom lines
-        if additional_tleap_lines is not None:
+        if additional_tleap_lines:
             if (isinstance(additional_tleap_lines, Iterable)
                 and not isinstance(additional_tleap_lines, str)
                 and isinstance(additional_tleap_lines[0], str)
@@ -2444,7 +2461,7 @@ class AmberInterface(BaseInterface):
                 time.sleep(0.1)
             cache_stru_amber_idx_map_mapper = pickle.load(f)
         with LogLevel(_LOGGER, logging.ERROR):
-            result = cache_stru_amber_idx_map_mapper.get(stru, None)
+            result = cache_stru_amber_idx_map_mapper.get(stru.cache_key(), None)
         if result:
             return result
 
@@ -2487,11 +2504,13 @@ class AmberInterface(BaseInterface):
 
         # save cache
         with LogLevel(_LOGGER, logging.ERROR):
-            cache_stru_amber_idx_map_mapper[stru] = result
+            cache_stru_amber_idx_map_mapper[stru.cache_key()] = result
         with open(cache_file_path, "wb") as of:
-            fs.lock(of)
-            pickle.dump(cache_stru_amber_idx_map_mapper, of)
-            fs.unlock(of)
+            try:
+                fs.lock(of)
+                pickle.dump(cache_stru_amber_idx_map_mapper, of)
+            finally:
+                fs.unlock(of)
 
         return result
 
@@ -3274,6 +3293,8 @@ class AmberInterface(BaseInterface):
             parameterizer_temp_dir = self.config()["DEFAULT_PARAMETERIZER_TEMP_DIR"]
         if keep_tleap_in == "default":
             keep_tleap_in = self.config()["DEFAULT_KEEP_TLEAP_IN"]
+        if additional_tleap_lines is None:
+            additional_tleap_lines = []
 
         return AmberParameterizer(
             self,
