@@ -1180,6 +1180,10 @@ class Structure(DoubleLinkedNode):
         """make Structure hashable"""
         return hash((self._topology_signature(), self._geometry_digest()))
 
+    def cache_key(self) -> Tuple[tuple, bytes]:
+        """Return a stable, pickle-friendly cache key representing this structure."""
+        return (self._topology_signature(), self._geometry_digest())
+
     def _topology_signature(self) -> tuple:
         """
         (chain name, residue idx, residue name, sorted atom name tuple) immutable sequence consisting of

@@ -146,9 +146,11 @@ def search_ncaa_parm_file(target_res: NonCanonicalBase, target_method: str,
     if cache_ncaa_lib_mapper != ncaa_lib_mapper:
         cache_ncaa_lib_mapper.update(ncaa_lib_mapper)
         with open(cache_file_path, "wb") as of:
-            fs.lock(of)
-            pickle.dump(cache_ncaa_lib_mapper, of)
-            fs.unlock(of)
+            try:
+                fs.lock(of)
+                pickle.dump(cache_ncaa_lib_mapper, of)
+            finally:
+                fs.unlock(of)
 
     # II. assign to (target_res, target_method)
     for file_path, (res_name, parm_method) in ncaa_lib_mapper.items():
