@@ -7,6 +7,7 @@ from pathlib import Path
 
 import enzy_htp.core.file_system as fs
 from enzy_htp.structure.structure_io import PrepinParser
+from enzy_htp.structure.mol_desc_data import MolDescData
 
 BASE_DIR = Path(__file__).absolute().parent
 DATA_DIR = f"{BASE_DIR}/../data"
@@ -120,3 +121,34 @@ def test_connect_atoms_noncyclic():
 
     for atom, answer_atom in zip(atoms, answer):
         assert (atom.name, [catom.name for catom in atom.connect_atoms]) == answer_atom
+
+def test_get_mol_desc_data_cyclic():
+    """test using a cyclic molecule"""
+    test_prepin = f"{DATA_DIR}/ligand_H5J.prepin"
+    mol_desc = PrepinParser.get_mol_desc_data(test_prepin)
+    assert isinstance(mol_desc, MolDescData)
+    assert mol_desc.name == "H5J"
+    assert len(mol_desc.atoms) == 16
+    assert len(mol_desc.bonds) == 17
+
+def test_get_mol_desc_data_noncyclic():
+    """test using a non-cyclic molecule and check details"""
+    test_prepin = f"{DATA_DIR}/PUT_any.prepin"
+    mol_desc = PrepinParser.get_mol_desc_data(test_prepin)
+    assert isinstance(mol_desc, MolDescData)
+    assert mol_desc.name == "PUT"
+    assert len(mol_desc.atoms) == 19
+    assert len(mol_desc.bonds) == 18
+    
+    # Check a specific atom
+    atom_N5 = next((atom for atom in mol_desc.atoms if atom['atom_name'] == 'N5'), None)
+    assert atom_N5 is not None
+    assert atom_N5['atom_type'] == 'n3'
+    assert round(atom_N5['charge'], 6) == -0.923800
+    assert len(atom_N5['coords']) == 3
+
+    # Check a specific bond
+    atom_C2 = next((atom for atom in mol_desc.atoms if atom['atom_name'] == 'C2'), None)
+    bond_N5_C2 = next((bond for bond in mol_desc.bonds if set([bond['atom1_id'], bond['atom2_id']]) == set([atom_N5['id'], atom_C2['id']])), None)
+    assert bond_N5_C2 is not None
+    assert bond_N5_C2['bond_type'] == 'standard'

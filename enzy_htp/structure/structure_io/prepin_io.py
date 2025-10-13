@@ -5,12 +5,14 @@ this parser only. The PrepinParser has no private data and serves as a namespace
 Author: Qianzhen Shao <shaoqz@icloud.com>
 Date: 2023-10-17
 """
+from __future__ import annotations
 from typing import Dict, List
 
 from ._interface import StructureParserInterface
 from ..structure import Structure, convert_res_to_structure
 from ..atom import Atom
 from ..residue import Residue
+from ..mol_desc_data import MolDescData
 
 import enzy_htp.core.file_system as fs
 from enzy_htp.core.math_helper import internal_to_cartesian
@@ -23,6 +25,75 @@ class PrepinParser(StructureParserInterface):
     def __init__(self) -> None:  # pylint: disable=super-init-not-called
         """pass"""
         pass
+
+    @classmethod
+    def get_mol_desc_data(cls, path: str) -> MolDescData:
+        """Converting a .prepin file (as its path) into the MolDescData()
+        Arg:
+            path:
+                the file path of the .prepin file
+        Return:
+            MolDescData()
+        """
+        prepin_data = cls._parse_prepin_file(path)
+
+        # support check
+        if prepin_data["IFIXC"] == "CHANGE":
+            _LOGGER.error("Does not support parse CHANGE prepin file to MolDescData() yet. "
+                          f"Please post an issue if really needed. ({path})")
+            raise FileFormatError
+
+        # convert to cartesian coordinate
+        cls._deduce_cartesian_coord(prepin_data)
+
+        atoms = []
+        for atom_data in prepin_data["atoms"]:
+            if atom_data["atom_name"] == "DUMM":
+                continue
+            atoms.append({
+                "id": atom_data["id"],
+                "atom_name": atom_data["atom_name"],
+                "atom_type": atom_data["atom_type"],
+                "charge": atom_data["CHRG"],
+                "coords": [atom_data["x_coord"], atom_data["y_coord"], atom_data["z_coord"]],
+            })
+
+        bonds = []
+        atom_id_mapper = {atom_data["id"]: atom_data for atom_data in prepin_data["atoms"]}
+        for atom_data in prepin_data["atoms"]:
+            if atom_data["atom_name"] == "DUMM":
+                continue
+            
+            na_id = atom_data.get("NA")
+            if na_id and na_id in atom_id_mapper:
+                na_atom_data = atom_id_mapper[na_id]
+                if na_atom_data["atom_name"] != "DUMM":
+                    bonds.append({
+                        "atom1_id": atom_data["id"],
+                        "atom2_id": na_id,
+                        "bond_type": "standard", # prepin does not specify bond type
+                    })
+
+        for name_1, name_2 in prepin_data.get("LOOP", []):
+            atom1_id = -1
+            atom2_id = -1
+            for atom_data in prepin_data["atoms"]:
+                if atom_data["atom_name"] == name_1:
+                    atom1_id = atom_data["id"]
+                if atom_data["atom_name"] == name_2:
+                    atom2_id = atom_data["id"]
+            if atom1_id != -1 and atom2_id != -1:
+                bonds.append({
+                    "atom1_id": atom1_id,
+                    "atom2_id": atom2_id,
+                    "bond_type": "standard",
+                })
+
+        return MolDescData(
+            name=prepin_data["NAMRES"],
+            atoms=atoms,
+            bonds=bonds,
+        )
 
     @classmethod
     def get_structure(cls, path: str) -> Structure:

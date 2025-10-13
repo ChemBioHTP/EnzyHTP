@@ -6,6 +6,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Author: QZ Shao <shaoqz@icloud.com>
 Date: 2023-10-05
 """
+from __future__ import annotations
 from typing import List, Dict, Any
 
 from enzy_htp.core import _LOGGER
@@ -15,6 +16,7 @@ from ._interface import StructureParserInterface
 from ..structure import Structure, convert_res_to_structure
 from ..atom import Atom
 from ..ligand import Ligand
+from ..mol_desc_data import MolDescData
 
 class Mol2Parser(StructureParserInterface):
     """Holds all functionality for .mol2 I/O with respect to the Ligand() class. This parser contains no private data
@@ -26,6 +28,63 @@ class Mol2Parser(StructureParserInterface):
     def __init__(self) -> None:
         """place holder"""
         pass
+
+    @classmethod
+    def write_from_mol_desc_data(cls, data: MolDescData, outfile: str):
+        """
+        Writes a .mol2 file from a MolDescData object.
+        Currently only support writing four sections and only for SMALL molecules:
+        - @<TRIPOS>MOLECULE
+        - @<TRIPOS>ATOM
+        - @<TRIPOS>BOND
+        - @<TRIPOS>SUBSTRUCTURE
+        (when needed, add more to MolDescData and this function)
+
+        Args:
+            data (MolDescData): The MolDescData object to write.
+            outfile (str): The path to the output .mol2 file.
+        
+        NOTE: will assign new atom ids starting from 1 in the output file. 
+        (based on the order of the original atom ids.)
+        """
+
+        content = [
+            "@<TRIPOS>MOLECULE",
+            data.name,
+            f"{len(data.atoms):>5} {len(data.bonds):>5}     1     0     0",
+            "SMALL",
+            data.charge_type,
+            "",
+            "",
+            "@<TRIPOS>ATOM"
+        ]
+
+        atom_map = {}
+        atoms = sorted(data.atoms, key=lambda x: x['id'])
+        for i, atom in enumerate(atoms):
+            atom_id = atom['id']
+            atom_map[atom_id] = i + 1
+            content.append(
+                f"{i + 1:>7} {atom['atom_name']:<8} "
+                f"{atom['coords'][0]:>10.4f} {atom['coords'][1]:>10.4f} {atom['coords'][2]:>10.4f} "
+                f"{atom['atom_type']:<10} 1 {data.name} {atom['charge']:>14.6f}"
+            )
+
+        content += [
+            "@<TRIPOS>BOND"
+        ]
+        for i, bond in enumerate(data.bonds):
+            atom1_id = atom_map[bond['atom1_id']]
+            atom2_id = atom_map[bond['atom2_id']]
+            content.append(f"{i + 1:>6}{atom1_id:>6}{atom2_id:>6} 1   ")
+        
+        content += [
+            "@<TRIPOS>SUBSTRUCTURE",
+            f"     1 {data.name}         1 TEMP              0 ****  ****    0 ROOT",
+            "",
+        ]
+
+        fs.write_lines(outfile, content)
 
     # == API ==
     @classmethod
