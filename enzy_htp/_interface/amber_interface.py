@@ -51,7 +51,7 @@ from enzy_htp.core.general import (
 from enzy_htp.chemical import QMLevelOfTheory
 from enzy_htp.chemical.force_field import AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
-from enzy_htp.structure.structure_io import pdb_io, prmtop_io
+from enzy_htp.structure.structure_io import pdb_io, prmtop_io, prepin_io, mol2_io
 from enzy_htp.structure.structure_constraint import (
     StructureConstraint,
     CartesianFreeze,
@@ -381,9 +381,25 @@ class AmberParameterizer(MolDynParameterizer):
             ac_path = f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.ac" # the search ensured no existing file named this
             self.parent_interface.antechamber_ncaa_to_moldesc(ncaa=maa_region,
                                                               out_path=ac_path,
-                                                              gaff_type=gaff_type)
+                                                              gaff_type=gaff_type,
+                                                              charge_method=self.charge_method)
             # 2. Correct atom types in .ac file (hybrid approach)
-            self._correct_atom_types_in_ac_file(ac_path)
+            # the backbone H will often have unconventional names like H38 at this point
+            # 2.1 find this H from connectivity
+            for atom in maa.find_atom_name("N").connect_atoms:
+                if atom.element == "H":
+                    h_name = atom.name
+                    break
+            else:
+                _LOGGER.error(f"Cannot find the backbone H atom connected to N in modified residue {maa.name}. Please check the structure, it is likely not protonated or misprotonated.")
+                raise RuntimeError(f"Cannot find backbone H atom in modified residue {maa.name}")
+            unconventional_bb_atom_mapper = {
+                h_name : "H",
+            }
+            # 2.2 fix the atom types
+            self._correct_atom_types_in_ac_file(
+                ac_path, unconventional_bb_atom_mapper=unconventional_bb_atom_mapper
+            )
 
             # 3. Create mc file
             mc_path = fs.get_valid_temp_name(
@@ -403,16 +419,15 @@ class AmberParameterizer(MolDynParameterizer):
             # 5. Run antechamber on prepin to get mol2
             mol_desc_path = fs.get_valid_temp_name(
                 f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.mol2")
-            self.parent_interface.run_antechamber(in_file=prepin_path, 
-            # BUG This is not a good way to convert a prepin to mol2. This changes the atom type. 
-            # The reason we want mol2 is MCPB.py only take mol2 files. (make a file format conversion method in AmberInterface?)
-                                                out_file=mol_desc_path,
-                                                net_charge=maa.net_charge,
-                                                spin=maa.multiplicity,
-                                                charge_method=self.charge_method,
-                                                res_name=maa.name)
-        # mol2 requires bond command in tleap.in
-        import pdb;pdb.set_trace()
+            charge_method = self.parent_interface.SUPPORTED_CHARGE_METHOD_MAPPER[self.charge_method]
+            self.parent_interface.convert_mol_desc_format(old_file=prepin_path, 
+                                                          new_file=mol_desc_path, 
+                                                          old_format='prepin', 
+                                                          new_format='mol2',
+                                                          additional_data={
+                                                            'charge_type': charge_method,
+                                                        })
+        # 5.1 mol2 requires bond command in tleap.in
         if self.parent_interface.get_file_format(mol_desc_path) == "mol2":
             n_side_res = maa.n_side_residue()
             c_side_res = maa.c_side_residue()
@@ -460,23 +475,31 @@ class AmberParameterizer(MolDynParameterizer):
         # Replace original with cleaned version
         os.rename(temp_path, frcmod_path)
 
-    def _correct_atom_types_in_ac_file(self, ac_file_path: str, force_field: str = None) -> None:
+    def _correct_atom_types_in_ac_file(
+        self, ac_file_path: str, 
+        force_field: str = None, unconventional_bb_atom_mapper: Dict = None) -> None:
         """Correct GAFF atom types to standard Amber protein atom types for backbone atoms.
         
         Args:
             ac_file_path: Path to the .ac file to modify
             force_field: Force field to use for atom type mapping. If None, will be determined from self.force_fields
+            unconventional_bb_atom_mapper: Optional mapping for any non-standard backbone atom names to standard ones
         """
         # Auto-detect force field from parameterizer settings if not provided
         if force_field is None:
             force_field = self.parent_interface.get_protein_force_field(self.force_fields)
+        if unconventional_bb_atom_mapper is None:
+            unconventional_bb_atom_mapper = {}
         
         # Use class variable for backbone atom type mappings
         if force_field not in AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER:
             _LOGGER.error(f"Force field {force_field} not supported for atom type correction. Supported: {list(AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER.keys())}. Feel free to submit an issue if you need it.")
             raise ValueError(f"Unsupported force field: {force_field}")
         
-        atom_map = AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER[force_field]
+        atom_map = copy.deepcopy(AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER[force_field])
+        for k, v in unconventional_bb_atom_mapper.items():
+            k_atom_type = atom_map[v]
+            atom_map[k] = k_atom_type
         
         # Read the .ac file
         with open(ac_file_path, 'r') as f:
@@ -1480,6 +1503,46 @@ class AmberInterface(BaseInterface):
             # Clean up output file
             fs.safe_rm(out_path)
 
+    def convert_mol_desc_format(
+            self, old_file: str, new_file: str, old_format: str, new_format: str,
+            additional_data: Dict = None
+        ) -> None:
+        """
+        Converts between different molecular description file formats.
+
+        This method acts as a dispatcher to handle file format conversions.
+
+        Args:
+            old_file (str): The path to the input file.
+            new_file (str): The path to the output file.
+            old_format (str): The format of the input file.
+            new_format (str): The format of the output file.
+            additional_data (Dict, optional): Any additional data required for conversion.
+
+        Raises:
+            NotImplementedError: If the requested conversion is not supported.
+        """
+        if additional_data is None:
+            additional_data = {}
+
+        # Parse the old file to the intermediate data structure
+        if old_format == 'prepin':
+            mol_desc_data = prepin_io.PrepinParser.get_mol_desc_data(old_file)
+        else:
+            raise NotImplementedError(
+                f"Conversion from '{old_format}' is not supported."
+            )
+        
+        # Write the new file from the intermediate data structure
+        mol_desc_data.update(additional_data) # update with additional data if any
+
+        if new_format == 'mol2':
+            mol2_io.Mol2Parser.write_from_mol_desc_data(mol_desc_data, new_file)
+        else:
+            raise NotImplementedError(
+                f"Conversion to '{new_format}' is not supported."
+            )
+
     def convert_traj_to_nc(self, traj_path: str, out_path: str, topology_path: str = str()) -> None:
         """Convert the given trajectory file to the Amber `.nc` format file in the out_path.
         
@@ -1873,6 +1936,52 @@ class AmberInterface(BaseInterface):
             raise RuntimeError(f"prepgen failed to create output file {out_file}. Output: {output_text}")
         if os.path.getsize(out_file) == 0:
             raise RuntimeError(f"prepgen created empty output file {out_file}. Output: {output_text}")
+
+    def make_mc_file(self, maa_region: StructureRegion, out_path: str):
+        """make the mc file for parameterization"""
+
+        if len(maa_region.involved_residues) > 1:
+            _LOGGER.error("Please provide a maa_region with exactly 1 involved residue")
+
+        maa: ModifiedResidue = maa_region.involved_residues[0]
+        
+        if not maa.is_connected():
+            _LOGGER.warning(f"maa is not connected; use init_connectivity() first.") 
+
+        # main chain
+        mc_atoms = maa.mainchain_atoms
+        lines = [f"HEAD_NAME {mc_atoms[0].name}", f"TAIL_NAME {mc_atoms[-1].name}"]
+
+        # get rid of first and last element
+        mc_atoms.pop(0)
+        mc_atoms.pop()
+        
+        for aa in mc_atoms:
+            lines.append(f"MAIN_CHAIN {aa.name}")
+
+        # omit cap atom names
+        for cap in maa_region.caps:
+            for aa in cap.atoms:
+                lines.append(f"OMIT_NAME {aa.name}")
+
+        # find pre_head and post_tail atom types
+        for cap in maa_region.caps:
+            if cap.link_atom.name == "N":
+                if cap.socket_atom.name != "C":
+                    _LOGGER.warning("Bond is not a classical peptide bond. MC generation may not work correctly.")
+                lines.append(f"PRE_HEAD_TYPE {cap.socket_atom.element}")
+            
+        for cap in maa_region.caps:
+            if cap.link_atom.name == "C":
+                if cap.socket_atom.name != "N":
+                    _LOGGER.warning("Bond is not a classical peptide bond. MC generation may not work correctly.")
+                lines.append(f"POST_TAIL_TYPE {cap.socket_atom.element}")
+
+        # charge of maa
+        lines.append(f"CHARGE {maa.net_charge}")
+
+        fs.write_lines(out_path, lines)
+        return out_path
 
     # -- add_pdb --
     def run_add_pdb(self, in_prmtop: str, out_path: str, ref_pdb: str, guess: bool = False):
@@ -4452,98 +4561,6 @@ class AmberInterface(BaseInterface):
 
         self.convert_traj_to_nc(stru_esm.coordinate_list, temp_nc)
     # endregion
-
-    def make_mc_file(self, maa_region: StructureRegion, out_path: str):
-        """make the mc file for parameterization"""
-
-        if len(maa_region.involved_residues) > 1:
-            _LOGGER.error("Please provide a maa_region with exactly 1 involved residue")
-
-        maa: ModifiedResidue = maa_region.involved_residues[0]
-        
-        if not maa.is_connected():
-            _LOGGER.warning(f"maa is not connected; use init_connectivity() first.") 
-
-        # main chain
-        mc_atoms = maa.mainchain_atoms
-        lines = [f"HEAD_NAME {mc_atoms[0].name}", f"TAIL_NAME {mc_atoms[-1].name}"]
-
-        # get rid of first and last element
-        mc_atoms.pop(0)
-        mc_atoms.pop()
-        
-        for aa in mc_atoms:
-            lines.append(f"MAIN_CHAIN {aa.name}")
-
-        # omit cap atom names
-        for cap in maa_region.caps:
-            for aa in cap.atoms:
-                lines.append(f"OMIT_NAME {aa.name}")
-
-        # find pre_head and post_tail atom types
-        for cap in maa_region.caps:
-            if cap.link_atom.name == "N":
-                if cap.socket_atom.name != "C":
-                    _LOGGER.warning("Bond is not a classical peptide bond. MC generation may not work correctly.")
-                lines.append(f"PRE_HEAD_TYPE {cap.socket_atom.element}")
-            
-        for cap in maa_region.caps:
-            if cap.link_atom.name == "C":
-                if cap.socket_atom.name != "N":
-                    _LOGGER.warning("Bond is not a classical peptide bond. MC generation may not work correctly.")
-                lines.append(f"POST_TAIL_TYPE {cap.socket_atom.element}")
-
-        # charge of maa
-        lines.append(f"CHARGE {maa.net_charge}")
-
-        fs.write_lines(out_path, lines)
-        return out_path
-
-    def make_mc_file(self, maa_region: StructureRegion, out_path: str):
-        """make the mc file for parameterization"""
-
-        if len(maa_region.involved_residues) > 1:
-            _LOGGER.error("Please provide a maa_region with exactly 1 involved residue")
-
-        maa: ModifiedResidue = maa_region.involved_residues[0]
-        
-        if not maa.is_connected():
-            _LOGGER.warning(f"maa is not connected; use init_connectivity() first.") 
-
-        # main chain
-        mc_atoms = maa.mainchain_atoms
-        lines = [f"HEAD_NAME {mc_atoms[0].name}", f"TAIL_NAME {mc_atoms[-1].name}"]
-
-        # get rid of first and last element
-        mc_atoms.pop(0)
-        mc_atoms.pop()
-        
-        for aa in mc_atoms:
-            lines.append(f"MAIN_CHAIN {aa.name}")
-
-        # omit cap atom names
-        for cap in maa_region.caps:
-            for aa in cap.atoms:
-                lines.append(f"OMIT_NAME {aa.name}")
-
-        # find pre_head and post_tail atom types
-        for cap in maa_region.caps:
-            if cap.link_atom.name == "N":
-                if cap.socket_atom.name != "C":
-                    _LOGGER.warning("Bond is not a classical peptide bond. MC generation may not work correctly.")
-                lines.append(f"PRE_HEAD_TYPE {cap.socket_atom.element}")
-            
-        for cap in maa_region.caps:
-            if cap.link_atom.name == "C":
-                if cap.socket_atom.name != "N":
-                    _LOGGER.warning("Bond is not a classical peptide bond. MC generation may not work correctly.")
-                lines.append(f"POST_TAIL_TYPE {cap.socket_atom.element}")
-
-        # charge of maa
-        lines.append(f"CHARGE {maa.net_charge}")
-
-        fs.write_lines(out_path, lines)
-        return out_path
 
 amber_interface = AmberInterface(None, eh_config._amber)
 """The singleton of AmberInterface() that handles all Amber related operations in EnzyHTP
