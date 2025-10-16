@@ -456,8 +456,11 @@ class AlphafoldInterface(BaseInterface):
             
             # Set up environment settings based on cluster and core type
             cluster = job_config.cluster
-            env_settings = cluster.AF2_ENV[core_type.upper()]
-            
+            if "container" in afconfig.INSTALL_TYPE:
+                env_settings = cluster.CONTAINER_ENV[core_type.upper()]
+            else:
+                env_settings = cluster.AF2_ENV[core_type.upper()]
+              
             # Create submission script path
             sub_script_path = out_dir / f"submit_alphafold_{job_index}.cmd"
             sub_script_path = fs.get_valid_temp_name(str(sub_script_path))

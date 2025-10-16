@@ -391,6 +391,14 @@ class Residue(DoubleLinkedNode):
         """Comparator that checks for sequence same-ness."""
         return self.key() == other.key()
 
+    def is_n_terminal(self) -> bool:
+        """Checks if the residue is at the N-terminus of its chain."""
+        return self is self.chain.n_ter_residue()
+
+    def is_c_terminal(self) -> bool:
+        """Checks if the residue is at the C-terminus of its chain."""
+        return self is self.chain.c_ter_residue()
+
     def is_deprotonatable(self) -> bool:
         """
         check if this residue can minus a proton in a pH range of 1-14.
@@ -428,8 +436,9 @@ class Residue(DoubleLinkedNode):
         sort children atoms with their atom idx
         sorted is always better than not but Residue() is being lazy here
         so only this function is called will it sorted
+        # Update: support None in idx to represent unknown index, put them to the end
         """
-        self._children.sort(key=lambda x: x.idx)
+        self._children.sort(key=lambda x: (x.idx is None, x.idx))
 
     def fix_atom_names(self):
         """
@@ -475,6 +484,63 @@ class Residue(DoubleLinkedNode):
             orig = aa.coord
             updated = (orig[0]+point[0], orig[1]+point[1], orig[2]+point[2])
             aa.coord = updated
+
+    def add_peptide_h(self):
+        """
+        Adds a standard peptide hydrogen (H) to the backbone nitrogen (N) atom.
+
+        This method calculates the position of the amide hydrogen based on the
+        geometry of the peptide plane, assuming a trans-peptide bond. It requires
+        the preceding residue in the chain to define the plane. If the residue
+        is an N-terminus (no preceding residue), this method does nothing.
+        The method is idempotent: if a backbone 'H' atom already exists, it will
+        be replaced.
+        """
+        prev_res = self.n_side_residue()
+        try:
+            # 1. Find necessary atoms for geometry definition
+            atom_n = self.find_atom_name("N")
+            atom_ca = self.find_atom_name("CA")
+            atom_c_prev = prev_res.find_atom_name("C")
+        except ResidueDontHaveAtom as e:
+            _LOGGER.error(f"Cannot add peptide H to {self.key_str}: required atom not found. {e}")
+            raise RuntimeError(f"Cannot add peptide H to {self.key_str}: required atom not found. {e}")
+
+        # 2. Define geometry constants
+        BOND_LENGTH_NH = 1.01  # Angstroms
+
+        # 3. Calculate H coordinate using vector math for a planar trans-peptide bond
+        v_n_ca = np.array(atom_ca.coord) - np.array(atom_n.coord)
+        v_n_c_prev = np.array(atom_c_prev.coord) - np.array(atom_n.coord)
+
+        # The N-H bond vector is opposite to the sum of the two normalized vectors,
+        # placing it in the C-N-CA plane and in the trans position.
+        v_nh_direction = -(v_n_ca / np.linalg.norm(v_n_ca) + v_n_c_prev / np.linalg.norm(v_n_c_prev))
+        v_nh_unit = v_nh_direction / np.linalg.norm(v_nh_direction)
+        h_coord = atom_n.coord + v_nh_unit * BOND_LENGTH_NH
+
+        # 4. rename existing H if exists
+        if self.has_atom_name("H"):
+            existing_h = self.find_atom_name("H")
+            all_names = self.atom_name_list
+            i = 1
+            new_name = f"H{i}"
+            while new_name in all_names:
+                i += 1
+                new_name = f"H{i}"
+            existing_h.name = new_name
+            _LOGGER.debug(f"Backbone 'H' already exists in {self.key_str}. Renaming it to {new_name}.")
+
+        # 5. Create the new Atom object (idx=None)
+        new_h = Atom(
+            name="H",
+            element="H",
+            coord=h_coord,
+            parent=self
+        )
+
+        # 6. Add atom to residue and establish connectivity
+        self.atoms.append(new_h)
 
     #endregion
 

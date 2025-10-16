@@ -42,12 +42,11 @@ def is_structure_valid(stru: Structure, print_report: bool = True) -> Tuple[bool
         "pdb_io" : {
             "nucleic_acid": partial_supp}, # only partial support, need new class for it.
         "protonate_stru" : {
-            "modified_residue": "check https://enzyhtp-doc.readthedocs.io/en/latest/modified_aa.html for manually support this."},
+            "modified_residue": f"{partial_supp} preserves user-provided states or use pybel to protonate a capped version and insert back."},
         "mutate_stru": {},
         "AmberParameterizer": {
-            "modified_residue" : future_supp, 
             "metalcenters" : "metals are treated as nonbonding from the solvent FF you use for now. We are developing support for MCPB", 
-            "nucleic_acid" : future_supp},
+            },
         }
     diversity = stru.chemical_diversity
     for source, v in unsupport_mapper.items():

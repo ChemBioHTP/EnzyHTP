@@ -22,7 +22,7 @@ from enzy_htp.core.clusters.accre import Accre
 from enzy_htp.core.clusters.accre_r9 import AccreR9
 from enzy_htp.core.exception import tLEaPError, AmberMDError
 from enzy_htp.core.logger import _LOGGER
-from enzy_htp.core.general import EnablePropagate
+from enzy_htp.core.general import EnablePropagate, LogLevel
 from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core import file_system as fs
 from enzy_htp.chemical.level_of_theory import QMLevelOfTheory
@@ -35,6 +35,7 @@ from enzy_htp._interface.amber_interface import (
 from enzy_htp.preparation.clean import remove_solvent
 import enzy_htp.structure as struct
 from enzy_htp.structure.structure_io.prmtop_io import PrmtopParser
+from enzy_htp.structure.structure_io import Mol2Parser
 from enzy_htp.structure.structure_constraint import (
     StructureConstraint,
     create_cartesian_freeze,
@@ -321,7 +322,7 @@ def test_amber_parameterizer_run_lv_4():
     fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
 
 
-def test_amber_parameterizer_run_lv_5():
+def test_amber_parameterizer_run_lv_5(): # need around 6min
     """level 5 test of the parameterizer.
     Test structure diversity:
     - 2 polypeptide chain
@@ -337,7 +338,7 @@ def test_amber_parameterizer_run_lv_5():
     # Assign charge/spin to all non-canonical residues in the structure
     test_stru.assign_ncaa_chargespin({"LLP": (-2, 1), "RLP": (-2, 1)})  # RLP is another ligand in the structure
     remove_solvent(test_stru)
-    connectivity.init_connectivity(test_stru)
+    connectivity.init_connectivity(test_stru, ncaa_lib=test_ncaa_lib)
     
     # Create parameterizer with empty library to force parameterization
     test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
@@ -1510,6 +1511,21 @@ def test_get_amber_index_mapper():
     assert index_mapper["atom"][(test_atom_1.key, test_atom_1.idx)] == 4434
 
 
+def test_get_amber_index_mapper_connected():
+    """this dont work for the 1Q4T case.
+    Update: 2024.11.6 seems it works for 1Q4T?"""
+    ai = interface.amber
+    test_pdb = f"{MM_DATA_DIR}/3FCR_protonated_change_idx.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_stru.assign_ncaa_chargespin({"LLP": (-2, 1)})
+    test_ncaa_lib = f"{MM_WORK_DIR}ncaa_lib_empty_lv5"
+    connectivity.init_connectivity(test_stru, ncaa_lib=test_ncaa_lib)
+    test_res_1 = test_stru.get("C.1")
+
+    index_mapper = ai.get_amber_index_mapper(test_stru)
+    assert index_mapper["residue"][test_res_1.key()][1] == 917
+
+
 def test_parse_cons_to_raw_rs_dict():
     """test using KE and example cons"""
     test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
@@ -2330,5 +2346,48 @@ def test_calculate_dsi_metrics(patch_scratch_dir):
     # DSI values should be reasonable (not NaN or infinite)
     assert not np.any(np.isnan(result))
     assert not np.any(np.isinf(result))
+
+
+def test_convert_mol_desc_format_prepin_to_mol2():
+    """Test converting from prepin to mol2."""
+    ai = interface.amber
+    prepin_file = f"{STRU_DATA_DIR}/ligand_H5J.prepin"
+    mol2_file = f"{MM_WORK_DIR}/H5J_converted.mol2"
+    
+    ai.convert_mol_desc_format(prepin_file, mol2_file, 'prepin', 'mol2')
+    
+    assert os.path.exists(mol2_file)
+    assert os.path.getsize(mol2_file) > 0
+    
+    # Optional: read back and check some basic properties
+    mol_desc_from_mol2 = Mol2Parser.get_ligand(mol2_file)
+    assert mol_desc_from_mol2.name == "H5J"
+    assert len(mol_desc_from_mol2.atoms) == 16
+    
+    fs.clean_temp_file_n_dir([mol2_file])
+
+def test_convert_mol_desc_format_prepin_to_mol2_manual_ref():
+    """Test converting from prepin to mol2. Using a manual curated mol2 file as answer"""
+    ai = interface.amber
+    prepin_file = f"{STRU_DATA_DIR}/LLP.prepin"
+    answer_mol2_file = f"{STRU_DATA_DIR}/LLP_answer.mol2"
+    mol2_file = f"{MM_WORK_DIR}/LLP.mol2"
+
+    ai.convert_mol_desc_format(prepin_file, mol2_file, 'prepin', 'mol2', additional_data={
+        "charge_type": "bcc",
+    })
+    
+    assert files_equivalent(mol2_file, answer_mol2_file)
+    
+    fs.clean_temp_file_n_dir([mol2_file])
+
+def test_convert_mol_desc_format_unsupported():
+    """Test that unsupported conversions raise NotImplementedError."""
+    ai = interface.amber
+    with pytest.raises(NotImplementedError):
+        ai.convert_mol_desc_format("dummy.in", "dummy.out", "mol2", "prepin")
+
+    with pytest.raises(NotImplementedError):
+        ai.convert_mol_desc_format("dummy.in", "dummy.out", "pdb", "mol2")
 
 

@@ -12,6 +12,7 @@ from enzy_htp import config
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import EnablePropagate
 import logging
+from enzy_htp.preparation.clean import remove_solvent
 import enzy_htp.structure as struct
 import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp.preparation import protonate as prot
@@ -19,6 +20,7 @@ from enzy_htp.preparation import protonate as prot
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)
 DATA_DIR = f"{CURR_DIR}/data/"
+STRU_DATA_DIR = f"{CURR_DIR}/../structure/data/"
 WORK_DIR = f"{CURR_DIR}/work_dir/"
 config["system.SCRATCH_DIR"] = WORK_DIR
 sp = struct.PDBParser()
@@ -331,3 +333,24 @@ def test_protonate_stru_imputed():
     prot.protonate_stru(stru)
 
     assert stru
+
+def test_protonate_stru_with_mod_aa_unchange():
+    """Testing the protonate_stru() method for a structure that has modified amino acids."""
+    pdb_file = f"{STRU_DATA_DIR}/3FCR.pdb"
+    stru = sp.get_structure(pdb_file, alt_loc_keep="A")
+    remove_solvent(stru)
+    prot.protonate_stru(stru, protonate_ligand=False, protonate_maa=False)
+    assert len(stru.hydrogens()) == 3389
+
+def test_protonate_stru_with_mod_aa_pybel():
+    """Ensure mod-AA hydrogens are present after protonating via PyBel."""
+    pdb_file = f"{STRU_DATA_DIR}/3FCR.pdb"
+    stru = sp.get_structure(pdb_file, alt_loc_keep="A")
+    remove_solvent(stru)
+
+    target_res = stru.get("A.288")
+    assert set(target_res.atom_name_list) == {'N1', 'C2', "C2'", 'C3', 'O3', 'C4', "C4'", 'C5', 'C6', "C5'", 'OP4', 'P', 'OP1', 'OP2', 'OP3', 'N', 'CA', 'CB', 'CG', 'CD', 'CE', 'NZ', 'C', 'O'}
+    prot.protonate_stru(stru, protonate_maa=True, mod_aa_engine='pybel')
+    assert set(target_res.atom_name_list) == {'N1', 'C2', "C2'", 'C3', 'O3', 'C4', "C4'", 'C5', 'C6', "C5'", 'OP4', 'P', 'OP1', 'OP2', 'OP3', 'N', 'CA', 'CB', 'CG', 'CD', 'CE', 'NZ', 'C', 'O', 
+    'H9', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'H7', 'H8', 'H12', 'H13', 'H14', 'H15', 'H16', 'H17', 'H18', 'H19', 'H20', 'H21', 'H22', 'H'}    
+    sp.save_structure("test.pdb", stru)

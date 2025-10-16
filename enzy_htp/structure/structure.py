@@ -1061,7 +1061,12 @@ class Structure(DoubleLinkedNode):
 
     def clone_residue_keys(self, other: Structure, amino_acid_only: bool =True):
         """clone residue keys from {other} to {self}.
-        IMPORTANT: assume the chain order and sequence are the same between self and other"""
+        IMPORTANT: assume the chain order and sequence are the same between self and other.
+        NOTE: this function used to be used for protonate_peptide_with_pdb2pqr. Because PDB2PQR will
+        remove the chain id in the output PQR file and cause bugs if polypeptide chains are seperated by
+        solvent chains or those chains are not in the A-index alphabetical order.
+        However, later we found that PDB2PQR will also remove any unrecongnized residues inside of the 
+        polypeptide chain causing sequence to mismatch. So this function is replaced by clone_chain_names."""
         # san check
         # - chain sequence consistency
         if not self.is_same_sequence(other, amino_acid_only=amino_acid_only):
@@ -1077,6 +1082,19 @@ class Structure(DoubleLinkedNode):
         for s_res, o_res in zip(self_residues, other_residues):
             s_res.chain.name = o_res.chain.name
             s_res.idx = o_res.idx
+
+    def clone_chain_names(self, other: Structure, amino_acid_only: bool =True):
+        """clone chain names from {other} to {self}.
+        IMPORTANT: assume the chain order are the same between self and other."""
+        if amino_acid_only:
+            self_chains = self.polypeptides
+            other_chains = other.polypeptides
+        else:
+            self_chains = self.chains
+            other_chains = other.chains
+
+        for s_ch, o_ch in zip(self_chains, other_chains):
+            s_ch.name = o_ch.name
     #endregion
 
     #region === Special ===
@@ -1161,6 +1179,10 @@ class Structure(DoubleLinkedNode):
     def __hash__(self) -> int:
         """make Structure hashable"""
         return hash((self._topology_signature(), self._geometry_digest()))
+
+    def cache_key(self) -> Tuple[tuple, bytes]:
+        """Return a stable, pickle-friendly cache key representing this structure."""
+        return (self._topology_signature(), self._geometry_digest())
 
     def _topology_signature(self) -> tuple:
         """

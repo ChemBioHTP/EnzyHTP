@@ -58,7 +58,8 @@ class PDBParser(StructureParserInterface):
                       add_ligand_list: List = None,
                       remove_trash: bool = True,
                       give_idx_map: bool = False,
-                      allow_multichain_in_atom: bool = False) -> Union[Structure, tuple]:
+                      allow_multichain_in_atom: bool = False,
+                      alt_loc_keep: int = "first",) -> Union[Structure, tuple]:
         """
         Converting a PDB file (as its path) into the Structure()
         Arg:
@@ -109,7 +110,7 @@ class PDBParser(StructureParserInterface):
         # a workaround is to add them back after Amber process
         idx_change_mapper = cls._resolve_missing_chain_id(
             target_model_df, target_model_ter_df, allow_multichain_in_atom=allow_multichain_in_atom)  # add missing chain id in place
-        cls._resolve_alt_loc(target_model_df)  # resolve alt loc record in place by delele redundant df rows
+        cls._resolve_alt_loc(target_model_df, keep=alt_loc_keep)  # resolve alt loc record in place by delele redundant df rows
         #endregion (Add here to address more problem related to the PDB file format here)
 
         # target_model_df below should be "standard" --> start building
@@ -561,41 +562,41 @@ class PDBParser(StructureParserInterface):
         """
         Resolves atoms with the alt_loc records
         Optional argument "keep" specifies the resolution method. Default
-        is "first" which forces keeping atoms in the frist residue (earlist 
-        in the file) out of multiple ones. Otherwise, keeps the specific 
-        alt_loc identifier (e.g.: B), assuming it exists.
+        is "first" which keeps atoms with the lexicographically smallest
+        alt_loc identifier (e.g., A before B) for each residue, independent
+        of DataFrame row order. Otherwise, if a specific alt_loc identifier
+        is provided (e.g., "B"), it keeps that identifier, assuming it exists.
 
         Only one record out of multiple alt_loc is allowed. Delete rest 
         df lines in place. 
         TODO support residue specific keep strageties
         """
-        alt_loc_atoms_df = df[df["alt_loc"].str.strip() != ""]
+        alt_loc_atoms_df = df[df["alt_loc"].str.strip() != ""]        
         # san check
         if len(alt_loc_atoms_df) == 0:
             _LOGGER.debug("No alt_loc to resolve.")
             return
+        # determine wanted alt loc
+        if keep == "first":
+            all_alt_locs = list(set(map(lambda s: s.strip(), alt_loc_atoms_df["alt_loc"])))
+            keep = sorted(all_alt_locs)[0]
         # solve
         # get a list of "loc" for deleting in the original df
         delete_loc_list = []
         # treat in residues
         alt_loc_residues = alt_loc_atoms_df.groupby(["residue_number", "chain_id"], sort=False)
         for r_id_c_id, res_df in alt_loc_residues:
+            # group by alt_loc values
             alt_res_dfs = res_df.groupby("alt_loc", sort=False)
-            if len(alt_res_dfs) == 1:
-                _LOGGER.debug(f"Only 1 alt_loc id found in residue {r_id_c_id[1], r_id_c_id[0]}. No need to resolve")
-                continue
+            # if len(alt_res_dfs) == 1:
+            #     _LOGGER.debug(f"Only 1 alt_loc id found in residue {r_id_c_id[1], r_id_c_id[0]}. No need to resolve")
+            #     continue
             _LOGGER.debug(f"Dealing with alt_loc residue: {r_id_c_id[1], r_id_c_id[0]}")
-            if keep == "first":
-                delele_res_df_locs = list(alt_res_dfs.groups.values())
-                del delele_res_df_locs[0]
-                for delete_lines in delele_res_df_locs:
-                    delete_loc_list.extend(list(delete_lines))
-            else:
-                delele_res_dfs_mapper = alt_res_dfs.groups
-                assert keep in delele_res_dfs_mapper
-                del delele_res_dfs_mapper[keep]
-                for delete_lines in list(delele_res_dfs_mapper.values()):
-                    delete_loc_list.extend(list(delete_lines))
+            delele_res_dfs_mapper = alt_res_dfs.groups
+            if keep in delele_res_dfs_mapper:
+                del delele_res_dfs_mapper[keep] # so that we keep this "keep" alt loc
+            for delete_lines in list(delele_res_dfs_mapper.values()):
+                delete_loc_list.extend(list(delete_lines))
 
         # delete in original df
         _LOGGER.debug(f"deleting df row: {delete_loc_list}")

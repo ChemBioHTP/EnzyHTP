@@ -6,6 +6,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Author: QZ Shao <shaoqz@icloud.com>
 Date: 2023-10-05
 """
+from __future__ import annotations
 from typing import List, Dict, Any
 
 from enzy_htp.core import _LOGGER
@@ -15,6 +16,7 @@ from ._interface import StructureParserInterface
 from ..structure import Structure, convert_res_to_structure
 from ..atom import Atom
 from ..ligand import Ligand
+from ..mol_desc_data import MolDescData
 
 class Mol2Parser(StructureParserInterface):
     """Holds all functionality for .mol2 I/O with respect to the Ligand() class. This parser contains no private data
@@ -26,6 +28,63 @@ class Mol2Parser(StructureParserInterface):
     def __init__(self) -> None:
         """place holder"""
         pass
+
+    @classmethod
+    def write_from_mol_desc_data(cls, data: MolDescData, outfile: str):
+        """
+        Writes a .mol2 file from a MolDescData object.
+        Currently only support writing four sections and only for SMALL molecules:
+        - @<TRIPOS>MOLECULE
+        - @<TRIPOS>ATOM
+        - @<TRIPOS>BOND
+        - @<TRIPOS>SUBSTRUCTURE
+        (when needed, add more to MolDescData and this function)
+
+        Args:
+            data (MolDescData): The MolDescData object to write.
+            outfile (str): The path to the output .mol2 file.
+        
+        NOTE: will assign new atom ids starting from 1 in the output file. 
+        (based on the order of the original atom ids.)
+        """
+
+        content = [
+            "@<TRIPOS>MOLECULE",
+            data.name,
+            f"{len(data.atoms):>5} {len(data.bonds):>5}     1     0     0",
+            "SMALL",
+            data.charge_type,
+            "",
+            "",
+            "@<TRIPOS>ATOM"
+        ]
+
+        atom_map = {}
+        atoms = sorted(data.atoms, key=lambda x: x['id'])
+        for i, atom in enumerate(atoms):
+            atom_id = atom['id']
+            atom_map[atom_id] = i + 1
+            content.append(
+                f"{i + 1:>7} {atom['atom_name']:<8} "
+                f"{atom['coords'][0]:>10.4f} {atom['coords'][1]:>10.4f} {atom['coords'][2]:>10.4f} "
+                f"{atom['atom_type']:<10} 1 {data.name} {atom['charge']:>14.6f}"
+            )
+
+        content += [
+            "@<TRIPOS>BOND"
+        ]
+        for i, bond in enumerate(data.bonds):
+            atom1_id = atom_map[bond['atom1_id']]
+            atom2_id = atom_map[bond['atom2_id']]
+            content.append(f"{i + 1:>6}{atom1_id:>6}{atom2_id:>6} 1   ")
+        
+        content += [
+            "@<TRIPOS>SUBSTRUCTURE",
+            f"     1 {data.name}         1 TEMP              0 ****  ****    0 ROOT",
+            "",
+        ]
+
+        fs.write_lines(outfile, content)
 
     # == API ==
     @classmethod
@@ -88,7 +147,28 @@ class Mol2Parser(StructureParserInterface):
             atoms[-1].idx = aa['atom_id']
             atoms[-1].element = aa['atom_type'].split('.')[0]
 
-        return Ligand(residue_idx=residue_idx, residue_name=residue_name, atoms=atoms, bonds=file_info['BOND'])            
+        bonds = file_info.get('BOND', [])
+        cls._connect_atoms(atoms, bonds)
+
+        return Ligand(residue_idx=residue_idx, residue_name=residue_name, atoms=atoms, bonds=bonds)
+
+    @classmethod
+    def _connect_atoms(cls, atoms: List[Atom], bonds: List[Dict]):
+        """connect {atoms} using information from {bonds}.
+        connectivities are written to {atom.connect} of each {atom}"""
+        if not bonds:
+            return
+
+        # init connectivity
+        for atom in atoms:
+            atom.connect = []
+
+        atom_map = {atom.idx: atom for atom in atoms}
+        for bond in bonds:
+            id1 = bond['origin_atom_id']
+            id2 = bond['target_atom_id']
+            if id1 in atom_map and id2 in atom_map:
+                atom_map[id1].connect_to(atom_map[id2])
 
     @classmethod
     def save_ligand(cls, outfile:str, ligand:Ligand) -> str:
@@ -279,9 +359,10 @@ class Mol2Parser(StructureParserInterface):
             error = True
             _LOGGER.error(f"The number of atoms {len(result['ATOM'])} in {path} is not consistent with the expected amount number {result['MOLECULE']['num_atoms']}")
 
-        if result['MOLECULE']['num_bond'] != len(result['BOND']):
+        num_bonds_in_file = len(result.get('BOND', []))
+        if result['MOLECULE']['num_bond'] != num_bonds_in_file:
             error = True
-            _LOGGER.error(f"The number of bonds {len(result['BOND'])} in {path} is not consistent with the expected amount number {result['MOLECULE']['num_bond']}")
+            _LOGGER.error(f"The number of bonds {num_bonds_in_file} in {path} is not consistent with the expected amount number {result['MOLECULE']['num_bond']}")
 
 
         if error:
