@@ -723,6 +723,8 @@ class ClusterJobConfig:
         'walltime',
         'account',
         'qos',
+        'exclude_node_id',
+        'constraint',
     ]
 
     def __init__(self, cluster: ClusterInterface = None, res_keywords: dict = None):
