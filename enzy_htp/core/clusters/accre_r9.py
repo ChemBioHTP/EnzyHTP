@@ -124,7 +124,8 @@ export LD_LIBRARY_PATH=/sb/apps/alphafold232/miniconda3/envs/af232/lib:$LD_LIBRA
         "walltime" : "time=",
         "account" : "account=",
         "exclude_node_id" : "exclude=",
-        "qos" : "qos="
+        "qos" : "qos=",
+        "constraint" : "constraint=", # NOTE Gaussian jobs need: haswell|broadwell|skylake|cascadelake|icelake
     }
 
     PARTITION_VALUE_MAP = {
