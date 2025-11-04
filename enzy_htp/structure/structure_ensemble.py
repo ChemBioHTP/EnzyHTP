@@ -76,7 +76,8 @@ class StructureEnsemble:
                 stru_oper.remove_solvent(result)
                 stru_oper.remove_counterions(result)
             result.apply_geom(this_coord)
-            result.update_pbc_box_edges(this_pbc_box_edges)
+            if this_pbc_box_edges is not None:
+                result.update_pbc_box_edges(this_pbc_box_edges)
             yield result
 
     @property
@@ -102,7 +103,8 @@ class StructureEnsemble:
         coord_0, pbc_box_edges = next(self.coord_parser(self.coordinate_list))
         result = deepcopy(self.topology)
         result.apply_geom(coord_0)
-        result.update_pbc_box_edges(pbc_box_edges)
+        if pbc_box_edges is not None:
+            result.update_pbc_box_edges(pbc_box_edges)
         return result
 
     @classmethod
