@@ -99,7 +99,11 @@ def _parse_sequences_input(sequences: Union[str, List[str], List[List[str]], Pat
     if isinstance(sequences, (str, Path)):
         # Check if it's a file path
         path = Path(sequences)
-        if path.exists() and path.suffix.lower() in ['.fasta', '.fa', '.fas']:
+        try:
+            path_exists = path.exists()
+        except OSError:
+            path_exists = False
+        if path_exists and path.suffix.lower() in ['.fasta', '.fa', '.fas']:
             # Parse FASTA file
             fasta_sequences = parse_fasta_file(str(path))
             # Normalize all to multimer form; wrap monomers as single-item lists
