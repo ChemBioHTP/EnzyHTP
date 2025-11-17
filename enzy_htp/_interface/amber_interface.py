@@ -1613,6 +1613,30 @@ class AmberInterface(BaseInterface):
         # clean up
         fs.clean_temp_file_n_dir([temp_pdb_path, temp_rst_path, eh_config["system.SCRATCH_DIR"]])
 
+    def convert_prmtop_to_pdb(self, prmtop_path: str, crd_path: str, out_pdb_path: str, remove_solvent: bool = False) -> None:
+        """convert the given Amber prmtop & inpcrd to a PDB file in out_pdb_path
+        Arguments:
+            prmtop_path:
+                the input prmtop file path
+            crd_path:
+                the input coordinate file path (e.g., Amber .inpcrd file, .rst file, .nc file, etc.)
+            out_pdb_path:
+                the output PDB file path"""
+        contents = [
+            f"parm {prmtop_path}",
+            f"trajin {crd_path} 1 1 1",
+        ]
+        if remove_solvent:
+            contents.append("strip :WAT,Na+,Cl-")
+        
+        contents.extend([
+            f"trajout {out_pdb_path} pdb",
+            "run",
+            "quit"
+        ])
+        contents = "\n".join(contents)
+        self.run_cpptraj(contents)
+
     # -- tleap --
     def run_tleap(
         self,
@@ -3986,6 +4010,7 @@ class AmberInterface(BaseInterface):
             ".nc" : AmberNCParser(prmtop_file=prmtop_path),
             ".mdcrd" : AmberMDCRDParser(prmtop_file=prmtop_path),
         }
+        temp_file_list = []
         # san check
         # - make sure the topology in {prmtop_path} is consistent with {traj_path} 
         # (check target: atom number)
@@ -3997,6 +4022,24 @@ class AmberInterface(BaseInterface):
         if not prmtop_io.PrmtopParser.has_add_pdb(prmtop_path):
             scratch_dir = eh_config["system.SCRATCH_DIR"]
             fs.safe_mkdir(scratch_dir)
+            temp_file_list.append(scratch_dir)
+
+            # make ref_pdb using cpptraj if not provided
+            if ref_pdb is None:
+                ref_pdb = fs.get_valid_temp_name(f"{scratch_dir}/load_traj_ref.pdb")
+                self.convert_prmtop_to_pdb(prmtop_path=prmtop_path, crd_path=traj_path, out_pdb_path=ref_pdb, remove_solvent=True)
+                _LOGGER.warning(
+                    f"No reference PDB provided for loading trajectory. "
+                    f"Generated one at {ref_pdb}. (using {prmtop_path} and the first frame of {traj_path})\n"
+                     "Note that the chain names will be defaulted to A, B, C...\n"
+                     "And the residue & atom indexes will be defaulted to 1, 2, 3...\n"
+                     "If you need specific indexing, please provide a `ref_pdb`."
+                )
+                # assign chain names
+                temp_stru = PDBParser().get_structure(ref_pdb)
+                PDBParser().save_structure(ref_pdb, temp_stru)
+                temp_file_list.append(ref_pdb)
+
             temp_prmtop = fs.get_valid_temp_name(f"{scratch_dir}/load_traj.prmtop")
             self.run_add_pdb(
                 in_prmtop=prmtop_path,
@@ -4011,6 +4054,8 @@ class AmberInterface(BaseInterface):
             coordinate_list=traj_path,
             coord_parser=coord_parser_mapper[Path(traj_path).suffix].get_coordinates,
         )
+        # clean temp files
+        fs.clean_temp_file_n_dir(temp_file_list)
 
         return result
 
