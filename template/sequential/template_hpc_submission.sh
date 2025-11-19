@@ -15,7 +15,7 @@ module load Gaussian/16.B.01
 source /home/shaoq1/bin/amber_env/amber-accre.sh
 # Multiwfn
 export KMP_STACKSIZE=200000000
-export Multiwfnpath=/home/shaoq1/bin/Multiwfn_3.7_bin_Linux_noGUI
+export Multiwfnpath=/home/shaoq1/bin/Multiwfn_3.8_dev_bin_Linux_noGUI
 export PATH=$PATH:$Multiwfnpath
 # EnzyHTP
 source ~/bin/miniconda3/bin/activate enzy_htp

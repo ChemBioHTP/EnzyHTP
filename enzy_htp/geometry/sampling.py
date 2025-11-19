@@ -256,6 +256,7 @@ def _process_equi_md_sampling_arguments(
         cluster_job_config=cluster_job_config,
         core_type="gpu",
         temperature=[(0, 0), (0.05*0.9, prod_temperature), (-1, prod_temperature)],
+        pressure_scaling="none",
         constrain=[freeze_backbone] + prod_constrain)
 
     equi_step_1 = parent_interface.build_md_step(
