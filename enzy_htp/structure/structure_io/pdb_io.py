@@ -566,9 +566,9 @@ class PDBParser(StructureParserInterface):
         alt_loc identifier (e.g., A before B) for each residue, independent
         of DataFrame row order. Otherwise, if a specific alt_loc identifier
         is provided (e.g., "B"), it keeps that identifier, assuming it exists.
-        The "ifnot" operator can be used to specify a fallback alt_loc identifier
+        The "else" operator can be used to specify a fallback alt_loc identifier
         in cases that the preferred one does not exist in all residues that contains alt_loc
-        (e.g., "B ifnot A" keeps "B" when it exists in a residue, otherwise keeps "A").
+        (e.g., "B else A" keeps "B" when it exists in a residue, otherwise keeps "A").
 
         Only one record out of multiple alt_loc is allowed. Delete rest 
         df lines in place. 
@@ -584,10 +584,10 @@ class PDBParser(StructureParserInterface):
         if keep == "first":
             all_alt_locs = list(set(map(lambda s: s.strip(), alt_loc_atoms_df["alt_loc"])))
             keep = sorted(all_alt_locs)[0]
-        elif "ifnot" in keep:
-            keep_options = list(map(lambda s: s.strip(), keep.split("ifnot")))
+        elif "else" in keep:
+            keep_options = list(map(lambda s: s.strip(), keep.split("else")))
             if len(keep_options) != 2:
-                message = f"Invalid alt_loc keep strategy: {keep}. Only one 'ifnot' is allowed."
+                message = f"Invalid alt_loc keep strategy: {keep}. Only one 'else' is allowed."
                 _LOGGER.error(message)
                 raise ValueError(message)
             # get all alt locs in the df
