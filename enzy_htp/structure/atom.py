@@ -50,6 +50,8 @@ class Atom(DoubleLinkedNode):
             parent: DoubleLinkedNode = None,
             idx: int = None,
             b_factor: float = None,
+            occupancy: float = None,
+            alt_loc: str = None,
             element: str = None,
             charge: float = None,
             atom_type: str = None,
@@ -63,6 +65,8 @@ class Atom(DoubleLinkedNode):
         # optional
         self._idx = idx
         self._b_factor = b_factor
+        self._occupancy = occupancy
+        self._alt_loc = alt_loc
         self._element = element
         self._charge = charge
         self._atom_type = atom_type
@@ -78,6 +82,8 @@ class Atom(DoubleLinkedNode):
         # optional
         _idx = None
         _b_factor = None
+        _occupancy = None
+        _alt_loc = None
         _element = None
         _charge = None
         _connect = None
@@ -87,6 +93,10 @@ class Atom(DoubleLinkedNode):
             _idx = ds["atom_number"]
         if "b_factor" in ds_keys and not np.isnan(ds["b_factor"]):
             _b_factor = ds["b_factor"]
+        if "occupancy" in ds_keys and not np.isnan(ds["occupancy"]):
+            _occupancy = ds["occupancy"]
+        if "alt_loc" in ds_keys and ds["alt_loc"].strip() != "":
+            _alt_loc = ds["alt_loc"].strip()
         if "element_symbol" in ds_keys and ds["element_symbol"].strip() != "":
             _element = ds["element_symbol"].strip()
         if "charge" in ds_keys and not np.isnan(ds["charge"]):
@@ -100,6 +110,8 @@ class Atom(DoubleLinkedNode):
             parent = parent,
             idx = _idx,
             b_factor = _b_factor,
+            occupancy = _occupancy,
+            alt_loc = _alt_loc,
             element = _element,
             charge = _charge,
             atom_type = _atom_type,
@@ -154,6 +166,24 @@ class Atom(DoubleLinkedNode):
     @b_factor.setter
     def b_factor(self, val):
         self._b_factor = val
+
+    @property
+    def occupancy(self):
+        """getter for occupancy"""
+        return self._occupancy
+
+    @occupancy.setter
+    def occupancy(self, val):
+        self._occupancy = val
+
+    @property
+    def alt_loc(self):
+        """getter for alt_loc"""
+        return self._alt_loc
+
+    @alt_loc.setter
+    def alt_loc(self, val):
+        self._alt_loc = val
 
     @property
     def element(self):
