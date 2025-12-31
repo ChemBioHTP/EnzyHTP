@@ -614,10 +614,10 @@ class PDBParser(StructureParserInterface):
                     _LOGGER.debug(f"Preferred alt_loc '{keep}' not found in residue {r_id_c_id[1], r_id_c_id[0]}. Using fallback alt_loc '{fall_back_keep}'.")
                     del delele_res_dfs_mapper[fall_back_keep]
                 else:
-                    message = (f"Preferred alt_loc '{keep}' not found in residue {r_id_c_id[1], r_id_c_id[0]} (existing alt_locs: {list(delele_res_dfs_mapper.keys())})."
-                                " No fallback alt_loc specified or found.")
-                    _LOGGER.error(message)
-                    raise ValueError(message)
+                    # this is the case that neither preferred nor fallback alt loc exists
+                    # it is possible that the residue only has some alt loc "B" atoms without "A"
+                    # in this case, we just remove all alt loc atoms.
+                    _LOGGER.debug(f"Neither preferred alt_loc '{keep}' nor fallback alt_loc '{fall_back_keep}' found in residue {r_id_c_id[1], r_id_c_id[0]}. Deleting all alt_loc atoms.")
             # collect delete locs
             for delete_lines in list(delele_res_dfs_mapper.values()):
                 delete_loc_list.extend(list(delete_lines))
