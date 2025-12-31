@@ -428,6 +428,12 @@ class Residue(DoubleLinkedNode):
         """determine if self and other is the same amino acid residue"""
         return self.sequence_name == other.sequence_name
 
+    def has_alt_loc(self) -> bool:
+        """determine if the residue has any atom with alt loc"""
+        for atom in self.atoms:
+            if atom.has_alt_loc():
+                return True
+        return False
     #endregion
 
     #region === Editor ===

@@ -457,6 +457,10 @@ class Atom(DoubleLinkedNode):
         """check if self has charge"""
         return self._charge is not None        
 
+    def has_alt_loc(self) -> bool:
+        """determine if the atom has alt loc"""
+        return self._alt_loc is not None
+
     #endregion
 
     #region == Special ==

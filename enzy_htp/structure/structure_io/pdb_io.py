@@ -566,20 +566,34 @@ class PDBParser(StructureParserInterface):
         alt_loc identifier (e.g., A before B) for each residue, independent
         of DataFrame row order. Otherwise, if a specific alt_loc identifier
         is provided (e.g., "B"), it keeps that identifier, assuming it exists.
+        The "ifnot" operator can be used to specify a fallback alt_loc identifier
+        in cases that the preferred one does not exist in all residues that contains alt_loc
+        (e.g., "B ifnot A" keeps "B" when it exists in a residue, otherwise keeps "A").
 
         Only one record out of multiple alt_loc is allowed. Delete rest 
         df lines in place. 
         TODO support residue specific keep strageties
         """
+        fall_back_keep = None
         alt_loc_atoms_df = df[df["alt_loc"].str.strip() != ""]        
         # san check
         if len(alt_loc_atoms_df) == 0:
             _LOGGER.debug("No alt_loc to resolve.")
             return
-        # determine wanted alt loc
+        # alt loc keywords (determine wanted alt loc)
         if keep == "first":
             all_alt_locs = list(set(map(lambda s: s.strip(), alt_loc_atoms_df["alt_loc"])))
             keep = sorted(all_alt_locs)[0]
+        elif "ifnot" in keep:
+            keep_options = list(map(lambda s: s.strip(), keep.split("ifnot")))
+            if len(keep_options) != 2:
+                message = f"Invalid alt_loc keep strategy: {keep}. Only one 'ifnot' is allowed."
+                _LOGGER.error(message)
+                raise ValueError(message)
+            # get all alt locs in the df
+            keep = keep_options[0]
+            fall_back_keep = keep_options[1]
+
         # solve
         # get a list of "loc" for deleting in the original df
         delete_loc_list = []
@@ -595,6 +609,16 @@ class PDBParser(StructureParserInterface):
             delele_res_dfs_mapper = alt_res_dfs.groups
             if keep in delele_res_dfs_mapper:
                 del delele_res_dfs_mapper[keep] # so that we keep this "keep" alt loc
+            else:
+                if fall_back_keep and fall_back_keep in delele_res_dfs_mapper:
+                    _LOGGER.debug(f"Preferred alt_loc '{keep}' not found in residue {r_id_c_id[1], r_id_c_id[0]}. Using fallback alt_loc '{fall_back_keep}'.")
+                    del delele_res_dfs_mapper[fall_back_keep]
+                else:
+                    message = (f"Preferred alt_loc '{keep}' not found in residue {r_id_c_id[1], r_id_c_id[0]} (existing alt_locs: {list(delele_res_dfs_mapper.keys())})."
+                                " No fallback alt_loc specified or found.")
+                    _LOGGER.error(message)
+                    raise ValueError(message)
+            # collect delete locs
             for delete_lines in list(delele_res_dfs_mapper.values()):
                 delete_loc_list.extend(list(delete_lines))
 
