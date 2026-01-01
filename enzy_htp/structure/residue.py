@@ -334,6 +334,14 @@ class Residue(DoubleLinkedNode):
             Atom.clone_connectivity(atom_mapping)
 
         return new_res
+    
+    def containing_alt_loc(self) -> list:
+        """get the alt locs contained in the residue"""
+        alt_locs = set()
+        for atom in self.atoms:
+            if atom.has_alt_loc():
+                alt_locs.add(atom.alt_loc)
+        return list(alt_locs)
     #endregion
 
     #region === Checker ===
