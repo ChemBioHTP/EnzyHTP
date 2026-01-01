@@ -164,6 +164,9 @@ class PDBParser(StructureParserInterface):
         Returns: 
             Path to the saved Structure() as a str().
         """            
+        if not isinstance(outfile, str):
+            raise TypeError("outfile must be a string representing the file path.")
+
         content:str = cls.get_file_str( stru, if_renumber, if_fix_atomname, same_chain_id_for_9999_solvent, omit_chain_id )
 
         fs.write_lines( outfile, content.splitlines() )
