@@ -593,6 +593,9 @@ class PDBParser(StructureParserInterface):
 
         Only one record out of multiple alt_loc is allowed. Delete rest 
         df lines in place. 
+        TODO support specific alt loc for specific residues.
+        TODO resolve cases when an atom only of "B" and "C" alt loc exists without "A"
+        TODO support a way to keep based on occupancy.
         """
         fall_back_keep = None
         single_alt_loc = single_alt_loc.lower()
