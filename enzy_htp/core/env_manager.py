@@ -137,7 +137,7 @@ class EnvironmentManager:
     #endregion
 
     #region ==shell command==
-    def run_command(self,
+    def run_command(self, # TODO add support for cwd
                     exe: str,
                     args: Union[str, List[str]],
                     try_time: int = 1,
