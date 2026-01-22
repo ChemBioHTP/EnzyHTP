@@ -35,16 +35,16 @@ class RosettaConfig(BaseConfig):
     ROSETTA3: str = "ROSETTA3"
     """Path variable that points to the git installation of rosetta aka 'main'."""
 
-    ROSETTA_SCRIPTS: str = "$ROSETTA3/source/bin/rosetta_scripts.linuxgccrelease"
+    ROSETTA_SCRIPTS: str = "$ROSETTA3/source/bin/rosetta_scripts.*linuxgccrelease"
     """The name of the RosettaScripts executable."""
 
     PARAMS_SCRIPT: str = f"$ROSETTA3/source/scripts/python/public/molfile_to_params.py"
     """Script used for paramterizing ligands for RosettaLigand protocol."""
 
-    RELAX: str = f"$ROSETTA3/source/bin/relax.default.linuxgccrelease"
+    RELAX: str = f"$ROSETTA3/source/bin/relax.default.*linuxgccrelease"
     """Executable used to relax a structure/pose."""
 
-    RELAX_MPI: str = f"$ROSETTA3/source/bin/relax.mpi.linuxgccrelease"
+    RELAX_MPI: str = f"$ROSETTA3/source/bin/relax.mpi.*linuxgccrelease"
     """MPI Executable used to relax a structure/pose."""
 
     RELAX_MPI_EXEC: str = f"mpiexec -np"
@@ -53,7 +53,7 @@ class RosettaConfig(BaseConfig):
     CART_DDG: str = f"$ROSETTA3/source/bin/cartesian_ddg.*linuxgccrelease"
     """Executable used for cartesian_ddg calculation."""
 
-    SCORE: str = f"$ROSETTA3/source/bin/score_jd2.default.linuxgccrelease"
+    SCORE: str = f"$ROSETTA3/source/bin/score_jd2.default.*linuxgccrelease"
     """Executable used to score a specific structure/pose."""
 
     PY_2_7: str = "python2.7"

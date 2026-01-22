@@ -334,6 +334,14 @@ class Residue(DoubleLinkedNode):
             Atom.clone_connectivity(atom_mapping)
 
         return new_res
+    
+    def containing_alt_loc(self) -> list:
+        """get the alt locs contained in the residue"""
+        alt_locs = set()
+        for atom in self.atoms:
+            if atom.has_alt_loc():
+                alt_locs.add(atom.alt_loc)
+        return list(alt_locs)
     #endregion
 
     #region === Checker ===
@@ -428,6 +436,12 @@ class Residue(DoubleLinkedNode):
         """determine if self and other is the same amino acid residue"""
         return self.sequence_name == other.sequence_name
 
+    def has_alt_loc(self) -> bool:
+        """determine if the residue has any atom with alt loc"""
+        for atom in self.atoms:
+            if atom.has_alt_loc():
+                return True
+        return False
     #endregion
 
     #region === Editor ===

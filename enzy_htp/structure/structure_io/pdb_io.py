@@ -59,7 +59,8 @@ class PDBParser(StructureParserInterface):
                       remove_trash: bool = True,
                       give_idx_map: bool = False,
                       allow_multichain_in_atom: bool = False,
-                      alt_loc_keep: int = "first",) -> Union[Structure, tuple]:
+                      alt_loc_keep: int = "first",
+                      single_alt_loc: str = "clean",) -> Union[Structure, tuple]:
         """
         Converting a PDB file (as its path) into the Structure()
         Arg:
@@ -91,6 +92,20 @@ class PDBParser(StructureParserInterface):
                 if allowing multiple chain IDs appears in the same chain that consists of ATOM
                 records. It conflict with the definiation of PDB file format but it is useful
                 for resolving chain id of pymol2 exported multichain PDBs.
+            alt_loc_keep:
+                specifies the resolution method for alt_loc records.
+                Default is "first" which keeps atoms with the lexicographically smallest
+                alt_loc identifier (e.g., A before B) for each residue, independent of
+                DataFrame row order. Otherwise, if a specific alt_loc identifier is
+                provided (e.g., "B"), it keeps that identifier, assuming it exists. The "else"
+                operator can be used to specify a fallback alt_loc identifier in cases that
+                the preferred one does not exist in all residues that contains alt_loc
+                (e.g., "B else A" keeps "B" when it exists in a residue, otherwise keeps "A").
+            single_alt_loc:
+                specifies how to treat the case when there is only one alt_loc in a residue.
+                Default is "clean", which deletes the alt_loc identifier (sets it to blank)
+                and keeps the atoms. Other options are "keep" (keeps the alt_loc identifier
+                as is) and "delete" (deletes the atoms with alt_loc identifier).
 
         Return:
             Structure()
@@ -110,7 +125,7 @@ class PDBParser(StructureParserInterface):
         # a workaround is to add them back after Amber process
         idx_change_mapper = cls._resolve_missing_chain_id(
             target_model_df, target_model_ter_df, allow_multichain_in_atom=allow_multichain_in_atom)  # add missing chain id in place
-        cls._resolve_alt_loc(target_model_df, keep=alt_loc_keep)  # resolve alt loc record in place by delele redundant df rows
+        cls._resolve_alt_loc(target_model_df, keep=alt_loc_keep, single_alt_loc=single_alt_loc)  # resolve alt loc record in place by delele redundant df rows
         #endregion (Add here to address more problem related to the PDB file format here)
 
         # target_model_df below should be "standard" --> start building
@@ -149,6 +164,9 @@ class PDBParser(StructureParserInterface):
         Returns: 
             Path to the saved Structure() as a str().
         """            
+        if not isinstance(outfile, str):
+            raise TypeError("outfile must be a string representing the file path.")
+
         content:str = cls.get_file_str( stru, if_renumber, if_fix_atomname, same_chain_id_for_9999_solvent, omit_chain_id )
 
         fs.write_lines( outfile, content.splitlines() )
@@ -558,28 +576,57 @@ class PDBParser(StructureParserInterface):
             idx_change_mapper[c_r_id] = (new_chain_id, c_r_id[1])
 
     @staticmethod
-    def _resolve_alt_loc(df: pd.DataFrame, keep: str = "first") -> None:
+    def _resolve_alt_loc(df: pd.DataFrame, keep: str = "first", single_alt_loc="clean") -> None:
         """
         Resolves atoms with the alt_loc records
-        Optional argument "keep" specifies the resolution method. Default
-        is "first" which keeps atoms with the lexicographically smallest
-        alt_loc identifier (e.g., A before B) for each residue, independent
-        of DataFrame row order. Otherwise, if a specific alt_loc identifier
-        is provided (e.g., "B"), it keeps that identifier, assuming it exists.
+        Args:
+        keep: 
+            specifies the resolution method. Default is "first" which keeps 
+            atoms with the lexicographically smallest alt_loc identifier (e.g., A before B) 
+            for each residue, independent of DataFrame row order. Otherwise, if a specific 
+            alt_loc identifier is provided (e.g., "B"), it keeps that identifier, assuming 
+            it exists. The "else" operator can be used to specify a fallback alt_loc 
+            identifier in cases that the preferred one does not exist in all residues that 
+            contains alt_loc (e.g., "B else A" keeps "B" when it exists in a residue, otherwise keeps "A").
+        single_alt_loc:
+            specifies how to treat the case when there is only one alt_loc in a residue.
+            Default is "clean", which deletes the alt_loc identifier (sets it to blank) and 
+            keeps the atoms. Other options are "keep" (keeps the alt_loc identifier as is) and
+            "delete" (deletes the atoms with alt_loc identifier).
 
         Only one record out of multiple alt_loc is allowed. Delete rest 
         df lines in place. 
-        TODO support residue specific keep strageties
+        TODO support specific alt loc for specific residues.
+        TODO resolve cases when an atom only of "B" and "C" alt loc exists without "A"
+        TODO support a way to keep based on occupancy.
         """
+        fall_back_keep = None
+        single_alt_loc = single_alt_loc.lower()
+        valid_single_alt_loc = {"clean", "keep", "delete"}
+        if single_alt_loc not in valid_single_alt_loc:
+            message = ("Invalid single_alt_loc strategy: "
+                       f"{single_alt_loc}. Supported values are {sorted(valid_single_alt_loc)}.")
+            _LOGGER.error(message)
+            raise ValueError(message)
         alt_loc_atoms_df = df[df["alt_loc"].str.strip() != ""]        
         # san check
         if len(alt_loc_atoms_df) == 0:
             _LOGGER.debug("No alt_loc to resolve.")
             return
-        # determine wanted alt loc
+        # alt loc keywords (determine wanted alt loc)
         if keep == "first":
             all_alt_locs = list(set(map(lambda s: s.strip(), alt_loc_atoms_df["alt_loc"])))
             keep = sorted(all_alt_locs)[0]
+        elif "else" in keep:
+            keep_options = list(map(lambda s: s.strip(), keep.split("else")))
+            if len(keep_options) != 2:
+                message = f"Invalid alt_loc keep strategy: {keep}. Only one 'else' is allowed."
+                _LOGGER.error(message)
+                raise ValueError(message)
+            # get all alt locs in the df
+            keep = keep_options[0]
+            fall_back_keep = keep_options[1]
+
         # solve
         # get a list of "loc" for deleting in the original df
         delete_loc_list = []
@@ -588,13 +635,34 @@ class PDBParser(StructureParserInterface):
         for r_id_c_id, res_df in alt_loc_residues:
             # group by alt_loc values
             alt_res_dfs = res_df.groupby("alt_loc", sort=False)
-            # if len(alt_res_dfs) == 1:
-            #     _LOGGER.debug(f"Only 1 alt_loc id found in residue {r_id_c_id[1], r_id_c_id[0]}. No need to resolve")
-            #     continue
+
+            # case: only one alt loc in this residue
+            if alt_res_dfs.ngroups == 1:
+                if single_alt_loc == "clean":
+                    df.loc[res_df.index, "alt_loc"] = ""
+                    continue
+                elif single_alt_loc == "delete":
+                    delete_loc_list.extend(list(res_df.index))
+                    continue
+                else:
+                # "keep" leaves the alt_loc untouched and is subject to choosing with "keep"
+                    pass
+                
+            # case: multiple alt loc in this residue (or single alt loc with "keep" strategy)
             _LOGGER.debug(f"Dealing with alt_loc residue: {r_id_c_id[1], r_id_c_id[0]}")
             delele_res_dfs_mapper = alt_res_dfs.groups
             if keep in delele_res_dfs_mapper:
                 del delele_res_dfs_mapper[keep] # so that we keep this "keep" alt loc
+            else:
+                if fall_back_keep and fall_back_keep in delele_res_dfs_mapper:
+                    _LOGGER.debug(f"Preferred alt_loc '{keep}' not found in residue {r_id_c_id[1], r_id_c_id[0]}. Using fallback alt_loc '{fall_back_keep}'.")
+                    del delele_res_dfs_mapper[fall_back_keep]
+                else:
+                    # this is the case that neither preferred nor fallback alt loc exists
+                    # it is possible that the residue only has some alt loc "B" atoms without "A"
+                    # in this case, we just remove all alt loc atoms.
+                    _LOGGER.debug(f"Neither preferred alt_loc '{keep}' nor fallback alt_loc '{fall_back_keep}' found in residue {r_id_c_id[1], r_id_c_id[0]}. Deleting all alt_loc atoms.")
+            # collect delete locs
             for delete_lines in list(delele_res_dfs_mapper.values()):
                 delete_loc_list.extend(list(delete_lines))
 

@@ -6,6 +6,8 @@ Date: 2025-05-18
 from os import path
 from typing import List, Tuple
 from os import path
+
+import numpy as np
 from enzy_htp import interface, _LOGGER, PDBParser
 from enzy_htp.core import file_system as fs
 
@@ -75,3 +77,14 @@ def test_read_cavity_from_xml():
     except ValueError:
         pass
     fs.safe_rmdir(WORK_DIR)
+
+def test_parse_mesh_file():
+    """Test the `interface.mole2._parse_mesh_file` function."""
+    mesh_filepath = path.join(DATA_DIR, "cavity_calc", "cavity_test.mesh")
+    mesh, com = interface.mole2._parse_mesh_file(mesh_filepath)
+    # Verify content.
+    assert mesh.n_points == 82
+    # Check a few sample values.
+    assert np.allclose(mesh.points[0], np.array([37.198039, 41.044986, 50.574963]))
+    import pyvista as pv
+    print(pv.__version__)

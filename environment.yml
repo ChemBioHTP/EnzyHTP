@@ -11,7 +11,7 @@ dependencies:
   - pdb2pqr=3.6.1
   - plum-dispatch=2.2.2
   - pymol-open-source=2.5.0=py39he03f1b4_6
-  - pyvista=0.42.3
+  - pyvista=0.45.2
   - rdkit
   - requests
   - scipy
