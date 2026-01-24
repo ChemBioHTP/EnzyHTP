@@ -43,7 +43,7 @@ class NonCanonicalBase(Residue):
         """Getter for the net_charge attribute."""
 
         if self._net_charge is None:  
-            err_msg = (f"NCAA does not have charge."  
+            err_msg = (f"NCAA {self.key_str} does not have charge."  
                       " ALWAYS check and explicit assign it using"  
                       " Structure.assign_ncaa_chargespin()")
             _LOGGER.error(err_msg)  
@@ -61,7 +61,7 @@ class NonCanonicalBase(Residue):
         """Getter for the multiplicity attribute."""
 
         if self._multiplicity is None:  
-            err_msg = (f"NCAA does not have spin."  
+            err_msg = (f"NCAA {self.key_str} does not have spin."  
                        " ALWAYS check and explicit assign it using"  
                        " Structure.assign_ncaa_chargespin()")
             _LOGGER.error(err_msg)
