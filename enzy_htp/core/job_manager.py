@@ -328,12 +328,13 @@ class ClusterJob():
         pend,
         run,
         complete,
-        canel,
-        error
+        cancel,
+        error,
+        unknown
 
         Return:
             a tuple of
-            (a str of pend or run or complete or canel or error,
+            (a str of pend or run or complete or cancel or error or unknown,
                 the real keyword form the cluster)
 
         Will also assign self.last_state

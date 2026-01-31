@@ -329,7 +329,7 @@ export LD_LIBRARY_PATH=/sb/apps/alphafold232/miniconda3/envs/af232/lib:$LD_LIBRA
     def get_job_state(cls, job_id: str) -> tuple[str, str]:
         """
         determine if the job is:
-        Pend or Run or Complete or Canel or Error
+        Pend or Run or Complete or Cancel or Error
         Return: 
             a tuple of
             (a str of pend or run or complete or canel or error,
@@ -339,4 +339,4 @@ export LD_LIBRARY_PATH=/sb/apps/alphafold232/miniconda3/envs/af232/lib:$LD_LIBRA
         for k, v in cls.JOB_STATE_MAP.items():
             if state in v:
                 return (k, state)
-        raise Exception(f"Do not regonize state: {state}")
+        return ("unknown", state)
