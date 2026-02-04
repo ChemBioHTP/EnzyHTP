@@ -10,6 +10,7 @@ import csv
 import json
 import subprocess
 import sys
+import re
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -166,9 +167,6 @@ def count_completed_sequences(work_dir: Path) -> tuple[int, int]:
 
 def _parse_sequences_from_submit(script_path: Path) -> list[int]:
     """Extract sequence indices from a submit_alphafold_X.cmd file."""
-
-    import re
-
     try:
         text = script_path.read_text(errors="ignore")
     except FileNotFoundError:
@@ -205,6 +203,13 @@ def _error_snippet_from_log(log_text: str) -> Optional[str]:
     snippet = lines[idx : min(len(lines), idx + 8)]
     return "\n".join(snippet)
 
+def _parse_work_dir_from_submit(script_path: Path) -> Path:
+    """Extract the working directory from a submit_alphafold_X.cmd file."""
+
+    text = script_path.read_text(errors="ignore")
+
+    return Path(re.search(r"--output_dir\s+(\S+)", text).group(1))
+
 def analyze_submitted_jobs(
     submitted_log: Path = Path("submitted_job_ids.log"),
     log_dir: Path = Path("."),
@@ -229,9 +234,15 @@ def analyze_submitted_jobs(
             continue
         parts = stripped.split()
         if len(parts) < 2:
-            continue
-        job_id, script_rel = parts[0], parts[1]
-        rows.append((job_id, Path(script_rel)))
+            if len(parts) == 1:
+                job_id = parts[0]
+                script_rel = None
+                print(f"[WARN] Missing script path for job id {job_id}, using sacct to aquire script path.")
+            else:
+                continue
+        else:
+            job_id, script_rel = parts[0], parts[1]
+        rows.append((job_id, script_rel))
 
     if not rows:
         print(f"[WARN] No jobs found in {submitted_log}")
@@ -239,8 +250,12 @@ def analyze_submitted_jobs(
 
     ok = fail = missing_log = running = pending = 0
     for job_id, script_rel in rows:
+        if script_rel is None:
+            script_rel = AccreR9.get_job_info(job_id, "SubmitLine%100").split()[-1]
+        script_rel = Path(script_rel)
         script_path = script_rel if script_rel.is_absolute() else submitted_log.parent / script_rel
-        work_dir = script_path.parent
+        work_dir = _parse_work_dir_from_submit(script_path)
+
         seq_ids = _parse_sequences_from_submit(script_path)
 
         log_path = log_dir / f"slurm-{job_id}.out"
@@ -256,7 +271,7 @@ def analyze_submitted_jobs(
 
         state, state_kw = AccreR9.get_job_state(job_id)
 
-        if not err_snippet and not missing_outputs:
+        if not missing_outputs:
             ok += 1
             if state and state != "complete":
                 # Outputs look fine but job still running/pending? note it.
@@ -414,7 +429,7 @@ def run_af2_main():
     eh_config.alphafold.INSTALL_TYPE="alphafold2_native_python"
     eh_config.alphafold.EXECUTABLE_PATH="/sb/apps/alphafold232/alphafold/run_alphafold.py"
     eh_config.alphafold.DATA_DIR="/sb/apps/alphafold-data.230"
-    work_dir = sys.argv[1] + "_af2_results"
+    work_dir = Path(sys.argv[2]).stem + "_af2_results"
 
     predict_structure(
         sequences=seq_list, 
@@ -446,13 +461,20 @@ def main():
         analyze_submitted_jobs(submitted, log_dir)
         return
 
-    # if len(sys.argv) < 3:
-    #     print("Usage: python af2_main.py <cpu_model_name> <uniprot_sequences.csv>", file=sys.stderr)
-    #     print("Or:    python af2_main.py count <work_dir>")
-    #     print("Or:    python af2_main.py analyze [submitted_job_ids.log] [log_dir]")
-    #     sys.exit(1)
-    generate_rerun_scripts()
-    # run_af2_main()
+    if len(sys.argv) >= 2 and sys.argv[1] in {"generate_rerun", "rerun_scripts"}:
+        submitted = Path(sys.argv[2]) if len(sys.argv) >= 3 else Path("submitted_job_ids.log")
+        generate_rerun_scripts(submitted_log=submitted)
+        return
+
+    if len(sys.argv) >= 3 and sys.argv[1] not in {"count", "analyze", "generate_rerun"}:
+        run_af2_main()
+
+    if len(sys.argv) < 3:
+        print("Usage: python af2_main.py <cpu_model_name> <uniprot_sequences.csv>", file=sys.stderr)
+        print("Or:    python af2_main.py count <work_dir>", file=sys.stderr)
+        print("Or:    python af2_main.py analyze [submitted_job_ids.log] [log_dir]", file=sys.stderr)
+        print("Or:    python af2_main.py generate_rerun [submitted_job_ids.log]", file=sys.stderr)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
