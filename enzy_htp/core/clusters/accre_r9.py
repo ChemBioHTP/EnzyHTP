@@ -85,11 +85,11 @@ export LD_LIBRARY_PATH=/sb/apps/alphafold232/miniconda3/envs/af232/lib:$LD_LIBRA
     """the env settings for all container based software on ACCRE_R9"""
 
     ENZYHTP_MAIN_ENV = { # use the env from QZ
-        "CPU": f"""source /home/shaoq1/bin/miniconda3/bin/activate new_enzy_htp
-{G16_ENV['CPU']["head"]}
+        "CPU": f"""{G16_ENV['CPU']["head"]}
 {ROSETTA_ENV['serial_CPU']}
 {AMBER_ENV['CPU']}
-{MULTIWFN_ENV['CPU']}""",
+{MULTIWFN_ENV['CPU']}
+source /home/shaoq1/bin/miniconda3/bin/activate new_enzy_htp""",
         "GPU": None,
     }
     #############################
