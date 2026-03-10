@@ -218,6 +218,8 @@ class AmberParameterizer(MolDynParameterizer):
 
     def run(self, stru: Structure) -> AmberParameter:
         """the parameterizer convert stru to amber parameter (inpcrd, prmtop)"""
+        run_additional_tleap_lines = list(self.additional_tleap_lines)
+
         # 0. set up paths
         result_inpcrd = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm.inpcrd")
         result_prmtop = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm.prmtop")
@@ -250,7 +252,11 @@ class AmberParameterizer(MolDynParameterizer):
         if "modified_residue" in diversity:
             for maa in stru.modified_residue:
                 if maa.name not in maa_parms:
-                    maa_parms[maa.name] = self._parameterize_modified_res(maa, gaff_type)
+                    mol_desc_path, frcmod_path_list, maa_additional_tleap_lines = self._parameterize_modified_res(maa, gaff_type)
+                    maa_parms[maa.name] = (mol_desc_path, frcmod_path_list)
+                    for tleap_line in maa_additional_tleap_lines:
+                        if tleap_line not in run_additional_tleap_lines:
+                            run_additional_tleap_lines.append(tleap_line)
         if "metalcenter" in diversity:
             _LOGGER.warning(
                 "Support for paramization of metalcenter is not ready yet."
@@ -274,7 +280,7 @@ class AmberParameterizer(MolDynParameterizer):
                                             metalcenter_parms=metalcenter_parms,
                                             result_inpcrd=result_inpcrd,
                                             result_prmtop=temp_prmtop,
-                                            additional_tleap_lines=self.additional_tleap_lines,)
+                                            additional_tleap_lines=run_additional_tleap_lines,)
 
         # 4. run tleap
         self.parent_interface.run_tleap(tleap_content, keep_in_file=self.keep_tleap_in)
@@ -335,7 +341,7 @@ class AmberParameterizer(MolDynParameterizer):
 
         return mol_desc_path, [frcmod_path]
 
-    def _parameterize_modified_res(self, maa: ModifiedResidue, gaff_type: str) -> Tuple[str, List[str]]:
+    def _parameterize_modified_res(self, maa: ModifiedResidue, gaff_type: str) -> Tuple[str, List[str], List[str]]:
         """parameterize modified residues for AmberMD, use ncaa_param_lib_path for customized
         parameters. Multiplicity and charge information can be set in ModifiedResidue objects.
         
@@ -361,22 +367,20 @@ class AmberParameterizer(MolDynParameterizer):
             _LOGGER.info(f"Modified residue {maa.name} is already supported by force field {self.force_fields}. "
                         "No additional parameterization needed.")
             # Return empty paths to indicate force field already supports this residue
-            return "", []
+            return "", [], []
     
         # init
         fs.safe_mkdir(self.ncaa_param_lib_path)
         target_method = f"{self.charge_method}-{gaff_type}"
         maa_region = create_region_from_residues(residues=[maa], nterm_cap="H", cterm_cap="OH")
+        additional_tleap_lines = []
 
         # 0. search parm lib - same as ligand
         mol_desc_path, frcmod_path_list = search_ncaa_parm_file(maa,
                                             target_method=target_method,
                                             ncaa_lib_path=self.ncaa_param_lib_path)
 
-        if mol_desc_path:
-            if frcmod_path_list:
-                return mol_desc_path, frcmod_path_list
-        else:
+        if not mol_desc_path:
             # 1. generate ac if not found
             ac_path = f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.ac" # the search ensured no existing file named this
             self.parent_interface.antechamber_ncaa_to_moldesc(ncaa=maa_region,
@@ -439,31 +443,34 @@ class AmberParameterizer(MolDynParameterizer):
                 f"bond a.{maa_amber_idx}.C a.{c_side_amber_idx}.N",
                 f"bond a.{maa_amber_idx}.N a.{n_side_amber_idx}.C",
             ]
-            self.additional_tleap_lines.extend(bond_lines) # NOTE use additional_tleap_lines for now. It is also in the right location in tleap.in.
+            additional_tleap_lines.extend(bond_lines)
 
-        # 6. Run parmchk2 twice on prepin to get frcmod files
-        frcmod_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.frcmod1")
-        frcmod2_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.frcmod2")
+        if not frcmod_path_list:
+            # 6. Run parmchk2 twice on prepin to get frcmod files
+            frcmod_path = fs.get_valid_temp_name(
+                f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.frcmod1")
+            frcmod2_path = fs.get_valid_temp_name(
+                f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.frcmod2")
+            
+            # First call: with annotation and custom force field path
+            parm_dat_path = self._get_force_field_parm_dat_path()
+            
+            self.parent_interface.run_parmchk2(in_file=mol_desc_path,
+                                                out_file=frcmod_path,
+                                                gaff_type=gaff_type,
+                                                custom_force_field=parm_dat_path,
+                                                print_annotation=True)
+            
+            # Clean ATTN lines from the first frcmod file
+            self._clean_frcmod_file(frcmod_path)
+            
+            # Second call: generate parameters using GAFF library 
+            self.parent_interface.run_parmchk2(in_file=mol_desc_path,
+                                            out_file=frcmod2_path,
+                                            gaff_type=gaff_type)
+            frcmod_path_list = [frcmod_path, frcmod2_path]
         
-        # First call: with annotation and custom force field path
-        parm_dat_path = self._get_force_field_parm_dat_path()
-        
-        self.parent_interface.run_parmchk2(in_file=mol_desc_path,
-                                            out_file=frcmod_path,
-                                            gaff_type=gaff_type,
-                                            custom_force_field=parm_dat_path,
-                                            print_annotation=True)
-        
-        # Clean ATTN lines from the first frcmod file
-        self._clean_frcmod_file(frcmod_path)
-        
-        # Second call: generate parameters using GAFF library 
-        self.parent_interface.run_parmchk2(in_file=mol_desc_path,
-                                           out_file=frcmod2_path,
-                                           gaff_type=gaff_type)
-        return mol_desc_path, [frcmod_path, frcmod2_path]
+        return mol_desc_path, frcmod_path_list, additional_tleap_lines
 
     def _clean_frcmod_file(self, frcmod_path: str) -> None:
         """Remove 'ATTN' lines from a frcmod file in-place."""
