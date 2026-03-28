@@ -39,6 +39,7 @@ qm_hpc_job_config = {
         "account" : "yang_lab",
         "partition" : "batch",
         'walltime' : '1-00:00:00',
+        "constraint" : "haswell|broadwell|skylake|cascadelake|icelake", # version issue on ACCRE
     }
 }
 result_dict = {}
