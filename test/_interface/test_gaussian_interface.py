@@ -149,6 +149,16 @@ def test_lot_to_keyword():
     test_kw = gi.lot_to_keyword(test_lot)
     assert answer_kw == test_kw
 
+def test_lot_to_keyword_with_def2_basis_alias():
+    """def2 basis names should be normalized to Gaussian keywords."""
+    test_lot = QMLevelOfTheory(
+        basis_set="def2-tzvp",
+        method="pbe0",
+    )
+    answer_kw = ("pbe1pbe def2tzvp", [], [])
+    test_kw = gi.lot_to_keyword(test_lot)
+    assert answer_kw == test_kw
+
 def test_get_geom_lines():
     """as name.
     answer confirmed using GaussView manually"""

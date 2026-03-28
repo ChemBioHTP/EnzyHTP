@@ -391,13 +391,14 @@ class GaussianInterface(BaseInterface):
     # region == mappers ==
     METHOD_KEYWORD_MAPPER = {
         "pbe0": "pbe1pbe",
-        "def2-svp" : "def2svp",
-        "def2-tzvp" : "def2tzvp",
-        "def2-qzvpp" : "def2qzvpp",
     }
     """map Schrodinger eq. solving method name to gaussian keyword. mostly record special ones."""
 
-    BASIS_SET_KEYWORD_MAPPER = {}
+    BASIS_SET_KEYWORD_MAPPER = {
+        "def2-svp": "def2svp",
+        "def2-tzvp": "def2tzvp",
+        "def2-qzvpp": "def2qzvpp",
+    }
     """map basis set name to gaussian keyword."""
 
     SOLVENT_KEYWORD_MAPPER = {}
@@ -459,9 +460,10 @@ class GaussianInterface(BaseInterface):
         # we can use the @filepath function
         gen_section_lines = []
 
-        result = self.BASIS_SET_KEYWORD_MAPPER.get(name, None)
+        normalized_name = name.strip()
+        result = self.BASIS_SET_KEYWORD_MAPPER.get(normalized_name.lower(), None)
         if result is None:
-            result = name
+            result = normalized_name
         result = " "+result
 
         return result, gen_section_lines
