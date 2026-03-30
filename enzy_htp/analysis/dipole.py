@@ -23,6 +23,7 @@ def bond_dipole(
         # execution config
         work_dir: str="./bond_dipole",
         keep_in_file: bool=False,
+        strict_target_bond: bool=False,
         # armer config
         cluster_job_config: Dict = None,
         job_check_period: int= 30, # s
@@ -46,6 +47,9 @@ def bond_dipole(
             the working dir that contains all the files in the SPE process
         keep_in_file:
             whether keep the input file of the calculation
+        strict_target_bond:
+            whether to raise an error if the target bond dipole key is missing
+            in parsed output. If False, warning and zero dipole are returned.
         cluster_job_config: 
             the config for cluster_job. If None is used, the calculation
             will be run locally.
@@ -82,6 +86,7 @@ def bond_dipole(
 
     result = BOND_DIPOLE_METHODS[method](
         ele_stru, atom_1, atom_2, work_dir, keep_in_file,
+        strict_target_bond = strict_target_bond,
         cluster_job_config = cluster_job_config, 
         job_check_period = job_check_period,
         **kwargs)

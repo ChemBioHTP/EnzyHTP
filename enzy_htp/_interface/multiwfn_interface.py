@@ -161,6 +161,7 @@ class MultiwfnInterface(BaseInterface):
                         keep_in_file: bool,
                         cluster_job_config: Dict = "default",
                         job_check_period: int = 60,
+                        strict_target_bond: bool = False,
                         **kwargs) -> Tuple[float, Tuple[float]]:
         """get bond dipole using wfn analysis with fchk files.
         TODO we also want to support single-center in some day?
@@ -188,6 +189,10 @@ class MultiwfnInterface(BaseInterface):
                 will be run locally.
             job_check_period:
                 the time cycle for update job state change (Unit: s)
+            strict_target_bond:
+                whether to raise error if the target bond key cannot be found
+                in parsed Multiwfn 2-center bond dipole output.
+                if False, a warning will be logged and a zero dipole is returned.
         Returns:
             (dipole_norm_signed, dipole_vec)
                 *dipole_norm_signed*
@@ -272,7 +277,20 @@ class MultiwfnInterface(BaseInterface):
         atom_2_id = ele_stru.geometry.get_atom_index(atom_2, indexing=1)
 
         dipole_vec = np.array((0.0, 0.0, 0.0))
-        target_dipoles = dipoles_data[(atom_1_id, atom_2_id)]
+        target_key = (atom_1_id, atom_2_id)
+        reverse_key = (atom_2_id, atom_1_id)
+        target_dipoles = dipoles_data.get(target_key)
+        if target_dipoles is None:
+            target_dipoles = dipoles_data.get(reverse_key)
+        if target_dipoles is None:
+            msg = (f"cannot find target bond dipole keys {target_key} or {reverse_key} "
+                   f"in Multiwfn result: {result_file}.")
+            if strict_target_bond:
+                raise ValueError(msg)
+
+            _LOGGER.warning(f"{msg} Returning zero dipole.")
+            target_dipoles = []
+
         if len(target_dipoles) > 1:
             _LOGGER.warning(f"found multiple LMO-based bond dipole for bond {(atom_1_id, atom_2_id)}. "
                             "The final bond dipole will be sum of all these dipole vectors. "

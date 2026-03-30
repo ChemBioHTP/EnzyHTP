@@ -3,6 +3,7 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-01-16
 """
 from pathlib import Path
+from collections import defaultdict
 import re
 import pytest
 import os
@@ -10,6 +11,8 @@ import numpy as np
 
 from enzy_htp.core.clusters.accre import Accre
 import enzy_htp.core.file_system as fs
+from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core.general import EnablePropagate
 from enzy_htp.chemical.level_of_theory import QMLevelOfTheory, MMLevelOfTheory
 from enzy_htp._config.armer_config import ARMerConfig
 from enzy_htp.electronic_structure import ElectronicStructure
@@ -48,6 +51,168 @@ def test_parse_two_center_dp_moments():
         np.array((-0.36498, -1.01171,  0.10899)),
         np.array((-0.63112, -1.67971,  0.29640)),
     ])
+
+
+def test_get_bond_dipole_reverse_key_fallback(monkeypatch, tmp_path, caplog):
+    """Reverse key should be accepted when direct key is missing."""
+    class DummyAtom:
+        def __init__(self, coord):
+            self.coord = coord
+
+    class DummyTopology:
+        @staticmethod
+        def get_corresponding_atom(atom):
+            return atom
+
+    class DummyGeometry:
+        def __init__(self, atom_to_id):
+            self.topology = DummyTopology()
+            self.atom_to_id = atom_to_id
+
+        def get_atom_index(self, atom, indexing=1):
+            return self.atom_to_id[atom]
+
+    class DummyEleStru:
+        def __init__(self, geometry):
+            self.geometry = geometry
+            self.mo = "dummy.fchk"
+
+    atom_1 = DummyAtom((0.0, 0.0, 0.0))
+    atom_2 = DummyAtom((1.0, 0.0, 0.0))
+    ele_stru = DummyEleStru(DummyGeometry({atom_1: 1, atom_2: 2}))
+
+    monkeypatch.setattr(fs, "safe_mkdir", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(fs, "get_valid_temp_name", lambda path: path)
+    monkeypatch.setattr(fs, "write_lines", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(fs, "safe_mv", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(fs, "clean_temp_file_n_dir", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mi, "run_multiwfn", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        mi,
+        "parse_two_center_dp_moments",
+        lambda _fname: defaultdict(list, {(2, 1): [np.array((1.0, 0.0, 0.0))]}),
+    )
+
+    result = mi.get_bond_dipole(
+        ele_stru=ele_stru,
+        atom_1=atom_1,
+        atom_2=atom_2,
+        work_dir=str(tmp_path),
+        keep_in_file=False,
+        cluster_job_config=None,
+        strict_target_bond=False,
+    )
+
+    assert np.isclose(result[0], 1.0)
+    assert np.array_equal(result[1], np.array((1.0, 0.0, 0.0)))
+    assert "cannot find target bond dipole keys" not in caplog.text
+
+
+def test_get_bond_dipole_missing_both_keys_warns_and_returns_zero(monkeypatch, tmp_path, caplog):
+    """Missing both directions should warn and return zero in non-strict mode."""
+    class DummyAtom:
+        def __init__(self, coord):
+            self.coord = coord
+
+    class DummyTopology:
+        @staticmethod
+        def get_corresponding_atom(atom):
+            return atom
+
+    class DummyGeometry:
+        def __init__(self, atom_to_id):
+            self.topology = DummyTopology()
+            self.atom_to_id = atom_to_id
+
+        def get_atom_index(self, atom, indexing=1):
+            return self.atom_to_id[atom]
+
+    class DummyEleStru:
+        def __init__(self, geometry):
+            self.geometry = geometry
+            self.mo = "dummy.fchk"
+
+    atom_1 = DummyAtom((0.0, 0.0, 0.0))
+    atom_2 = DummyAtom((1.0, 0.0, 0.0))
+    ele_stru = DummyEleStru(DummyGeometry({atom_1: 1, atom_2: 2}))
+
+    monkeypatch.setattr(fs, "safe_mkdir", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(fs, "get_valid_temp_name", lambda path: path)
+    monkeypatch.setattr(fs, "write_lines", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(fs, "safe_mv", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(fs, "clean_temp_file_n_dir", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mi, "run_multiwfn", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        mi,
+        "parse_two_center_dp_moments",
+        lambda _fname: defaultdict(list),
+    )
+    with EnablePropagate(_LOGGER):
+        result = mi.get_bond_dipole(
+            ele_stru=ele_stru,
+            atom_1=atom_1,
+            atom_2=atom_2,
+            work_dir=str(tmp_path),
+            keep_in_file=False,
+            cluster_job_config=None,
+            strict_target_bond=False,
+        )
+
+    assert np.isclose(result[0], 0.0)
+    assert np.array_equal(result[1], np.array((0.0, 0.0, 0.0)))
+    assert "cannot find target bond dipole keys (1, 2) or (2, 1)" in caplog.text
+
+
+def test_get_bond_dipole_missing_target_key_strict_raises(monkeypatch, tmp_path):
+    """Missing both directions should raise in strict mode."""
+    class DummyAtom:
+        def __init__(self, coord):
+            self.coord = coord
+
+    class DummyTopology:
+        @staticmethod
+        def get_corresponding_atom(atom):
+            return atom
+
+    class DummyGeometry:
+        def __init__(self, atom_to_id):
+            self.topology = DummyTopology()
+            self.atom_to_id = atom_to_id
+
+        def get_atom_index(self, atom, indexing=1):
+            return self.atom_to_id[atom]
+
+    class DummyEleStru:
+        def __init__(self, geometry):
+            self.geometry = geometry
+            self.mo = "dummy.fchk"
+
+    atom_1 = DummyAtom((0.0, 0.0, 0.0))
+    atom_2 = DummyAtom((1.0, 0.0, 0.0))
+    ele_stru = DummyEleStru(DummyGeometry({atom_1: 1, atom_2: 2}))
+
+    monkeypatch.setattr(fs, "safe_mkdir", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(fs, "get_valid_temp_name", lambda path: path)
+    monkeypatch.setattr(fs, "write_lines", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(fs, "safe_mv", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(fs, "clean_temp_file_n_dir", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mi, "run_multiwfn", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        mi,
+        "parse_two_center_dp_moments",
+        lambda _fname: defaultdict(list),
+    )
+
+    with pytest.raises(ValueError, match=r"cannot find target bond dipole keys \(1, 2\) or \(2, 1\)"):
+        mi.get_bond_dipole(
+            ele_stru=ele_stru,
+            atom_1=atom_1,
+            atom_2=atom_2,
+            work_dir=str(tmp_path),
+            keep_in_file=False,
+            cluster_job_config=None,
+            strict_target_bond=True,
+        )
 
 def test_get_bond_dipole():
     """as name. the test stru is extracted from a real simulation traj.
