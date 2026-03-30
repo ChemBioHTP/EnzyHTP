@@ -422,12 +422,18 @@ def _child_main(
 
             # QM & dipole
             if j >= len(task_result_data["qm_results"]):
+                qm_cpu_job_config = {
+                    "cluster" : cpu_job_config["cluster"],
+                    "res_keywords" : cpu_job_config["res_keywords"] | {
+                        "constraint" : "haswell|broadwell|skylake|cascadelake|icelake"
+                    }
+                }
                 qm_results = single_point(
                     stru=replica_esm,
                     engine="gaussian",
-                    method=QMLevelOfTheory( basis_set="def2-tzvp", method="pbe0" ),
+                    method=QMLevelOfTheory( basis_set="def2tzvp", method="pbe0" ),
                     regions=["resi 217+218"],
-                    cluster_job_config=cpu_job_config,
+                    cluster_job_config=qm_cpu_job_config,
                     job_check_period=60,
                     job_array_size=20,
                     work_dir=f"{task_dir}/QM_SPE/rep_{j}",
@@ -441,8 +447,8 @@ def _child_main(
                 replica_dipole = []
                 for ele_stru in qm_results:
                     this_frame_stru = ele_stru.geometry.topology
-                    atom_1 = this_frame_stru.get("C.217.C1")
-                    atom_2 = this_frame_stru.get("C.217.I1")
+                    atom_1 = this_frame_stru.get("C.218.C1")
+                    atom_2 = this_frame_stru.get("C.218.I1")
 
                     # bond dipole
                     dipole = bond_dipole(
@@ -739,10 +745,10 @@ def main():
     #     shrapnel_dir="./shrapnel_aclmt/",
     # )
 
-    unfinished = (detect_child_job_progress(
-        md_parallel_runs=1,
-        print_unfinished_only=True,
-    ))
+    # unfinished = (detect_child_job_progress(
+    #     md_parallel_runs=1,
+    #     print_unfinished_only=True,
+    # ))
     # unfinished_idx = set([int(i.removeprefix("./shrapnel_aclmt/group_")) for i in unfinished])
     # running_idx = {
     #     0 ,1 ,2 ,3 ,4 ,5 ,6 ,7 ,8 ,9 ,10,12,14,27,33,34,36,37,41,51,53,55,63,64,71,72,73,74,75,76,77,78,79,80,81,82,88,92,94
