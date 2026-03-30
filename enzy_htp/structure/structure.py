@@ -564,9 +564,12 @@ class Structure(DoubleLinkedNode):
             chain, res_idx, atom_name = key.split('.')
             res_idx = int(res_idx)
             res = self.find_residue_with_key((chain, res_idx))
-            try:
-                result = res.find_atom_name(atom_name)
-            except ResidueDontHaveAtom as e:
+            if res:
+                try:
+                    result = res.find_atom_name(atom_name)
+                except ResidueDontHaveAtom as e:
+                    result = None
+            else:
                 result = None
         
         if result is None:
