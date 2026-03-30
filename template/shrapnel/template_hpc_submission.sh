@@ -4,7 +4,7 @@
 #SBATCH --partition=batch
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --mem=5G
+#SBATCH --mem=15G
 #SBATCH --time=10-00:00:00
 #SBATCH --signal=B:USR1@30
 #SBATCH --no-requeue

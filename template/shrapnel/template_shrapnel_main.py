@@ -154,7 +154,7 @@ def run_shrapnel(
                     "mutant" : mut, 
                     "ncaa_chrgspin" : ligand_chrg_spin_mapper, 
                     "constraints" : md_constraints})
-
+    _LOGGER.info(f"Total {len(child_tasks)} tasks will be distributed into {shrapnel_groups} groups.")
     num_task_each_grp = mh.calc_average_task_num(len(child_tasks), shrapnel_groups)
     child_main_path = f"{work_dir}/{child_main_fname}"
     kwargs_file = f"{work_dir}/{kwargs_fname}"
@@ -206,6 +206,7 @@ def run_shrapnel(
         # 3. submit jobs
         save_obj(child_jobs, child_job_checkpoint)
     else:
+        _LOGGER.info("Loading existing child jobs from checkpoint.")
         child_jobs: List[ClusterJob] = load_obj(child_job_checkpoint) # NOTE that this will cause source code change in this script cannot effect the content of those existing jobs. (e.g.: partition etc.)
         new_child_jobs = []
         # 1. analyze remaining child_jobs (recycle old one) may benefit from having a mimo
@@ -270,7 +271,9 @@ def _child_main(
     from enzy_htp.preparation import protonate_stru, remove_hydrogens
     from enzy_htp.mutation import mutate_stru
     from enzy_htp.geometry import equi_md_sampling
-    from enzy_htp.analysis import ele_field_strength_at_along, ddg_fold_of_mutants, rmsd, binding_energy
+    from enzy_htp.analysis import ele_field_strength_at_along, ddg_fold_of_mutants, rmsd, binding_energy, bond_dipole, ele_stab_energy_of_bond
+    from enzy_htp.quantum import single_point
+    from enzy_htp.chemical.level_of_theory import QMLevelOfTheory
     from enzy_htp import interface
     from enzy_htp.mutation_class import Mutation
     from enzy_htp.structure import StructureConstraint, Structure, Atom, StructureEnsemble
@@ -321,7 +324,7 @@ def _child_main(
         ligand_chrg_spin_mapper: Dict = task["ncaa_chrgspin"]
         md_constraints: List[Callable[[Structure], StructureConstraint]] = task["constraints"]
 
-        task_result_data: Dict = result_dict.get(task_uid, dict())
+        task_result_data: Dict = result_dict.setdefault(task_uid, dict())
         task_dir = f"task_{i}" # as this will be executed under the grp_dir
     
         # 1. prepare
@@ -356,7 +359,7 @@ def _child_main(
                     "leaprc.water.tip3p",
                 ],
             )
-            gpu_job_config = {
+            task_gpu_job_config = {
                 "cluster" : gpu_job_config["cluster"],
                 "res_keywords" : gpu_job_config["res_keywords"] | {"node_cores" : gpu_partition}
             }
@@ -366,8 +369,7 @@ def _child_main(
             new_trajs = equi_md_sampling(
                 stru = mutant_stru,
                 param_method = param_method,
-                cluster_job_config = gpu_job_config,
-                dont_freeze_bb_in_min=True,
+                cluster_job_config = task_gpu_job_config,
                 prod_constrain=task_constraints,
                 prod_time=md_length,
                 record_period=md_length*0.01,
@@ -380,42 +382,95 @@ def _child_main(
             save_obj(result_dict, result_path)
 
         # metrics specific
-        mut_data = {
-            "ef" : [],
-            "rmsd" : [],
-            "mmpbsa" : [],
-        }
-        for replica_esm in trajs:
+        for metric_key in ("ef", "rmsd", "mmpbsa", "bond_dipole", "dg_ele", "qm_results"):
+            task_result_data.setdefault(metric_key, list())
+
+        for j, replica_esm in enumerate(trajs):
             # EF
-            replica_ef = []
-            atom_1 = mutant_stru.get("C.290.C1")
-            atom_2 = mutant_stru.get("C.290.I1")
-            ef_region_pattern = "resi 1-288"
-            for traj_stru in replica_esm.structures(remove_solvent=True):
-                # 5. get dEF
-                field_strength = ele_field_strength_at_along(
-                    traj_stru, atom_1, atom_2, region_pattern=ef_region_pattern)
-                replica_ef.append(field_strength)
-            mut_data["ef"].append(replica_ef)
+            if j < len(task_result_data.get("ef", list())):
+                replica_ef = task_result_data["ef"][j]
+            else:
+                replica_ef = []
+                atom_1 = mutant_stru.get("C.290.C1")
+                atom_2 = mutant_stru.get("C.290.I1")
+                ef_region_pattern = "resi 1-288"
+                for traj_stru in replica_esm.structures(remove_solvent=True):
+                    # 5. get dEF
+                    field_strength = ele_field_strength_at_along(
+                        traj_stru, atom_1, atom_2, region_pattern=ef_region_pattern)
+                    replica_ef.append(field_strength)
+                task_result_data["ef"].append(replica_ef)
+                save_obj(result_dict, result_path)
 
             # RMSD
-            replica_rmsd = rmsd(
-                replica_esm, 
-                region_pattern="resi 7+11+27+40+41+43+165+168+169+170+199+210+211+289 and (not elem H)",
-            )
-            mut_data["rmsd"].append(replica_rmsd)
+            if j >= len(task_result_data["rmsd"]):
+                replica_rmsd = rmsd(
+                    replica_esm, 
+                    region_pattern="resi 7+11+27+40+41+43+165+168+169+170+199+210+211+289 and (not elem H)",
+                )
+                task_result_data["rmsd"].append(replica_rmsd)
+                save_obj(result_dict, result_path)
 
             # MMPBSA
-            replica_mmpbsa = binding_energy(
-                replica_esm,
-                ligand="resi 290",
-                method="mmpbsa_amber",
-                cluster_job_config=cpu_job_config,
-            )
-            mut_data["mmpbsa"].append(replica_mmpbsa)
+            if j >= len(task_result_data["mmpbsa"]):
+                replica_mmpbsa = binding_energy(
+                    replica_esm,
+                    ligand="resi 290",
+                    method="mmpbsa_amber",
+                    cluster_job_config=cpu_job_config,
+                )
+                task_result_data["mmpbsa"].append(replica_mmpbsa)
+                save_obj(result_dict, result_path)
 
-        result_dict[task_uid].update(mut_data)
-        save_obj(result_dict, result_path)
+            # QM & dipole
+            if j >= len(task_result_data["qm_results"]):
+                qm_cpu_job_config = {
+                    "cluster" : cpu_job_config["cluster"],
+                    "res_keywords" : cpu_job_config["res_keywords"] | {
+                        "constraint" : "haswell|broadwell|skylake|cascadelake|icelake"
+                    }
+                }
+                qm_results = single_point(
+                    stru=replica_esm,
+                    engine="gaussian",
+                    method=QMLevelOfTheory( basis_set="def2tzvp", method="pbe0" ),
+                    regions=["resi 289+290"],
+                    cluster_job_config=qm_cpu_job_config,
+                    job_check_period=60,
+                    job_array_size=20,
+                    work_dir=f"{task_dir}/QM_SPE/rep_{j}",
+                )
+                task_result_data["qm_results"].append(qm_results)
+                save_obj(result_dict, result_path)
+            else:
+                qm_results = task_result_data["qm_results"][j]
+
+            if j >= len(task_result_data["bond_dipole"]):
+                replica_dipole = []
+                for ele_stru in qm_results:
+                    this_frame_stru = ele_stru.geometry.topology
+                    atom_1 = this_frame_stru.get("C.290.C1")
+                    atom_2 = this_frame_stru.get("C.290.I1")
+
+                    # bond dipole
+                    dipole = bond_dipole(
+                        ele_stru, atom_1, atom_2,
+                        work_dir=f"{task_dir}/bond_dipole/rep_{j}"
+                    )
+                    replica_dipole.append(dipole)
+                task_result_data["bond_dipole"].append(replica_dipole)
+                save_obj(result_dict, result_path)
+            else:
+                replica_dipole = task_result_data["bond_dipole"][j]
+
+            #dg_ele
+            if j >= len(task_result_data["dg_ele"]):
+                replica_dg_ele = []
+                for dip, ef in zip(replica_dipole, replica_ef):
+                    dg_ele = ele_stab_energy_of_bond(dip[0], ef)
+                    replica_dg_ele.append(dg_ele)
+                task_result_data["dg_ele"].append(replica_dg_ele)
+                save_obj(result_dict, result_path)
 
     # final san check
     for task in tasks:
@@ -423,9 +478,17 @@ def _child_main(
         assert task_uid in result_dict
         # assert "ddg_fold" in result_dict[task_uid]
         assert "trajs" in result_dict[task_uid]
+        assert len(result_dict[task_uid]["trajs"]) == md_parallel_runs
         assert "ef" in result_dict[task_uid]
+        assert len(result_dict[task_uid]["ef"]) == md_parallel_runs
         assert "rmsd" in result_dict[task_uid]
+        assert len(result_dict[task_uid]["rmsd"]) == md_parallel_runs
         assert "mmpbsa" in result_dict[task_uid]
+        assert len(result_dict[task_uid]["mmpbsa"]) == md_parallel_runs
+        assert "bond_dipole" in result_dict[task_uid]
+        assert len(result_dict[task_uid]["bond_dipole"]) == md_parallel_runs
+        assert "dg_ele" in result_dict[task_uid]
+        assert len(result_dict[task_uid]["dg_ele"]) == md_parallel_runs
 
 def _make_child_job(
         grp_id: int,
@@ -479,16 +542,16 @@ def _sig_handler(signum, frame, *, child_jobs, child_jobs_checkpoint):
     sys.exit(0)  
 
 def resubmit_child_jobs(child_job_list: list, child_job_checkpoint: str, 
-                        shrapnel_check_period: int, shrapnel_child_array_size: int):
+                        shrapnel_check_period: int, shrapnel_child_array_size: int, shrapnel_dir: str):
     """Resubmit a specific list of children jobs.
     This function is handy when you have part of the child jobs failed after the main script finishes.
     Always dump resubmitted child jobs to a new file."""
     child_jobs: List[ClusterJob] = load_obj(child_job_checkpoint) # NOTE that this will cause source code change in this script cannot effect the content of those existing jobs. (e.g.: partition etc.)
-    child_jobs_mapper = {i.sub_dir.removeprefix("./shrapnel/") : i for i in child_jobs}
+    child_jobs_mapper = {i.sub_dir.removeprefix(shrapnel_dir) : i for i in child_jobs}
 
     new_child_jobs = [child_jobs_mapper[group_name] for group_name in child_job_list]
     new_child_job_checkpoint = Path(child_job_checkpoint).with_suffix(".new.pickle")
-    new_child_job_checkpoint = fs.get_valid_temp_name(new_child_job_checkpoint)
+    new_child_job_checkpoint = fs.get_valid_temp_name(str(new_child_job_checkpoint))
     
     _sig_handler_partial = partial(_sig_handler, child_jobs=new_child_jobs, child_jobs_checkpoint=new_child_job_checkpoint)
     signal.signal(signal.SIGUSR1, _sig_handler_partial)
@@ -649,6 +712,7 @@ def main():
         shrapnel_cpujob_config = shrapnel_cpujob_config,
         shrapnel_gpujob_config = shrapnel_gpujob_config,
         # shrapnel
+        work_dir = "./shrapnel",
         shrapnel_child_array_size = 100,
         shrapnel_groups = 100,
         shrapnel_gpu_partition_mapper = {
