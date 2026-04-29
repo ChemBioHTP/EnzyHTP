@@ -58,7 +58,7 @@ from .preparation import PDBLine, read_pdb_lines, dock_reactants, generate_confo
 
 from .mutation import assign_mutant, mutate_stru
 
-from .geometry import equi_md_sampling, md_simulation
+from .geometry import equi_md_sampling, md_simulation, md_energy_injection, deployable_md_energy_injection
 
 from .quantum import single_point, optimize
 

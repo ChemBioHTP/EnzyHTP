@@ -12,8 +12,10 @@ Date: 2022-06-02
 import copy
 import glob
 from io import StringIO
+import math
 import os
 import pickle
+import random
 import re
 import shutil
 from pathlib import Path
@@ -49,6 +51,12 @@ from enzy_htp.core.general import (
     CaptureLogging,
 )
 from enzy_htp.chemical import QMLevelOfTheory
+from enzy_htp.chemical.physics import (
+    AMU_TO_KG,
+    ANGSTROM_PER_PS_TO_M_PER_S,
+    BOLTZMANN_CONSTANT,
+    get_element_atomic_mass,
+)
 from enzy_htp.chemical.force_field import AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp.structure.structure_io import pdb_io, prmtop_io, prepin_io, mol2_io
@@ -711,6 +719,20 @@ class AmberMDResultEgg(MolDynResultEgg):
     rst_path: str
     prmtop_path: str
     parent_job: ClusterJob
+
+
+@dataclass
+class AmberRestart:
+    """Amber coordinate/restart record."""
+    title: str
+    atom_count: int
+    coordinates: np.ndarray
+    velocities: Union[np.ndarray, None] = None
+    box: Union[Tuple[float, ...], None] = None
+    time: Union[float, None] = None
+
+
+AMBER_RESTART_VELOCITY_TO_ANGSTROM_PER_PS = 20.455
 
 
 class AmberMDStep(MolDynStep):
@@ -1384,6 +1406,168 @@ class AmberInterface(BaseInterface):
     }
     """Mapper for protein force fields to their parameter dat files"""
 
+    def _get_atom_mass(self, atom: Atom) -> float:
+        """Get approximate atomic mass in amu from the atom element."""
+        return get_element_atomic_mass(atom.element)
+
+    def _calculate_temperature_from_restart_velocities(
+            self,
+            selection: StruSelection,
+            restart_velocities: np.ndarray,
+        ) -> float:
+        """Calculate kinetic temperature for a selection from Amber restart velocities."""
+        kinetic_term = 0.0
+        for atom in selection.atoms:
+            velocity = restart_velocities[atom.idx - 1] * AMBER_RESTART_VELOCITY_TO_ANGSTROM_PER_PS
+            kinetic_term += self._get_atom_mass(atom) * float(sum(component * component for component in velocity))
+
+        degrees_of_freedom = 3 * len(selection.atoms)
+        if degrees_of_freedom == 0:
+            _LOGGER.error("Cannot calculate temperature for an empty selection.")
+            raise ValueError
+
+        conversion = AMU_TO_KG * (ANGSTROM_PER_PS_TO_M_PER_S ** 2) / BOLTZMANN_CONSTANT
+        return conversion * kinetic_term / degrees_of_freedom
+
+    def _remove_velocity_drift(
+            self,
+            restart_velocities: np.ndarray,
+            atom_indexes: List[int],
+            atom_masses: List[float],
+        ) -> None:
+        """Remove center-of-mass drift from selected restart velocities."""
+        if len(atom_indexes) <= 1:
+            return
+        total_mass = sum(atom_masses)
+        if total_mass <= 0:
+            _LOGGER.error("Cannot remove velocity drift with non-positive total mass.")
+            raise ValueError
+
+        drift = [0.0, 0.0, 0.0]
+        for atom_index, atom_mass in zip(atom_indexes, atom_masses):
+            for axis in range(3):
+                drift[axis] += atom_mass * restart_velocities[atom_index][axis]
+        drift = [component / total_mass for component in drift]
+
+        for atom_index in atom_indexes:
+            for axis in range(3):
+                restart_velocities[atom_index][axis] -= drift[axis]
+
+    def perturb_restart_velocities(
+            self,
+            selection: StruSelection,
+            restart_in: str,
+            restart_out: str,
+            target_temperature: float,
+            mode: str = "maxwell_reassign",
+            remove_drift: bool = True,
+        ) -> Dict:
+        """Apply an inter-segment velocity perturbation to an Amber restart file."""
+        if target_temperature <= 0:
+            _LOGGER.error(f"Target temperature must be positive. Got {target_temperature}")
+            raise ValueError
+
+        restart = self.read_from_rst(restart_in)
+        if restart.velocities is None:
+            _LOGGER.error(f"Amber restart file does not contain velocities: {restart_in}")
+            raise ValueError
+
+        new_velocities = restart.velocities.copy()
+        selected_indexes = []
+        selected_masses = []
+        current_temperature = None
+        scale_factor = None
+
+        if mode == "velocity_scale":
+            current_temperature = self._calculate_temperature_from_restart_velocities(
+                selection,
+                restart.velocities,
+            )
+            if current_temperature <= 0:
+                _LOGGER.error(f"Current driven-region temperature is not positive: {current_temperature}")
+                raise ValueError
+            scale_factor = math.sqrt(target_temperature / current_temperature)
+
+        for atom in selection.atoms:
+            atom_index = atom.idx - 1
+            atom_mass = self._get_atom_mass(atom)
+            if mode == "velocity_scale":
+                new_velocities[atom_index] = new_velocities[atom_index] * scale_factor
+            elif mode == "maxwell_reassign":
+                sigma_m_per_s = math.sqrt(BOLTZMANN_CONSTANT * target_temperature / (atom_mass * AMU_TO_KG))
+                sigma_restart = sigma_m_per_s / (
+                    ANGSTROM_PER_PS_TO_M_PER_S * AMBER_RESTART_VELOCITY_TO_ANGSTROM_PER_PS
+                )
+                for axis in range(3):
+                    new_velocities[atom_index][axis] = random.gauss(0.0, sigma_restart)
+            else:
+                _LOGGER.error(f"Unsupported restart-velocity perturbation mode: {mode}")
+                raise ValueError
+            selected_indexes.append(atom_index)
+            selected_masses.append(atom_mass)
+
+        if remove_drift:
+            self._remove_velocity_drift(new_velocities, selected_indexes, selected_masses)
+
+        self.write_to_rst(
+            restart=type(restart)(
+                title=restart.title,
+                atom_count=restart.atom_count,
+                coordinates=restart.coordinates,
+                velocities=new_velocities,
+                box=restart.box,
+                time=restart.time,
+            ),
+            out_path=restart_out,
+        )
+
+        result = {
+            "restart_in": restart_in,
+            "restart_out": restart_out,
+            "target_temperature": target_temperature,
+            "mode": mode,
+        }
+        if current_temperature is not None:
+            result["current_temperature"] = current_temperature
+        if scale_factor is not None:
+            result["scale_factor"] = scale_factor
+        return result
+
+    def deserialize_md_result(self, result_record: Dict, topology_file: str) -> MolDynResult:
+        """Rebuild a MolDynResult from serialized Amber metadata."""
+        if result_record.get("source") != "amber":
+            _LOGGER.error(f"Unsupported MD result source for Amber deserialization: {result_record.get('source')}")
+            raise ValueError
+
+        traj_file = result_record.get("traj_file")
+        traj_parser = None
+        if traj_file is not None:
+            traj_parser = AmberNCParser(
+                prmtop_file=topology_file,
+                interface=self,
+            ).get_coordinates
+
+        traj_log_file = result_record.get("traj_log_file")
+        traj_log_parser = self.read_from_mdout if traj_log_file is not None else None
+
+        last_frame_file = result_record.get("last_frame_file")
+        last_frame_parser = None
+        if last_frame_file is not None:
+            last_frame_parser = AmberRSTParser(
+                prmtop_file=topology_file,
+                interface=self,
+            ).get_structure
+
+        return MolDynResult(
+            traj_file=traj_file,
+            traj_parser=traj_parser,
+            traj_log_file=traj_log_file,
+            traj_log_parser=traj_log_parser,
+            last_frame_file=last_frame_file,
+            last_frame_parser=last_frame_parser,
+            source=result_record["source"],
+        )
+
     def __init__(self, parent, config: AmberConfig = None) -> None:
         """Simplistic constructor that optionally takes an AmberConfig object as its only argument.
         Calls parent class."""
@@ -1580,6 +1764,65 @@ class AmberInterface(BaseInterface):
             _LOGGER.error(f"found unsupported file format: {in_format} ({traj_path})")
             raise ValueError
 
+    def combine_traj_segments(
+            self,
+            traj_paths: List[str],
+            topology_path: str,
+            out_path: str,
+            frame1_pdb_path: str,
+            autoimage: bool = True,
+        ) -> None:
+        """Combine ordered Amber trajectory segments into one NetCDF trajectory.
+
+        This helper uses `cpptraj` to concatenate multiple trajectory segments that
+        share the same Amber topology. It can optionally apply `autoimage` before
+        writing the combined trajectory, and it also writes a matching frame-1 PDB
+        for visualization workflows that need a coordinate/topology-like reference
+        structure with the same atom ordering as the trajectory.
+
+        Args:
+            traj_paths:
+                the ordered list of trajectory segment paths to concatenate
+            topology_path:
+                the Amber topology (`.prmtop`) path for the trajectory segments
+            out_path:
+                the output path for the combined NetCDF trajectory
+            frame1_pdb_path:
+                the output path for the matching first-frame PDB
+            autoimage:
+                whether to apply `cpptraj autoimage` before writing the output trajectory
+                and frame-1 PDB
+        """
+        if not traj_paths:
+            _LOGGER.error("combine_traj_segments() requires at least one trajectory path.")
+            raise ValueError
+        if not fs.is_path_exist(topology_path):
+            _LOGGER.error(f"Topology filepath ({topology_path}) doesn't exist.")
+            raise FileNotFoundError
+        missing_paths = [traj_path for traj_path in traj_paths if not fs.is_path_exist(traj_path)]
+        if missing_paths:
+            _LOGGER.error(f"Missing trajectory segment(s) for combine_traj_segments(): {missing_paths}")
+            raise FileNotFoundError
+
+        out_dir = os.path.dirname(out_path)
+        if out_dir:
+            fs.safe_mkdir(out_dir)
+        frame1_dir = os.path.dirname(frame1_pdb_path)
+        if frame1_dir:
+            fs.safe_mkdir(frame1_dir)
+
+        contents = [f"parm {topology_path}"]
+        contents.extend(f"trajin {traj_path}" for traj_path in traj_paths)
+        if autoimage:
+            contents.append("autoimage")
+        contents.extend([
+            f"trajout {out_path} netcdf",
+            f"trajout {frame1_pdb_path} pdb onlyframes 1",
+            "run",
+            "quit",
+        ])
+        self.run_cpptraj("\n".join(contents))
+
     def convert_top_to_prmtop(self, fpath: str, out_path: str) -> None:
         """convert the given topology file to the Amber .prmtop file in the out_path
         (any format Amber already support will be kept as is) """ #NOTE(qz) use mdtraj or pytraj to really do this.
@@ -1643,6 +1886,105 @@ class AmberInterface(BaseInterface):
         ])
         contents = "\n".join(contents)
         self.run_cpptraj(contents)
+
+    def read_from_rst(self, rst_path: str) -> AmberRestart:
+        """Read an Amber ASCII restart/inpcrd file."""
+        with open(rst_path) as handle:
+            title = handle.readline().rstrip("\n")
+            count_line = handle.readline().split()
+            if not count_line:
+                _LOGGER.error(f"Amber restart file is missing atom count: {rst_path}")
+                raise ValueError
+            atom_count = int(count_line[0])
+            time = float(count_line[1]) if len(count_line) > 1 else None
+            payload = []
+            for line in handle:
+                payload.extend(line.split())
+
+        raw_values = np.array([float(value) for value in payload], dtype=float)
+        coord_size = atom_count * 3
+        if raw_values.size < coord_size:
+            _LOGGER.error(
+                f"Amber restart file does not contain enough coordinate values for {atom_count} atoms: {rst_path}"
+            )
+            raise ValueError
+
+        coordinates = raw_values[:coord_size].reshape((atom_count, 3))
+        remainder = raw_values[coord_size:]
+        velocities = None
+        box = None
+
+        if remainder.size in (3, 6):
+            box = tuple(remainder.tolist())
+        elif remainder.size >= coord_size:
+            velocities = remainder[:coord_size].reshape((atom_count, 3))
+            tail = remainder[coord_size:]
+            if tail.size in (0, 3, 6):
+                box = tuple(tail.tolist()) if tail.size else None
+            else:
+                _LOGGER.error(
+                    f"Amber restart tail has unsupported length after velocities: {tail.size} values in {rst_path}"
+                )
+                raise ValueError
+        elif remainder.size != 0:
+            _LOGGER.error(
+                f"Amber restart tail has unsupported length: {remainder.size} values in {rst_path}"
+            )
+            raise ValueError
+
+        return AmberRestart(
+            title=title,
+            atom_count=atom_count,
+            coordinates=coordinates,
+            velocities=velocities,
+            box=box,
+            time=time,
+        )
+
+    def write_to_rst(self, restart: AmberRestart, out_path: str) -> None:
+        """Write an Amber ASCII restart/inpcrd file."""
+        coordinates = np.asarray(restart.coordinates, dtype=float)
+        if coordinates.shape != (restart.atom_count, 3):
+            _LOGGER.error(
+                f"Amber restart coordinates shape does not match atom count: {coordinates.shape} vs {restart.atom_count}"
+            )
+            raise ValueError
+
+        velocities = None
+        if restart.velocities is not None:
+            velocities = np.asarray(restart.velocities, dtype=float)
+            if velocities.shape != (restart.atom_count, 3):
+                _LOGGER.error(
+                    f"Amber restart velocities shape does not match atom count: {velocities.shape} vs {restart.atom_count}"
+                )
+                raise ValueError
+
+        box = None
+        if restart.box is not None:
+            box = tuple(float(value) for value in restart.box)
+            if len(box) not in (3, 6):
+                _LOGGER.error(f"Amber restart box must contain 3 or 6 values. Got {len(box)}")
+                raise ValueError
+
+        fs.safe_mkdir(os.path.dirname(os.path.abspath(out_path)))
+        with open(out_path, "w") as handle:
+            handle.write(f"{restart.title}\n")
+            if restart.time is None:
+                handle.write(f"{restart.atom_count:6d}\n")
+            else:
+                handle.write(f"{restart.atom_count:6d}{restart.time:15.7f}\n")
+
+            for values in (coordinates.reshape(-1), None if velocities is None else velocities.reshape(-1), box):
+                if values is None:
+                    continue
+                line = []
+                for idx, value in enumerate(values, start=1):
+                    line.append(f"{float(value):12.7f}")
+                    if idx % 6 == 0:
+                        handle.write("".join(line) + "\n")
+                        line = []
+                if line:
+                    handle.write("".join(line) + "\n")
 
     # -- tleap --
     def run_tleap(
@@ -3050,6 +3392,7 @@ class AmberInterface(BaseInterface):
             {'type': 'cntrl',
             'config': imin_or_not_cntrl | {
                 'ntx': ntx, 'irest': irest,
+                'ntxo': 1,
                 'ntc': ntc, 'ntf': ntf,
                 'cut': self.config()["HARDCODE_CUT"],
                 'ntpr': ntpr, 'ntwx': ntwx,
@@ -4632,6 +4975,19 @@ class AmberRSTParser():
     
     def get_structure(self, rst_file: str) -> Structure:
         """parse a rst file to a Structure()."""
+        stru = prmtop_io.PrmtopParser().get_structure(self.prmtop_file)
+        restart = self.parent_interface.read_from_rst(rst_file)
+        stru.apply_geom(restart.coordinates.tolist())
+        if restart.box is not None:
+            if len(restart.box) >= 3:
+                if stru.has_pbc_box():
+                    if len(restart.box) == 3:
+                        stru.update_pbc_box_edges(tuple(restart.box))
+                    else:
+                        stru.pbc_box_shape = tuple(restart.box)
+                elif len(restart.box) == 6:
+                    stru.pbc_box_shape = tuple(restart.box)
+        return stru
 
 
 class AmberMDCRDParser():
@@ -4788,4 +5144,3 @@ class AmberNCParser():
 
     def get_last_structure(self, nc_file: str) -> Structure:
         """parse the last frame in a nc file to a Structure(). Intermediate files are created."""
-

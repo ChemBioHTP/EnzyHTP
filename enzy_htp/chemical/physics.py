@@ -9,6 +9,43 @@ from numpy.typing import ArrayLike
 
 from enzy_htp.core.logger import _LOGGER
 
+ATOMIC_MASS_MAPPER = {
+    "H": 1.008,
+    "C": 12.011,
+    "N": 14.007,
+    "O": 15.999,
+    "P": 30.974,
+    "S": 32.06,
+    "F": 18.998,
+    "CL": 35.45,
+    "BR": 79.904,
+    "I": 126.90447,
+    "NA": 22.98976928,
+    "MG": 24.305,
+    "K": 39.0983,
+    "CA": 40.078,
+    "MN": 54.938044,
+    "FE": 55.845,
+    "CO": 58.933194,
+    "NI": 58.6934,
+    "CU": 63.546,
+    "ZN": 65.38,
+}
+"""Approximate atomic masses in amu keyed by element symbol."""
+
+AMU_TO_KG = 1.66053906660e-27
+ANGSTROM_PER_PS_TO_M_PER_S = 100.0
+BOLTZMANN_CONSTANT = 1.380649e-23
+
+
+def get_element_atomic_mass(element: str) -> float:
+    """Return approximate atomic mass in amu for an element symbol."""
+    norm_element = element.upper()
+    if norm_element not in ATOMIC_MASS_MAPPER:
+        _LOGGER.error(f"Unsupported element for atomic-mass lookup: {element}")
+        raise ValueError
+    return ATOMIC_MASS_MAPPER[norm_element]
+
 def electric_field_strength(
         p0: ArrayLike,
         c0: float,

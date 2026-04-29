@@ -32,5 +32,5 @@ from .level_of_theory import (
     MMLevelOfTheory,
 )
 
-from .physics import electric_field_strength
+from .physics import electric_field_strength, get_element_atomic_mass
 from .seq_res import SeqRes
