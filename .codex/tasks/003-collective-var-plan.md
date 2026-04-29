@@ -25,25 +25,28 @@ Introduce a reusable, typed abstraction that captures the reaction-coordinate de
 
 ### Required API (sketch)
 ```py
-class CVBase(ABC):
+class CVTargets:
+    data: list[float]
+
+class CollectiveVariable(ABC):
     name: str
     unit: str
 
-    def generate_window_targets(self, start=None, end=None, step=None, list=None) -> List[float]: ...
+    def generate_window_targets(self, data=None, *, start=None, end=None, step=None) -> CVTargets: ...
     def serialize_for_engine(self, engine: str, work_dir: str, window_target: float) -> dict|str: ...
     def evaluate_on_structure(self, structure) -> float: ...
     def evaluate_on_frame(self, frame) -> float: ...
     def to_dict(self) -> dict: ...
     @classmethod
-    def from_dict(cls, data: dict) -> 'CVBase': ...
+    def from_dict(cls, data: dict) -> 'CollectiveVariable': ...
 ```
 
 ### CV Subclasses (initial)
 - `DistanceCV`: distance between two selections (residue- or atom-based). Units: Å.
 - `AngleCV`: angle between three points. Units: degrees.
 - `DihedralCV`: torsion angle between four points. Units: degrees.
-- `AmberConstraintCollectiveVariable(CVBase)`: wraps Amber restraint generator (see section 2).
-- `PlumedCollectiveVariable(CVBase)`: holds PLUMED declarations or converters.
+- `AmberCV(CollectiveVariable)`: wraps Amber restraint generator (see section 2).
+- `PlumedCV(CollectiveVariable)`: holds PLUMED declarations or converters.
 
 ### Acceptance criteria
 - Instances produce deterministic numeric RC values for a given structure/frame.
@@ -57,7 +60,7 @@ class CVBase(ABC):
 Make Amber-friendly CVs by emitting the restraint (`.rst` / `DISANG` or inline md input) files and providing small md input snippets for job payload assembly.
 
 ### Proposed class
-- `AmberConstraintCollectiveVariable(CVBase)` in `enzy_htp/structure/collective_variable.py`.
+- `AmberCV(CollectiveVariable)` in `enzy_htp/structure/collective_variable.py`.
 
 ### Responsibilities
 - Wrap existing `structure_constraint.create_group_distance_constraint`-style generators.
@@ -81,7 +84,7 @@ Make Amber-friendly CVs by emitting the restraint (`.rst` / `DISANG` or inline m
 Support PLUMED-declared CVs as first-class objects: accept raw PLUMED strings or build PLUMED declarations from internal CV descriptions when possible.
 
 ### Proposed class
-- `PlumedCollectiveVariable(CVBase)` in the same module or `enzy_htp/interface/plumed.py`.
+- `PlumedCV(CollectiveVariable)` in the same module or `enzy_htp/interface/plumed.py`.
 
 ### Responsibilities
 - Accept either:
@@ -105,15 +108,15 @@ Ensure analysis tools can compute probability densities and WHAM with respect to
 
 ### Requirements
 - Stable, machine-readable CV serialization: JSON schema returned by `to_dict()` including engine-specific payloads and selectors.
-- A helper `extract_reaction_coordinate` should accept either a `CVBase` or precomputed timeseries file; prefer `CVBase` and a trajectory parser to compute on-demand.
+- A helper `extract_reaction_coordinate` should accept either a `CollectiveVariable` or precomputed timeseries file; prefer `CollectiveVariable` and a trajectory parser to compute on-demand.
 - Timeseries export function `export_timeseries_for_wham(timeseries, path)` to create WHAM-compatible files (frame index + RC value) and to attach necessary metadata (target distance, force constant).
 
 ### Implementation notes
 - Keep unit canonicalization: densities and PMF are calculated in CV units (e.g., Å or degrees). Document conversions clearly.
-- If CV is PLUMED-only and analysis requires RC values, require user to provide PLUMED timeseries file paths; implement `CVBase.from_plumed_timeseries(...)` minimal wrapper.
+- If CV is PLUMED-only and analysis requires RC values, require user to provide PLUMED timeseries file paths; implement `CollectiveVariable.from_plumed_timeseries(...)` minimal wrapper.
 
 ### Acceptance criteria
-- `probability_density`, `wham_pmf`, and `plot_probability_density` accept `CVBase` or timeseries arrays and produce reproducible outputs.
+- `probability_density`, `wham_pmf`, and `plot_probability_density` accept `CollectiveVariable` or timeseries arrays and produce reproducible outputs.
 
 ---
 
@@ -123,14 +126,14 @@ Ensure analysis tools can compute probability densities and WHAM with respect to
 Wire `umbrella_sampling` (and `UmbrellaSamplingResult`) to accept any `CVBase` instance and use `serialize_for_engine` to prepare per-window files.
 
 ### Changes required
-- `umbrella_sampling(..., cv: CVBase, ...)` — no API breaking change beyond accepting CVBase.
+- `umbrella_sampling(..., cv: CollectiveVariable, ...)` — no API breaking change beyond accepting `CollectiveVariable`.
 - For each window:
   1. call `payload = cv.serialize_for_engine(engine, mdstep_dir, target)`
   2. include `payload` files/snippets in the job directory
   3. ensure `UmbrellaWindowResult.metadata` includes `cv: cv.to_dict()` and `engine_payload: payload`
 
 ### Acceptance criteria
-- Existing tests like `test/geometry/test_umbrella_integration.py` should run when using `AmberConstraintCollectiveVariable` with minimal changes.
+- Existing tests like `test/geometry/test_umbrella_integration.py` should run when using `AmberCV` with minimal changes.
 
 ---
 
@@ -144,7 +147,7 @@ Wire `umbrella_sampling` (and `UmbrellaSamplingResult`) to accept any `CVBase` i
   - `serialize_for_engine('amber')` output shape and basic content (file written)
 
 ### Integration tests
-- Update `test/geometry/test_umbrella_integration.py` to exercise `AmberConstraintCollectiveVariable` and timeseries extraction.
+- Update `test/geometry/test_umbrella_integration.py` to exercise `AmberCV` and timeseries extraction.
 
 ### Documentation
 - Add usage examples in `template/` and a short README section showing:
@@ -155,20 +158,20 @@ Wire `umbrella_sampling` (and `UmbrellaSamplingResult`) to accept any `CVBase` i
 ---
 
 ## 7) Minimum Implementation Sequence (first pass)
-1. Implement `CVBase` and `DistanceCV` + `AmberConstraintCollectiveVariable`.
+1. Implement `CollectiveVariable` and `DistanceCV` + `AmberCV`.
 2. Add `generate_window_targets` and `serialize_for_engine('amber')` with file output.
-3. Wire `umbrella_sampling` to accept `CVBase` and include payload in window metadata.
+3. Wire `umbrella_sampling` to accept `CollectiveVariable` and include payload in window metadata.
 4. Add unit tests for CV behaviors and a small integration test using `test_umbrella_integration.py` snippet.
 5. Document API and examples.
 
 ---
 
 ## 8) Completion Checklist
-- [ ] `CVBase` implemented and exported
+- [ ] `CollectiveVariable` implemented and exported
 - [ ] `DistanceCV` + `AngleCV` + `DihedralCV` basic implementations
-- [ ] `AmberConstraintCollectiveVariable` adapter implemented
-- [ ] `PlumedCollectiveVariable` (skeleton) implemented
-- [ ] `umbrella_sampling` accepts `CVBase` and stores payloads in `UmbrellaSamplingResult`
+- [ ] `AmberCV` adapter implemented
+- [ ] `PlumedCV` (skeleton) implemented
+- [ ] `umbrella_sampling` accepts `CollectiveVariable` and stores payloads in `UmbrellaSamplingResult`
 - [ ] Unit + integration tests added
 - [ ] Documentation and usage examples added
 
@@ -178,5 +181,5 @@ Wire `umbrella_sampling` (and `UmbrellaSamplingResult`) to accept any `CVBase` i
 The CV feature is complete when:
 1. Users can declare CVs programmatically or via PLUMED and run umbrella sampling using the same high-level API.
 2. Engine adapters produce the necessary files and metadata for MD job submission.
-3. Analysis functions accept `CVBase` or precomputed timeseries and produce deterministic density/PMF outputs.
+3. Analysis functions accept `CollectiveVariable` or precomputed timeseries and produce deterministic density/PMF outputs.
 4. Tests and examples validate the main usage paths and the code follows EnzyHTP conventions.

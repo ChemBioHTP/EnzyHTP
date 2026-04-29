@@ -11,6 +11,9 @@ from .sampling import (
     equi_md_sampling,
     deployable_md_simulation,
     deployable_equi_md_sampling,
+    umbrella_sampling,
+    UmbrellaWindowResult,
+    UmbrellaSamplingResult,
 )
 
 # from .reaction import (

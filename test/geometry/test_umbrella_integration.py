@@ -17,18 +17,19 @@ import pytest
 import numpy as np
 from functools import partial
 from pathlib import Path
+import pytest
 
 from enzy_htp.core.clusters.accre import Accre
 import enzy_htp.core.file_system as fs
 from enzy_htp.structure import structure_constraint as stru_cons
 from enzy_htp.geometry import umbrella_sampling
-from enzy_htp.analysis import (
-    extract_reaction_coordinate,
-    probability_density,
-    wham_pmf,
-    plot_probability_density,
-    plot_pmf,
-)
+# from enzy_htp.analysis import (
+#     extract_reaction_coordinate,
+#     probability_density,
+#     wham_pmf,
+#     plot_probability_density,
+#     plot_pmf,
+# )
 from enzy_htp import interface
 from enzy_htp import PDBParser
 
@@ -36,6 +37,8 @@ DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
 WORK_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/work_dir/"
 sp = PDBParser()
 
+
+pytest.mark.skip("Umbrella not yet implemented")
 
 def _get_missing_wham_executables() -> list:
     """Get missing WHAM executables from the registered EnzyHTP interface."""

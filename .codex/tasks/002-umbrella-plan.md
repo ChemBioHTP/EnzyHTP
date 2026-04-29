@@ -52,6 +52,7 @@ Create a WHAM execution interface in `_interface`, consistent with EnzyHTP's int
   - `enzy_htp/_interface/interface.py`
   - `enzy_htp/_interface/__init__.py`
 
+
 ### Required interface methods
 - `set_parent(...)`
 - executable/environment checks via config
@@ -59,6 +60,8 @@ Create a WHAM execution interface in `_interface`, consistent with EnzyHTP's int
 - `run_wham(...)`
 - `parse_pmf(...)`
 - standardized error mapping/logging
+
+**Important:** When generating WHAM metadata, ensure that the force constant value written is double the value used in AMBER (i.e., `force_constant_WHAM = 2 * force_constant_AMBER`). This is required because WHAM expects the force constant in a form that is double the AMBER restraint value. This nuance must be handled in the metadata writing logic and clearly documented in code and tests.
 
 ### Integration
 - Use `eh_config["wham.*"]` defaults for executable, bins, tolerance, temperature, padding.
@@ -74,6 +77,7 @@ Provide a science API aligned with `equi_md_sampling` style while supporting mul
 ### Proposed location
 - `enzy_htp/geometry/sampling.py` — add `umbrella_sampling()` alongside existing functions such as `equi_md_sampling()`
 
+
 ### Required improvements
 - Prefer `CollectiveVariable` (or equivalent window-spec object) over raw callable-only input.
 - Add explicit scheduling modes:
@@ -86,6 +90,8 @@ Provide a science API aligned with `equi_md_sampling` style while supporting mul
   - production time
   - record period
   - temperature
+
+**Note:** When passing force constants to the WHAM interface or generating metadata for WHAM, always apply the conversion: `force_constant_WHAM = 2 * force_constant_AMBER`. This ensures consistency with WHAM's expectations and avoids subtle analysis errors. This requirement should be reflected in both implementation and documentation.
 
 ### Output expectations
 - Deterministic window directory layout.

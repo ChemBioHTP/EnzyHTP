@@ -51,3 +51,13 @@ from .structure_constraint import (
 )
 
 from .structure_selection_class import StruSelection
+
+from .collective_variable import (
+    CVTargets,
+    CollectiveVariable,
+    DistanceCV,
+    AngleCV,
+    DihedralCV,
+    AmberCV,
+    PlumedCV,
+)

@@ -5,13 +5,15 @@ Science API:
     + md_simulation()
     + equi_md_sampling()
     + deployable_equi_md_sampling()
+    + umbrella_sampling()
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-7-30
 """
 import copy
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import Any, Callable, List, Dict, Optional, Tuple, Union
 
 import enzy_htp.core.file_system as fs
 from enzy_htp.core.logger import _LOGGER
@@ -24,6 +26,47 @@ from enzy_htp._interface.handle_types import (
     MolDynParameterizer,
     MolDynParameter,
     MolDynResult)
+
+
+# ---------------------------------------------------------------------------
+# Umbrella sampling result dataclasses
+# ---------------------------------------------------------------------------
+
+@dataclass
+class UmbrellaWindowResult:
+    """Result produced by a single umbrella sampling window.
+
+    Attributes:
+        window_index:   Zero-based index of this window within the CV target list.
+        window_target:  The RC target value for this window (in ``cv.unit``).
+        md_results:     Raw MD output: ``List[List[MolDynResult]]`` where the
+                        outer list spans parallel replicas and the inner list
+                        spans MD steps.
+        metadata:       Arbitrary key→value metadata; always includes:
+                        ``cv`` (``cv.to_dict()``), ``engine_payload`` (the
+                        dict returned by ``cv.serialize_for_engine``), and
+                        ``work_dir``.
+    """
+    window_index: int
+    window_target: float
+    md_results: List[List[MolDynResult]]
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class UmbrellaSamplingResult:
+    """Aggregated result from :func:`umbrella_sampling`.
+
+    Attributes:
+        windows:         List of per-window results in target order.
+        cv_dict:         ``cv.to_dict()`` snapshot captured at call time.
+        window_targets:  The ordered list of RC target values that were run.
+        work_dir:        Root working directory used for the run.
+    """
+    windows: List[UmbrellaWindowResult]
+    cv_dict: Dict[str, Any]
+    window_targets: List[float]
+    work_dir: str
 
 def equi_md_sampling(stru: Structure,
                      param_method: MolDynParameterizer, # TODO support using engine + kwarg to specify
@@ -574,6 +617,295 @@ def _serial_md_steps(
         results.append(result_ele)
 
     return results
+
+# ---------------------------------------------------------------------------
+# Umbrella sampling Science API
+# ---------------------------------------------------------------------------
+
+def umbrella_sampling(
+    stru: Structure,
+    cv,  # CollectiveVariable – typed as Any to avoid circular import at module level
+    window_targets,  # CVTargets | List[float]
+    param_method: MolDynParameterizer = None,
+    params_in: MolDynParameter = None,
+    parallel_runs: int = 1,
+    parallel_method: str = "cluster_job",
+    work_dir: str = "./umbrella_MD",
+    prod_time: float = 20.0,
+    prod_temperature: float = 300.0,
+    record_period: float = 0.2,
+    cluster_job_config: Optional[Dict] = None,
+    extra_constrain: Optional[List] = None,
+    steps_builder: Optional[Callable] = None,
+    job_check_period: int = 210,
+) -> UmbrellaSamplingResult:
+    """Run umbrella sampling across multiple CV windows.
+
+    Each window is defined by a target value in *window_targets*.  For every
+    window the function:
+
+    1. Obtains per-window MD constraints from the CV (``AmberCV`` → via
+       :py:meth:`~enzy_htp.structure.collective_variable.AmberCV.to_structure_constraint`).
+    2. Optionally calls ``cv.serialize_for_engine(engine, window_dir, target)``
+       to write engine-specific files and store the payload in
+       :class:`UmbrellaWindowResult.metadata`.
+    3. Builds MD steps via *steps_builder* (or a built-in equi+prod preset
+       when *steps_builder* is ``None``).
+    4. Invokes :func:`md_simulation` and collects results.
+
+    Args:
+        stru:
+            Starting enzyme structure.
+        cv:
+            A :class:`~enzy_htp.structure.collective_variable.CollectiveVariable`
+            instance (typically :class:`~enzy_htp.structure.collective_variable.AmberCV`).
+        window_targets:
+            An iterable of per-window RC target values (or a
+            :class:`~enzy_htp.structure.collective_variable.CVTargets` object).
+        param_method:
+            MD parameterizer (e.g. ``AmberParameter``).  Mutually exclusive
+            with *params_in* – providing *params_in* skips re-parameterization.
+        params_in:
+            Pre-computed :class:`MolDynParameter`.  When given, *param_method*
+            is only used to determine the engine and build steps.
+        parallel_runs:
+            Number of parallel replicas per window.
+        parallel_method:
+            Parallelisation strategy passed to :func:`md_simulation`.
+        work_dir:
+            Root directory.  Per-window subdirectories are created as
+            ``<work_dir>/window_<i>/``.
+        prod_time:
+            Production MD length (ns).  Used only when *steps_builder* is
+            ``None``.
+        prod_temperature:
+            Production temperature (K).  Used only when *steps_builder* is
+            ``None``.
+        record_period:
+            Trajectory recording period (ns).  Used only when *steps_builder*
+            is ``None``.
+        cluster_job_config:
+            HPC job configuration dict forwarded to MD step builders.
+        extra_constrain:
+            Additional :class:`~enzy_htp.structure.structure_constraint.StructureConstraint`
+            objects applied in every window (e.g. backbone freeze).
+        steps_builder:
+            Optional callable ``(constrain: List[StructureConstraint]) →
+            List[MolDynStep]`` that fully controls step construction.  When
+            supplied, *prod_time*, *prod_temperature*, *record_period*, and
+            *cluster_job_config* are ignored (the builder should use them as
+            needed via closure).
+        job_check_period:
+            Poll interval (s) for HPC job monitoring.
+
+    Returns:
+        A :class:`UmbrellaSamplingResult` containing per-window results and
+        CV metadata.
+
+    Raises:
+        ValueError:    If neither *param_method* nor *params_in* is provided.
+        NotImplementedError: If the CV type is not supported for automatic
+                             constraint extraction and no *steps_builder* is
+                             given.
+
+    Example::
+
+        from enzy_htp.structure import PDBParser
+        from enzy_htp.structure.collective_variable import DistanceCV, AmberCV
+        from enzy_htp.geometry import umbrella_sampling
+        from enzy_htp._interface.amber_interface import AmberParameter
+
+        stru  = PDBParser().get_structure("enzyme_amber.pdb")
+        cv    = AmberCV(
+                    DistanceCV("A.55.CA", "B.100.CA", name="reaction_coord"),
+                    amber_params={"rk2": 100.0, "rk3": 100.0},
+                )
+        tgts  = cv.generate_window_targets(start=14.0, end=24.0, step=1.0)
+        params = AmberParameter("enzyme.inpcrd", "enzyme.prmtop")
+        result = umbrella_sampling(stru, cv, tgts, params_in=params,
+                                   work_dir="./umbrella_MD",
+                                   cluster_job_config={...})
+    """
+    # --- lazy import to avoid circular deps ---
+    from enzy_htp.structure.collective_variable import AmberCV, CVTargets
+
+    # --- sanity check ---
+    if param_method is None and params_in is None:
+        _LOGGER.error("umbrella_sampling: either param_method or params_in must be provided.")
+        raise ValueError("Provide param_method or params_in.")
+
+    if extra_constrain is None:
+        extra_constrain = []
+
+    # --- normalise window_targets ---
+    if isinstance(window_targets, CVTargets):
+        target_list: List[float] = list(window_targets.data)
+    else:
+        target_list = list(window_targets)
+
+    # --- determine engine / interface ---
+    if params_in is not None:
+        engine = params_in.engine
+        parent_interface = params_in.parent_interface if hasattr(params_in, "parent_interface") else None
+    else:
+        engine = param_method.engine
+        parent_interface = param_method.parent_interface
+
+    # Fall back to using param_method's interface when params_in doesn't expose it
+    if parent_interface is None and param_method is not None:
+        parent_interface = param_method.parent_interface
+
+    # --- root work dir ---
+    fs.safe_mkdir(work_dir)
+
+    # --- collect results ---
+    window_results: List[UmbrellaWindowResult] = []
+
+    for i, target in enumerate(target_list):
+        window_dir = fs.get_valid_temp_name(f"{work_dir}/window_{i:04d}")
+        fs.safe_mkdir(window_dir)
+
+        _LOGGER.info(
+            f"umbrella_sampling: window {i}/{len(target_list) - 1} "
+            f"target={target} {cv.unit} dir={window_dir}"
+        )
+
+        # ---- 1. Build per-window CV constraint ----
+        cv_constraint = None
+        if isinstance(cv, AmberCV):
+            cv_constraint = cv.to_structure_constraint(
+                stru, target, rs_filepath="{mdstep_dir}/cv.rs"
+            )
+        elif steps_builder is None:
+            raise NotImplementedError(
+                f"umbrella_sampling: automatic constraint extraction is only "
+                f"supported for AmberCV, got '{type(cv).__name__}'.  "
+                "Provide a steps_builder callable for other CV types."
+            )
+
+        # ---- 2. Assemble full constraint list ----
+        window_constrain = (
+            ([cv_constraint] if cv_constraint is not None else []) + extra_constrain
+        )
+
+        # ---- 3. Build MD steps ----
+        if steps_builder is not None:
+            steps = steps_builder(window_constrain)
+        else:
+            if parent_interface is None:
+                raise ValueError(
+                    "umbrella_sampling: cannot build default MD steps without "
+                    "a parent_interface.  Provide a steps_builder or ensure "
+                    "param_method exposes parent_interface."
+                )
+            steps = _build_default_umbrella_steps(
+                parent_interface,
+                stru,
+                window_constrain,
+                prod_time=prod_time,
+                prod_temperature=prod_temperature,
+                record_period=record_period,
+                cluster_job_config=cluster_job_config,
+            )
+
+        # ---- 4. Run MD simulation ----
+        _, md_result = md_simulation(
+            stru=stru,
+            param_method=param_method,
+            steps=steps,
+            params_in=params_in,
+            parallel_runs=parallel_runs,
+            parallel_method=parallel_method,
+            work_dir=window_dir,
+            job_check_period=job_check_period,
+        )
+
+        # ---- 5. Collect engine payload for metadata ----
+        try:
+            engine_payload = cv.serialize_for_engine(engine, window_dir, target)
+        except (NotImplementedError, Exception) as exc:
+            _LOGGER.debug(
+                f"umbrella_sampling: cv.serialize_for_engine skipped for window {i}: {exc}"
+            )
+            engine_payload = {}
+
+        window_results.append(UmbrellaWindowResult(
+            window_index=i,
+            window_target=target,
+            md_results=md_result,
+            metadata={
+                "cv": cv.to_dict(),
+                "engine_payload": engine_payload,
+                "work_dir": window_dir,
+            },
+        ))
+
+    return UmbrellaSamplingResult(
+        windows=window_results,
+        cv_dict=cv.to_dict(),
+        window_targets=target_list,
+        work_dir=work_dir,
+    )
+
+
+def _build_default_umbrella_steps(
+    parent_interface,
+    stru: Structure,
+    constrain: List,
+    prod_time: float = 20.0,
+    prod_temperature: float = 300.0,
+    record_period: float = 0.2,
+    cluster_job_config: Optional[Dict] = None,
+) -> List[MolDynStep]:
+    """Build a default min → equi → prod MD step sequence for umbrella sampling.
+
+    Args:
+        parent_interface:    MD engine interface (e.g. ``interface.amber``).
+        stru:                Structure for backbone-freeze generation.
+        constrain:           Per-window constraints (CV + any extras).
+        prod_time:           Production MD length (ns).
+        prod_temperature:    Production temperature (K).
+        record_period:       Trajectory recording period (ns).
+        cluster_job_config:  HPC job configuration.
+
+    Returns:
+        ``[min_step, equi_step, prod_step]``
+    """
+    bb_freeze = stru_cons.create_backbone_freeze(stru)
+    min_constrain = [bb_freeze] + constrain
+
+    min_step = parent_interface.build_md_step(
+        name="min_micro",
+        minimize=True,
+        length=20000,  # cycles
+        cluster_job_config=cluster_job_config,
+        core_type="gpu",
+        constrain=min_constrain,
+    )
+
+    equi_step = parent_interface.build_md_step(
+        name="equi_npt",
+        length=prod_time * 0.01,
+        cluster_job_config=cluster_job_config,
+        core_type="gpu",
+        temperature=prod_temperature,
+        constrain=constrain,
+    )
+
+    prod_step = parent_interface.build_md_step(
+        name="prod_npt",
+        length=prod_time,
+        cluster_job_config=cluster_job_config,
+        core_type="gpu",
+        restart=True,
+        if_report=True,
+        temperature=prod_temperature,
+        record_period=record_period,
+        constrain=constrain,
+    )
+
+    return [min_step, equi_step, prod_step]
+
 
 # == helper tools ==
 def get_deployable_md_cli() -> str:
