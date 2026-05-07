@@ -3,7 +3,7 @@
 
 + QZ Shao <shaoqz@icloud.com>
 + Chris Jurich <chris.jurich@vanderbilt.edu>
-+ Yaoyukun Jiang <biopaul919@gmail.com>
++ Yaoyukun Jiang <yaoyukun.jiang@vanderbilt.edu>
 + Reecan J. Juarez <reecan.j.juarez@vanderbilt.edu>
 + Matthew T. Tremblay <matthew.t.tremblay@vanderbilt.edu>
 + Wook Shin <wook.shin@vanderbilt.edu>
