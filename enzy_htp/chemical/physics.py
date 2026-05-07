@@ -31,11 +31,27 @@ ATOMIC_MASS_MAPPER = {
     "CU": 63.546,
     "ZN": 65.38,
 }
-"""Approximate atomic masses in amu keyed by element symbol."""
+"""Approximate standard atomic weights in amu keyed by element symbol.
+
+Values follow common IUPAC standard atomic weights for naturally occurring
+elements.
+
+Source: E. Riedel, C. Janiak, Anorganische Chemie, Berlin, Boston,
+De Gruyter, 2022.
+
+"""
 
 AMU_TO_KG = 1.66053906660e-27
 ANGSTROM_PER_PS_TO_M_PER_S = 100.0
 BOLTZMANN_CONSTANT = 1.380649e-23
+"""
+conversion factors and constants, atomic mass constant in kg, 
+Angstrom/ps to m/s, and Boltzmann constant.
+
+Source: E. Tiesinga, P. J. Mohr, D. B. Newell, B. N. Taylor,
+CODATA Recommended Values of the Fundamental Physical Constants: 2018.
+J Phys Chem Ref Data. 2021;50(3):033105. doi:10.1063/5.0064853
+"""
 
 
 def get_element_atomic_mass(element: str) -> float:

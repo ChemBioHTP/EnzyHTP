@@ -29,8 +29,10 @@ from enzy_htp.chemical.level_of_theory import QMLevelOfTheory
 from enzy_htp._interface.amber_interface import (
     AmberParameterizer,
     AmberParameter,
+    AmberRestartParser,
     AmberMDStep,
     AmberMDResultEgg,
+    AmberRestartStructureParser,
     AmberMDCRDParser,)
 from enzy_htp.preparation.clean import remove_solvent
 import enzy_htp.structure as struct
@@ -689,6 +691,18 @@ def test_build_md_step_default():
     assert md_step.cluster_job_config.res_keywords["core_type"] == "cpu"
     assert md_step.length == 0.1
     assert md_step.record_period == 0.0001
+
+
+def test_build_md_step_ascii_rst_controls_ntxo():
+    ai = interface.amber
+    normal_step = ai.build_md_step(length=0.1, core_type="cpu")
+    ascii_step = ai.build_md_step(length=0.1, core_type="cpu", ascii_rst=True)
+
+    normal_cntrl = ai._parse_md_config_dict_to_raw(normal_step.md_config_dict)["namelists"][0]["config"]
+    ascii_cntrl = ai._parse_md_config_dict_to_raw(ascii_step.md_config_dict)["namelists"][0]["config"]
+
+    assert "ntxo" not in normal_cntrl
+    assert ascii_cntrl["ntxo"] == 1
 
 
 def test_build_md_step_res_keywords():
@@ -2017,6 +2031,41 @@ def test_convert_stru_to_inpcrd():
 
     fs.clean_temp_file_n_dir([test_out_path])
 
+
+def test_combine_traj_segments(monkeypatch, tmp_path):
+    ai = interface.amber
+    traj_paths = [
+        str(tmp_path / "seg_000000.nc"),
+        str(tmp_path / "seg_000001.nc"),
+    ]
+    topology_path = str(tmp_path / "top.prmtop")
+    out_path = str(tmp_path / "prod_npt_combined.nc")
+    frame1_pdb_path = str(tmp_path / "prod_npt_combined_frame1.pdb")
+
+    for path in traj_paths + [topology_path]:
+        touch(path)
+
+    captured = {}
+
+    def fake_run_cpptraj(instr_str, log_path=None, temp_in_path=None):
+        captured["instr_str"] = instr_str
+
+    monkeypatch.setattr(ai, "run_cpptraj", fake_run_cpptraj)
+
+    ai.combine_traj_segments(
+        traj_paths=traj_paths,
+        topology_path=topology_path,
+        out_path=out_path,
+        frame1_pdb_path=frame1_pdb_path,
+    )
+
+    assert f"parm {topology_path}" in captured["instr_str"]
+    assert f"trajin {traj_paths[0]}" in captured["instr_str"]
+    assert f"trajin {traj_paths[1]}" in captured["instr_str"]
+    assert "autoimage" in captured["instr_str"]
+    assert f"trajout {out_path} netcdf" in captured["instr_str"]
+    assert f"trajout {frame1_pdb_path} pdb onlyframes 1" in captured["instr_str"]
+
 def test_convert_stru_to_inpcrd_too_many_solvent():
     test_crd = f"{MM_DATA_DIR}/AMY_1f.mdcrd"
     test_prmtop = f"{MM_DATA_DIR}/AMY.prmtop"
@@ -2034,6 +2083,110 @@ def test_convert_stru_to_inpcrd_too_many_solvent():
     assert files_equivalent(test_out_path, answer_inpcrd_file)
 
     fs.clean_temp_file_n_dir([test_out_path])
+
+
+def test_amber_restart_parser_reads_coordinate_only_inpcrd():
+    test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
+
+    result = AmberRestartParser().get_restart(test_inpcrd)
+
+    assert result["atom_count"] == 23242
+    assert result["coordinates"].shape == (23242, 3)
+    assert result["velocities"] is None
+    assert result["coordinates"][0] == pytest.approx((44.0262403, 37.2702258, 13.8906503))
+
+
+def test_amber_restart_parser_roundtrip_with_velocities(tmp_path):
+    test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
+    test_out = tmp_path / "roundtrip.rst"
+    restart_parser = AmberRestartParser()
+    base_restart = restart_parser.get_restart(test_inpcrd)
+    velocities = np.full((base_restart["atom_count"], 3), 0.125, dtype=float)
+
+    restart_parser.write_restart(
+        {
+            "title": "roundtrip",
+            "atom_count": base_restart["atom_count"],
+            "coordinates": base_restart["coordinates"],
+            "velocities": velocities,
+            "box": base_restart["box"],
+            "time": 1.5,
+        },
+        str(test_out),
+    )
+
+    reread = restart_parser.get_restart(str(test_out))
+
+    assert reread["title"] == "roundtrip"
+    assert reread["time"] == pytest.approx(1.5)
+    assert reread["coordinates"] == pytest.approx(base_restart["coordinates"])
+    assert reread["velocities"] == pytest.approx(velocities)
+    assert reread["box"] == base_restart["box"]
+
+
+def test_amber_restart_structure_parser_get_structure(tmp_path):
+    test_prmtop = f"{MM_DATA_DIR}/AMY.prmtop"
+    test_inpcrd = tmp_path / "AMY.rst"
+    atom_count = 77526
+    AmberRestartParser().write_restart(
+        {
+            "title": "AMY",
+            "atom_count": atom_count,
+            "coordinates": np.zeros((atom_count, 3)),
+            "velocities": None,
+            "box": None,
+            "time": None,
+        },
+        str(test_inpcrd),
+    )
+
+    result = AmberRestartStructureParser(test_prmtop).get_structure(str(test_inpcrd))
+
+    assert result.num_atoms == atom_count
+    assert result.atoms[0].coord == pytest.approx((0.0, 0.0, 0.0))
+
+
+def test_amber_restart_parser_rejects_invalid_tail(tmp_path):
+    bad_rst = tmp_path / "bad_tail.rst"
+    bad_rst.write_text(
+        "bad\n"
+        "     2\n"
+        "   0.0000000   0.0000000   0.0000000   1.0000000   0.0000000   0.0000000\n"
+        "   1.0000000   2.0000000\n"
+    )
+
+    with pytest.raises(ValueError):
+        AmberRestartParser().get_restart(str(bad_rst))
+
+
+def test_amber_restart_parser_rejects_invalid_velocity_shape(tmp_path):
+    out_path = tmp_path / "bad_velocity_shape.rst"
+
+    with pytest.raises(ValueError):
+        AmberRestartParser().write_restart(
+            {
+                "title": "bad",
+                "atom_count": 2,
+                "coordinates": np.zeros((2, 3)),
+                "velocities": np.zeros((1, 3)),
+            },
+            str(out_path),
+        )
+
+
+def test_amber_restart_parser_rejects_invalid_box_length(tmp_path):
+    out_path = tmp_path / "bad_box.rst"
+
+    with pytest.raises(ValueError):
+        AmberRestartParser().write_restart(
+            {
+                "title": "bad",
+                "atom_count": 2,
+                "coordinates": np.zeros((2, 3)),
+                "box": (1.0, 2.0, 3.0, 4.0),
+            },
+            str(out_path),
+        )
 
 
 def test_get_protein_force_field():
@@ -2389,5 +2542,3 @@ def test_convert_mol_desc_format_unsupported():
 
     with pytest.raises(NotImplementedError):
         ai.convert_mol_desc_format("dummy.in", "dummy.out", "pdb", "mol2")
-
-

@@ -737,7 +737,7 @@ class ClusterJobConfig:
     def from_dict(cls, source_dict: Dict) -> ClusterJobConfig:
         """support directly coverting the old cluster_job_config to the new one"""
         cluster = source_dict.get("cluster", None)
-        res_keywords = source_dict.get("res_keywords", None)
+        res_keywords = source_dict.get("res_keywords", {})
         return cls(cluster, res_keywords)
 
     # region == attribute getter ==
@@ -769,6 +769,8 @@ class ClusterJobConfig:
 
     def check_res_keys(self):
         """check if all the keys are valid in res_keywords"""
+        if self.res_keywords is None:
+            self.res_keywords = {}
         for k in self.res_keywords:
             if k not in self.ALLOWED_RES_KEYWORDS:
                 _LOGGER.warning(f"unsupported keyword: {k} found in res_keywords. Not used")

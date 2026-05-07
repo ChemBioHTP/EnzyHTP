@@ -23,7 +23,7 @@ from enzy_htp.structure.structure_ensemble import StructureEnsemble
 from enzy_htp.core.general import EnablePropagate, get_itself
 from enzy_htp.structure.structure_operation import remove_solvent
 
-from enzy_htp._interface.amber_interface import AmberNCParser, AmberRSTParser, AmberMDCRDParser
+from enzy_htp._interface.amber_interface import AmberNCParser, AmberRestartStructureParser, AmberMDCRDParser
 from enzy_htp.structure.structure_io import PrmtopParser, PDBParser
 
 
@@ -102,4 +102,3 @@ def test_spi_consistent_with_old_enzyhtp():
     spis = spi_metric( se , tt, active_site)
 
     assert abs(np.mean(np.array(spis)) - target_spi) <= 0.01
-
