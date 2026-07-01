@@ -423,11 +423,10 @@ def test_amber_parameterizer_run_lv_6_mcpb_3pzw_sub():
         charge_method="RESP", # need to abort when AM1BCC is used and mcpb & metal is needed.
         keep_tleap_in=True,
         metal_center_method="mcpb", # this is needed. other options currently support: "nonbonded" but make sure the set up is extensible to other mcpb like methods.
-        mcpb_cutoff=3.0,
         mcpb_add_redcrd=0,
         mcpb_anglefc_avg=0,
         mcpb_bondfc_avg=0,
-        mcpb_cut_off=2.8,
+        mcpb_cut_off=3.0,
         mcpb_ion_paraset="12_6",
         mcpb_large_opt=1,
         mcpb_scale_factor=1.0,
