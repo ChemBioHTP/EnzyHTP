@@ -377,6 +377,81 @@ def test_amber_parameterizer_run_lv_6(): #TODO
     test_param_worker.run(test_stru)
 
 
+@pytest.mark.xfail(strict=True, reason="AmberParameterizer MCPB path is not implemented yet.")
+def test_amber_parameterizer_run_mcpb_3pzw_sub():
+    """Completion-target test for MCPB.py bonded metal-center parameterization.
+
+    The parameterizer config is intentionally structure-independent. Metal
+    centers, donor atoms, MCPB atom IDs, and bond commands must be resolved
+    inside AmberParameterizer.run(test_stru). MCPB force-field settings are
+    derived from the existing force_fields parameter.
+    """
+    ai = interface.amber
+    test_ncaa_lib = f"{MM_WORK_DIR}ncaa_lib_empty_lv6"
+    fs.safe_mkdir(test_ncaa_lib)
+    # prepare test structure
+    test_stru = struct.PDBParser().get_structure(f"{MM_DATA_DIR}/3pzw_sub.pdb")
+    ligand_chrg_spin_mapper = {
+        "FE1": (3, 6),
+        "O11": (-1, 1),
+        "LIG": (-1, 1),
+        "HD1": (0, 1),
+        "HD2": (0, 1),
+        "HD3": (0, 1),
+        "IE1": (-1, 1),
+        "AN1": (0, 1),
+    }
+    mod_aa_mainchain_atom_mapper = {
+        "AN1": ["N", "CA", "C"],
+        "HD1": ["N", "CA", "C"],
+        "HD2": ["N", "CA", "C"],
+        "HD3": ["N", "CA", "C"],
+        "IE1": ["N", "CA", "C"],
+    }
+    test_stru.assign_ncaa_chargespin(ligand_chrg_spin_mapper)
+    test_stru.assign_mod_aa_mainchain(mod_aa_mainchain_atom_mapper)
+    connectivity.init_connectivity(test_stru, ncaa_lib=test_ncaa_lib)
+
+    # build AmberParameterizer
+    param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=test_ncaa_lib,
+        force_fields=[
+            "leaprc.protein.ff14SB",
+            "leaprc.gaff",
+            "leaprc.water.tip3p",
+        ],
+        charge_method="RESP", # need to abort when AM1BCC is used and mcpb & metal is needed.
+        keep_tleap_in=True,
+        metal_center_method="mcpb", # this is needed. other options currently support: "nonbonded" but make sure the set up is extensible to other mcpb like methods.
+        mcpb_cutoff=3.0,
+        mcpb_add_redcrd=0,
+        mcpb_anglefc_avg=0,
+        mcpb_bondfc_avg=0,
+        mcpb_cut_off=2.8,
+        mcpb_ion_paraset="12_6",
+        mcpb_large_opt=1,
+        mcpb_scale_factor=1.0,
+        mcpb_software_version="g16",
+        mcpb_sqm_opt=0,
+        mcpb_xstru=0,
+        mcpb_step1_method="1a",
+        mcpb_step2_method="2s",
+        mcpb_step3_method="3b",
+        mcpb_step4_method="4b",
+    )
+
+    params = param_worker.run(test_stru)
+
+    answer_prmtop = f"{MM_DATA_DIR}/mcpb_answer/amber_parm.prmtop" # from manual run of MCPB.py on 3pzw_sub.pdb with the same settings as above
+    assert files_equivalent(params.prmtop_path, answer_prmtop)
+
+    fs.clean_temp_file_n_dir(params.file_list + [
+        param_worker.parameterizer_temp_dir,
+        f"{MM_WORK_DIR}/mcpb",
+        test_ncaa_lib,
+    ])
+
+
 def test_amber_parameterizer_run_lv_1_add_lines():
     """level 1 test of the parameterizer with additional custom lines to tleap.in.
     Test structure diversity:
