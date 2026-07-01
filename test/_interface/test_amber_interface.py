@@ -378,7 +378,7 @@ def test_amber_parameterizer_run_lv_6(): #TODO
 
 
 @pytest.mark.xfail(strict=True, reason="AmberParameterizer MCPB path is not implemented yet.")
-def test_amber_parameterizer_run_mcpb_3pzw_sub():
+def test_amber_parameterizer_run_lv_6_mcpb_3pzw_sub():
     """Completion-target test for MCPB.py bonded metal-center parameterization.
 
     The parameterizer config is intentionally structure-independent. Metal
