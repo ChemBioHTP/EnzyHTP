@@ -1,6 +1,57 @@
 """The template for EnzyHTP 2.0 shrapnel main script. It creates
 children jobs that each handle part of the given tasks.
 
+Rerun/cache notes
+-----------------
+This script is designed to be restartable, but most child-run state is cached
+in pickle files. Re-submitting this script does not necessarily mean all code,
+PDB, and task changes are picked up by existing child jobs.
+
+Safe direct rerun:
+    If child jobs failed because of walltime, scheduler interruption, or a
+    transient MD/runtime failure, and the task definition and child workflow
+    have not changed, directly re-submit this main script. Existing
+    ``shrapnel_child_jobs.pickle`` will be loaded, unfinished child jobs will be
+    reused, and each child will resume from its ``group_*/results.pickle``.
+
+Change -> cache files that must be regenerated:
+    * Change ``_child_main()`` implementation:
+        Regenerate ``shrapnel/child_main.py`` and the child submit scripts.
+        The simplest clean restart is to move/remove ``shrapnel/`` and
+        ``shrapnel_child_jobs.pickle``.
+
+    * Change MD length, replica count, CPU/GPU job config, or ncaa parameter
+      library path:
+        Regenerate ``shrapnel/child_main_kwargs.pickle`` and child jobs. A
+        clean restart should move/remove ``shrapnel/`` and
+        ``shrapnel_child_jobs.pickle``. If existing ``results.pickle`` files are
+        kept, completed stages inside them may still be reused and may not
+        reflect the new settings.
+
+    * Change input PDB files, mutation strings/lists, ``chain_sync_list``,
+      ``chain_index_mapper``, constraints, charge/spin maps, or task grouping:
+        Regenerate ``shrapnel/group_*/tasks.pickle``. These files contain
+        already parsed ``Structure`` objects and mutation objects, so edits to
+        the source PDB or task definitions are not seen by existing child jobs.
+        Use a clean restart: move/remove ``shrapnel/`` and
+        ``shrapnel_child_jobs.pickle``.
+
+    * Change only post-processing/summarization after all child jobs finish:
+        Existing child caches may be kept. Re-run the main script only if
+        ``group_*/results.pickle`` has the data expected by the new summary
+        logic.
+
+    * Suspect corrupted or partial ``group_*/results.pickle``:
+        Do not assume a direct rerun is enough. Inspect progress with
+        ``detect_child_job_progress()`` and repair with
+        ``fix_broken_result_file()`` when applicable, or remove the affected
+        group result file to recompute that group's cached stages.
+
+Practical rule:
+    Direct rerun is for resuming the same workflow. Clean restart is for making
+    code, PDB, task, or job-configuration changes take effect. Prefer moving
+    cache files to a backup name instead of deleting them immediately.
+
 Author: QZ Shao <shaoqz@icloud.com>
 Date: 2024-11-11
 """
