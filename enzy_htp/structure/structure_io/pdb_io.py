@@ -489,7 +489,7 @@ class PDBParser(StructureParserInterface):
                     if "ATOM" in current_chain_records:
                         if not allow_multichain_in_atom:
                             # ATOM chain: multiple chain id not allowed
-                            message = "Found multiple chain id in ATOM chain. Not allowed."
+                            message = f"Found multiple chain id in ATOM chain. Not allowed. (chain ids: {existing_chain_ids}). Check your PDB."
                             _LOGGER.error(message)
                             raise ValueError(message)
                         else:
@@ -500,7 +500,7 @@ class PDBParser(StructureParserInterface):
                             chains_in_chain = chain.groupby("chain_id", sort=False)
                             for chain_id_in_chain, chain_in_chain in chains_in_chain:
                                 if chain_id_in_chain in recorded_chain_ids:
-                                    message = "Found the repeating chain id in a ATOM chain with multiple chain id. Check your PDB."
+                                    message = f"Found the repeating chain id in a ATOM chain with multiple chain id. Check your PDB. (chain id: {chain_id_in_chain})"
                                     _LOGGER.error(message)
                                     raise ValueError(message)
                                 else:
@@ -544,7 +544,7 @@ class PDBParser(StructureParserInterface):
                         result_loc_map.extend(list(zip(atom_missing_c_id.index, [current_chain_id] * len(atom_missing_c_id))))
                 else:
                     # case: more than 1 chain id in chain
-                    message = "Found multiple chain id together with missing chain id in 1 chain. Impossible to solve."
+                    message = f"Found multiple chain id together with missing chain id in 1 chain. Impossible to solve. (chain ids: {existing_chain_ids})"
                     _LOGGER.error(message)
                     raise ValueError(message)
         # add missing chain id
