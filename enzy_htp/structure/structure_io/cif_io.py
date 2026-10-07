@@ -8,7 +8,7 @@ Date: 2026-10-07
 import copy
 import os
 from collections import defaultdict
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -136,8 +136,10 @@ class CIFParser(StructureParserInterface):
         # target_model_df below should be "standard" --> start building
         # reuse the format agnostic parts of the PDB building steps.
         # see CIFParser._normalize_atom_site_df() for the normalization making this possible
-        atom_mapper: Dict[tuple, Atom] = cls._build_atoms(target_model_df)
-        res_mapper = cls._build_residues(atom_mapper, add_solvent_list, add_ligand_list)
+        atom_mapper: Dict[tuple, Atom]
+        res_info_mapper: Dict[tuple, tuple]
+        atom_mapper, res_info_mapper = cls._build_atoms(target_model_df)
+        res_mapper = cls._build_residues(atom_mapper, res_info_mapper, add_solvent_list, add_ligand_list)
         chain_list: Dict[str, Chain] = PDBParser._build_chains(res_mapper, remove_trash)
 
         if give_idx_map:
@@ -365,6 +367,13 @@ class CIFParser(StructureParserInterface):
         result["element_symbol"] = clean_str(df["type_symbol"])
         result["charge"] = parse_charge(clean_str(df["pdbx_formal_charge"]))
         result["line_idx"] = range(len(df))
+        # carry the polymer-membership signals for the residue categorization:
+        # a HETATM residue sharing the polymer entity id with a numeric
+        # label_seq_id is a modified monomer in the polymer sequence.
+        if "label_entity_id" in df.columns:
+            result["entity_id"] = clean_str(df["label_entity_id"])
+        if "label_seq_id" in df.columns:
+            result["label_seq_id"] = clean_str(df["label_seq_id"])
         return result
 
     @classmethod
@@ -374,32 +383,44 @@ class CIFParser(StructureParserInterface):
         PDBParser._resolve_alt_loc(df, keep=keep, single_alt_loc=single_alt_loc)
 
     @staticmethod
-    def _build_atoms(df: pd.DataFrame) -> Dict[tuple, Atom]:
+    def _build_atoms(df: pd.DataFrame) -> Tuple[Dict[tuple, Atom], Dict[tuple, tuple]]:
         """
         build atom objects from a "standard" dataframe. Same as the PDB one except
         the group_PDB record is kept in the residue key for the categorization step.
         (in mmCIF, polymer ATOM and non-polymer HETATM components can share the same
         chain id, which is the main difference from the PDB format)
         Return:
-            {("chain_id", "residue_idx", "residue_name", "record_name") : [Atom_obj, ...], ...}
+            atom_mapper:
+                {("chain_id", "residue_idx", "residue_name", "record_name") : [Atom_obj, ...], ...}
+            res_info_mapper:
+                {("chain_id", "residue_idx", "residue_name") : (entity_id, label_seq_id), ...}
+                carrying the polymer-membership signals of each residue. ("", "") when
+                the file does not provide the label_entity_id/label_seq_id tags.
         """
         atom_mapper = defaultdict(list)
+        res_info_mapper = {}
         df.sort_values("line_idx", inplace=True)
         for i, row in df.iterrows():
             atom_obj = Atom.from_biopandas(row)
             residue_key = (row["chain_id"].strip(), row["residue_number"], row["residue_name"].strip(), row["record_name"].strip())
             atom_mapper[residue_key].append(atom_obj)
-        return atom_mapper
+            res_key = residue_key[:3]
+            if res_key not in res_info_mapper:
+                res_info_mapper[res_key] = (row.get("entity_id", ""), row.get("label_seq_id", ""))
+        return atom_mapper, res_info_mapper
 
     @classmethod
     def _build_residues(cls,
                         atom_mapper: Dict[tuple, Atom],
+                        res_info_mapper: Dict[tuple, tuple],
                         add_solvent_list: List = None,
                         add_ligand_list: List = None) -> Dict[str, Residue]:
         """
         build Residue() objects from atom_mapper
         Arg:
             atom_mapper
+            res_info_mapper: the polymer-membership signals of each residue
+                (see CIFParser._build_atoms() for the definition)
             add_solvent_list: (used for categorize residues) additional names for solvent
             add_ligand_list: (used for categorize residues) additional names for ligands
             * solvent list have higher pirority
@@ -413,28 +434,40 @@ class CIFParser(StructureParserInterface):
             result_mapper[res_key[0]].append(res_obj)  # here it is {"chain_id": Residue()}
             record_mapper[res_key[:3]] = res_key[3]
         # categorize_residue
-        cls._categorize_cif_residue(result_mapper, record_mapper, add_solvent_list, add_ligand_list)
+        cls._categorize_cif_residue(result_mapper, record_mapper, res_info_mapper, add_solvent_list, add_ligand_list)
 
         return result_mapper
 
     @staticmethod
     def _categorize_cif_residue(residue_mapper: Dict[str, List[Residue]],
                                 record_mapper: Dict[tuple, str],
+                                res_info_mapper: Dict[tuple, tuple],
                                 add_solvent_list: list = None,
                                 add_ligand_list: list = None) -> None:
         """
         Categorize Residue base on its name, chain info, and the ATOM/HETATM record
-        in mmCIF format. Takes a mapper of {chain_id, [Residue, ...]} and a mapper of
-        {(chain_id, residue_idx, residue_name): record_name} and converts
+        in mmCIF format. Takes a mapper of {chain_id, [Residue, ...]}, a mapper of
+        {(chain_id, residue_idx, residue_name): record_name}, and a mapper of the
+        polymer-membership signals (see CIFParser._build_atoms()) and converts
         them into its specialized Residue() inherited classes.
         * different from PDB, mmCIF allows non-polymer (HETATM) components to share
           the same chain id with the polymer (ATOM) ones. So the categorization is
           done per residue with its own record instead of per chain.
+        * a HETATM residue can still be a polymer monomer when it shares the
+          polymer entity id and has a numeric label_seq_id. This is how modified
+          residues appear in mmCIF files converted from the PDB format.
         """
         if add_solvent_list is None:
             add_solvent_list = []
         if add_ligand_list is None:
             add_ligand_list = []
+        # collect the entity ids of the polymer (ATOM) records
+        polymer_entity_ids = set()
+        for res_key, record_name in record_mapper.items():
+            if record_name == "ATOM":
+                entity_id = res_info_mapper.get(res_key, ("", ""))[0]
+                if entity_id != "":
+                    polymer_entity_ids.add(entity_id)
         for chain_id, residues in residue_mapper.items():
             peptide_chain = 0
             for residue in residues:
@@ -445,9 +478,13 @@ class CIFParser(StructureParserInterface):
             for i, residue in enumerate(residues):
                 if residue.rtype == chem.ResidueType.CANONICAL:
                     continue
-                record_name = record_mapper[(chain_id, residue.idx, residue.name)]
-                if record_name == "ATOM" and peptide_chain:
-                    # only modified aa can be a polymer (ATOM) residue in a peptide chain
+                res_key = (chain_id, residue.idx, residue.name)
+                record_name = record_mapper[res_key]
+                entity_id, label_seq_id = res_info_mapper.get(res_key, ("", ""))
+                if peptide_chain and (record_name == "ATOM" or (entity_id in polymer_entity_ids and label_seq_id.isdigit())):
+                    # only modified aa can be a polymer residue in a peptide chain
+                    # (either written as an ATOM record or as a HETATM one sharing
+                    # the polymer entity with a numeric label_seq_id)
                     _LOGGER.debug(f"found modified residue {chain_id} {residue.idx}")
                     residue_mapper[chain_id][i] = residue_to_modified_residue(residue)
                     continue
@@ -550,12 +587,13 @@ class CIFParser(StructureParserInterface):
             charge = f"{int(atom.charge):>2}"
         else:
             charge = f"{'?':>2}"
+        alt_loc = atom.alt_loc if atom.alt_loc else "."
         fields = [
             f"{group:<6}",                                  # group_PDB
             f"{atom.idx:>5d}",                              # id
             f"{atom.element:>2}",                           # type_symbol
             f"{cls._cif_quote(atom.name):<6}",              # label_atom_id
-            f"{'.'}  ",                                     # label_alt_id
+            f"{alt_loc}  ",                                 # label_alt_id
             f"{cls._cif_quote(res.name):<5}",               # label_comp_id
             f"{cls._cif_quote(chain.name):<3}",             # label_asym_id
             "1    ",                                        # label_entity_id
