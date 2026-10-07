@@ -2,6 +2,27 @@
 Definition of the mmCIF file format (https://www.wwpdb.org/documentation/file-format-content/cif33/cc.html)
 Also contains util function that requires knoweledge of the mmCIF format
 
+`Structure` enrichment wishlist (to keep the mmCIF parsing advantages while staying
+PDB compatible. the parser consumes the richer mmCIF information at the parse time
+and the `Structure` data model is the bottleneck of how much of it survives):
+    1. track label_entity_id/label_seq_id of each residue (e.g.: as optional
+       `Residue` fields). Currently the polymer-membership signal is consumed
+       once to categorize residues and then dropped, so the exported file
+       hardcodes entity '1' and label_seq '.' (see _write_cif_atom_site_row()).
+    2. track the original ATOM/HETATM record of each residue. Currently the
+       writer re-derives the record from the residue category (canonical or
+       modified -> ATOM), which normalizes unusual files instead of faithfully
+       round-tripping them.
+    3. member views for the mixed-content chains (mmCIF keeps waters/metals/
+       ligands on the auth chain id of the polymer): rtype-filtered residue
+       views (e.g.: polymer-only) and a polymer-only Chain.sequence, so the
+       downstream modules do not see 'HOH' in a sequence string.
+    4. resolve the (chain_id, resi) key collision in
+       Structure.find_residue_with_key() explicitly (e.g.: warn) instead of
+       silently taking the first match. Waters renumbered from 1 on the same
+       auth chain would shadow the polymer residue with the same number.
+    5. multi-model support: Structure` only holds the selected model.
+
 Author: Zhong, Yinjie <yinjie.zhong@outlook.com>
 Date: 2026-10-07
 """
@@ -33,9 +54,28 @@ from ..structure import Structure
 class CIFParser(StructureParserInterface):
     """
     Parser for covert mmCIF into Structure and vice versa
-    * different from PDB, mmCIF allows non-polymer (HETATM) components to share
-      the same chain id (auth_asym_id) with the polymer (ATOM) ones. (e.g.: water
-      with the auth chain id of the protein) They are merged into the same Chain().
+    * Different from PDB, mmCIF allows non-polymer (HETATM) components to share
+      the same chain id (auth_asym_id) with the polymer (ATOM) ones (e.g.: water
+      with the auth chain id of the protein). They are merged into the same `Chain` instance.
+    * Consistency with PDBParser is verified on the test data pairs (see
+      `test/structure/structure_io/test_cif_io.py`):
+        - 3FCR: all 3829 atoms are recovered from the mmCIF with identical
+          coordinates and the same categorization (0 mismatch over 777 residues).
+          The modified residues (MSE x6, LLP x1) written as HETATM records
+          sharing the polymer entity id are recognized via the
+          label_entity_id/label_seq_id signals.
+        - 1NVG: all 2616 atoms of the legacy de-watered PDB file are recovered
+          from the mmCIF with identical coordinates, b-factors, and elements
+          and the same categorization (0 mismatch over 349 residues, incl. the
+          2 ZN ions -> MetalUnit). The mmCIF side keeps strictly more
+          information than its PDB counterpart: the 6 alt loc atoms of HIS 39
+          keep the kept alternates' alt loc 'A' designation and the real
+          occupancy (0.6) where the PDB file has both stripped (alternates
+          removed, occupancy flattened to 1.0); the 120 crystallographic waters
+          are kept as `Solvent` instance on the auth chain A of the protein where the
+          PDB file has none; and nothing is exiled to a separate chain (the
+          PDB file puts the ZN ions on their own chain B) since mmCIF carries
+          the auth chain id on every atom.
     """
 
     def __init__(self) -> None:  # pylint: disable=super-init-not-called
@@ -54,8 +94,7 @@ class CIFParser(StructureParserInterface):
         "B_iso_or_equiv", "pdbx_formal_charge", "auth_seq_id", "auth_comp_id",
         "auth_asym_id", "auth_atom_id", "pdbx_PDB_model_num"
     ]
-    ## the data block name of the exported file since Structure() does not
-    ## track an entry id
+    ## the data block name of the exported file since `Structure` does not track an entry id
     DATA_BLOCK_NAME = "enzy_htp"
 
     # interface
@@ -70,7 +109,8 @@ class CIFParser(StructureParserInterface):
                       alt_loc_keep: str = "first",
                       single_alt_loc: str = "clean",) -> Union[Structure, tuple]:
         """
-        Converting a mmCIF file (as its path) into the Structure()
+        Converting a mmCIF file (as its path) into the a `Structure` instance.
+
         Arg:
             path:
                 the file path of the mmCIF file
@@ -113,7 +153,7 @@ class CIFParser(StructureParserInterface):
                 as is) and "delete" (deletes the atoms with alt_loc identifier).
 
         Return:
-            Structure()
+            Structure
         """
         _LOGGER.debug(f"working on {path}")
         cls._check_valid_cif(path)
@@ -152,16 +192,16 @@ class CIFParser(StructureParserInterface):
                        stru: Structure,
                        if_renumber: bool = True,
                        if_fix_atomname: bool = True,) -> str:
-        """Inverse of CIFParser.get_structure(). Given a Structure(), save it to the given .cif path.
+        """Inverse of CIFParser.get_structure(). Given a `Structure` instance, save it to the given .cif path.
 
         Args:
-            outfile: Path to save the Structure() as a str().
-            stru: The Structure() to save.
+            outfile: Path to save the `Structure` instance as a string.
+            stru: The `Structure` instance to save.
             if_renumber: Should atoms be renumbered from 1?
-            if_fix_atomname: Should atoms be ranemed to PDB convention?
+            if_fix_atomname: Should atoms be renamed to PDB convention?
 
         Returns:
-            Path to the saved Structure() as a str().
+            Path to the saved `Structure` instance as a string.
         """
         if not isinstance(outfile, str):
             raise TypeError("outfile must be a string representing the file path.")
@@ -233,11 +273,11 @@ class CIFParser(StructureParserInterface):
             if_fix_atomname: bool = True,
             ) -> str:
         """
-        Convert Structure() into mmCIF file string. Only the simplest function is need for
+        Convert `Structure` instance into mmCIF file string. Only the simplest function is need for
         enzyme modeling.
 
         Args:
-            stru: The Structure object to convert.
+            stru: The `Structure` instance to convert.
             if_renumber: Whether to renumber atoms starting from 1.
             if_fix_atomname: Whether to fix atom names to PDB conventions.
 
@@ -416,7 +456,7 @@ class CIFParser(StructureParserInterface):
                         add_solvent_list: List = None,
                         add_ligand_list: List = None) -> Dict[str, Residue]:
         """
-        build Residue() objects from atom_mapper
+        build `Residue` instances from atom_mapper
         Arg:
             atom_mapper
             res_info_mapper: the polymer-membership signals of each residue
@@ -449,7 +489,7 @@ class CIFParser(StructureParserInterface):
         in mmCIF format. Takes a mapper of {chain_id, [Residue, ...]}, a mapper of
         {(chain_id, residue_idx, residue_name): record_name}, and a mapper of the
         polymer-membership signals (see CIFParser._build_atoms()) and converts
-        them into its specialized Residue() inherited classes.
+        them into its specialized `Residue` inherited classes.
         * different from PDB, mmCIF allows non-polymer (HETATM) components to share
           the same chain id with the polymer (ATOM) ones. So the categorization is
           done per residue with its own record instead of per chain.
@@ -573,8 +613,8 @@ class CIFParser(StructureParserInterface):
         https://www.wwpdb.org/documentation/file-format-content/cif33/cc.html
         Simplified conventions of EnzyHTP:
             1. label_* ids are the same as the auth_* ones except label_seq_id and
-               label_entity_id which are not tracked by Structure() ('1' and '.')
-            2. the insertion code is not tracked by Atom() and always written as '.'
+               label_entity_id which are not tracked by `Structure` ('1' and '.')
+            2. the insertion code is not tracked by `Atom` and always written as '.'
             3. all atoms are written under model #1
             4. residues that are not canonical or modified are written as HETATM
         """
