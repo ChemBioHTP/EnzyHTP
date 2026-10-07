@@ -534,9 +534,11 @@ def test_get_structure_modified_residue_entity_signal():
             tokens[7] = '.'  # label_entity_id
             line = ' '.join(tokens)
         no_signal_lines.append(line)
-    stru_no_signal: Structure = sp.get_structure(
-        write_mini_cif('\n'.join(no_signal_lines), 'modified_no_signal_test.cif'))
+    no_signal_cif = write_mini_cif('\n'.join(no_signal_lines), 'modified_no_signal_test.cif')
+    stru_no_signal: Structure = sp.get_structure(no_signal_cif)
     assert stru_no_signal.get('A.2.SE').residue.rtype == chem.ResidueType.LIGAND
+    fs.safe_rm(cif_file)
+    fs.safe_rm(no_signal_cif)
 
 
 @pytest.mark.interface
@@ -582,3 +584,4 @@ def test_get_file_str_write_alt_loc():
     n_row = list(filter(lambda x: x.split()[19] == 'N', data_rows))  # auth_atom_id field
     assert len(n_row) == 2
     assert all(row.split()[4] == '.' for row in n_row)
+    fs.safe_rm(cif_file)
