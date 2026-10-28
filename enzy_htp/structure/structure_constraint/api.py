@@ -304,8 +304,9 @@ class CartesianFreeze(StructureConstraint):
         return True
 
     def correct_num_atoms(self) -> bool:
-        """True as long as there is at least one atom in the constraint."""
-        return len(self.atoms)
+        """No requirement for the number of atoms in a CartesianFreeze constraint. Any number of atoms can be frozen.
+        e.g., when creating a backbone freeze for a non-protein num_atoms can be 0 """
+        return True
 
     def current_geometry(self) -> float:
         """Always returns 0.0. Not needed for this type of constraint.
