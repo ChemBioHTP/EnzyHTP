@@ -36,6 +36,7 @@ from .structure import (
     Ligand,
     MetalUnit,
     Solvent,
+    CIFParser,
     PDBParser,
     Mol2Parser
 )

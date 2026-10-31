@@ -1,5 +1,5 @@
 """the I/O submodule for generation, construction, importing, and exporting of various structure related objects:
-    + Structure objects: PDBParser
+    + Structure objects: PDBParser, CIFParser
     + Ligand objects: Mol2Parser
 
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
@@ -8,6 +8,7 @@ Date: 2022-08-01
 """
 from ._interface import StructureParserInterface
 from .pdb_io import PDBParser
+from .cif_io import CIFParser
 from .mol2_io import Mol2Parser
 from .prepin_io import PrepinParser
 from .gjf_io import GJFParser
