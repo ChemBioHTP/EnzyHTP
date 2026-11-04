@@ -20,7 +20,10 @@ from typing import Generator, List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
 import pandas as pd
 from sympy import sympify
-from collections import Iterable
+try:
+    from collections import Iterable
+except ImportError:
+    from collections.abc import Iterable # Python 3.10+
 from enzy_htp.structure.chain import Chain
 from enzy_htp.structure.structure_region.api import create_region_from_residues, create_region_from_selection_pattern
 
@@ -320,7 +323,7 @@ class AmberParameterizer(MolDynParameterizer):
                           " (lig or maa) but GAFF/GAFF2 is not used!"
                           f" Check you force_fields. (current: {self.force_fields})")
             raise ValueError
-    
+
         # init
         fs.safe_mkdir(self.ncaa_param_lib_path)
         target_method = f"{self.charge_method}-{gaff_type}"
@@ -423,7 +426,7 @@ class AmberParameterizer(MolDynParameterizer):
         for ncaa_name, (mol_desc_path, frcmod_path_list) in maa_parms.items():
             lines.extend(
                 self._make_ncaa_tleap_lines(ncaa_name, mol_desc_path, frcmod_path_list))
-            
+
         # PB/GBRadii setting
         if self.gb_radii:
             lines.append(f"set default PBRadii {self.RADII_MAPPER[self.gb_radii]}")
@@ -509,9 +512,9 @@ class AmberMDStep(MolDynStep):
         make_job()
         translate()
         try_merge_job()"""
-    def __init__(self, 
+    def __init__(self,
                  interface,
-                 name: str, 
+                 name: str,
                  length: float,
                  timestep: float,
                  minimize: bool,
@@ -543,7 +546,7 @@ class AmberMDStep(MolDynStep):
         self.keep_in_file = keep_in_file
         self._work_dir = work_dir
 
-    # region == property == 
+    # region == property ==
     @property
     def engine(self) -> str:
         return "Amber"
@@ -637,7 +640,7 @@ class AmberMDStep(MolDynStep):
         """the method that make a ClusterJob that runs the step
         Args:
             input_data: the input data of the step
-            path_rel_to: 
+            path_rel_to:
                 if this argument is specified, the file path inside of the .in file
                 will be written as the relative path to {path_rel_to}. However, the
                 path stored in python variables are still absolute or relative to cwd
@@ -747,9 +750,9 @@ class AmberMDStep(MolDynStep):
 
         result = MolDynResult(
             traj_file = traj_path,
-            traj_parser = traj_parser, 
+            traj_parser = traj_parser,
             traj_log_file = mdout_path,
-            traj_log_parser = traj_log_parser, 
+            traj_log_parser = traj_log_parser,
             last_frame_file = mdrst_path,
             last_frame_parser = last_frame_parser,
             source="amber",
@@ -770,9 +773,9 @@ class AmberMDStep(MolDynStep):
         If the file exists, will change the filename to {self.name}_{index}.in
         The index start from 1.
         *content* is based on attributes of the instance.
-        
+
         Args:
-            path_rel_to: 
+            path_rel_to:
                 if this argument is specified, the file path inside of the .in file
                 will be written as the relative path to {path_rel_to}. However, the
                 path stored in python variables are still absolute or relative to cwd
@@ -787,7 +790,7 @@ class AmberMDStep(MolDynStep):
 
     def _make_md_cmd(self, temp_mdin_file, prmtop, coord, path_rel_to: str = None,) -> str:
         """compile the sander/pmemd cmd from config
-        path_rel_to: 
+        path_rel_to:
             if this argument is specified, the file path inside of the .in file
             will be written as the relative path to {path_rel_to}. However, the
             path stored in python variables are still absolute or relative to cwd
@@ -836,7 +839,7 @@ class AmberMDStep(MolDynStep):
         last_frame_parser = AmberRSTParser(
             prmtop_file=result_egg.prmtop_path,
             interface=self.parent_interface)
-        
+
         # error check
         self.check_md_error(traj_file, traj_log_file, result_egg.prmtop_path, result_egg.parent_job)
 
@@ -850,9 +853,9 @@ class AmberMDStep(MolDynStep):
 
         return MolDynResult(
             traj_file = traj_file,
-            traj_parser = traj_parser, 
+            traj_parser = traj_parser,
             traj_log_file = traj_log_file,
-            traj_log_parser = traj_log_parser, 
+            traj_log_parser = traj_log_parser,
             last_frame_file = last_frame_file,
             last_frame_parser = last_frame_parser,
             source="amber",
@@ -870,7 +873,7 @@ class AmberMDStep(MolDynStep):
         Possible Amber error info places:
         1. stdout/stderr
         2. mdout file
-        3. more analysis of comm problem from the traj (TODO) 
+        3. more analysis of comm problem from the traj (TODO)
         The ultimate goal is to summarize each error type and give suggestions.
         Notes: designed here so that it can also checks based on config of the current step"""
         # only when MD is not complete, there is an error
@@ -894,14 +897,14 @@ class AmberMDStep(MolDynStep):
                 raise TypeError
             # 2. mdout file
             # have no experience that error pops here yet. Add when observed
-            # 3. traj analysis 
+            # 3. traj analysis
             # TODO
             # Note that if_report = 0 will make traj_path = None
             # TODO give suggestion for each detected types of errors.
 
             _LOGGER.error(f"Amber MD didn't finish normally.{os.linesep}{os.linesep.join(error_info_list)}")
             raise AmberMDError(error_info_list)
-    
+
     @classmethod
     def try_merge_jobs(cls, job_list: List[ClusterJob]) -> List[ClusterJob]:
         """the classmethod that merge a list of sequential jobs from MolDynStep to fewer jobs.
@@ -910,7 +913,7 @@ class AmberMDStep(MolDynStep):
         and are sequential in steps. The merge specifically merges the command of each job.
         Returns: a list of reduced jobs.
         TODO: This is not a good design.
-            This method could be generalized in ClusterJob 
+            This method could be generalized in ClusterJob
             but need to develop parser of sub_script_str
             we should probably do this when adding the 2nd MD engine."""
         result = [job_list[0]]
@@ -925,12 +928,12 @@ class AmberMDStep(MolDynStep):
             mergable = (
                 job.mimo["env_settings"],
                 job.mimo["res_keywords"],
-                job.mimo["sub_dir"],                
+                job.mimo["sub_dir"],
             )
             exposed_mergable = (
                 merged_job.mimo["env_settings"],
                 merged_job.mimo["res_keywords"],
-                merged_job.mimo["sub_dir"],                
+                merged_job.mimo["sub_dir"],
             )
             if mergable == exposed_mergable:
                 merged_cmds = merged_job.mimo["commands"] + job.mimo["commands"]
@@ -1043,7 +1046,7 @@ class AmberInterface(BaseInterface):
 
     def convert_traj_to_nc(self, traj_path: str, out_path: str, topology_path: str = str()) -> None:
         """Convert the given trajectory file to the Amber `.nc` format file in the out_path.
-        
+
         Args:
             traj_path (str): Path to the input trajectory file.
             out_path (str): Path to the output Amber `.nc` format trajectory file.
@@ -1159,7 +1162,7 @@ class AmberInterface(BaseInterface):
 
     # -- antechamber/parmchk2 --
     def run_antechamber(self, in_file: str, out_file: str, net_charge: int, spin: int,
-                        charge_method: str, atom_type: str = "gaff", 
+                        charge_method: str, atom_type: str = "gaff",
                         charge_file: str=None,
                         res_name: str=None,) -> None:
         """the python wrapper of running antechamber
@@ -1308,7 +1311,7 @@ class AmberInterface(BaseInterface):
                 if "RESIDUE_CHAINID" in line: # TODO move this function to PrmtopIO and make a better solution
                     break
                 of.write(line)
-        
+
     # -- cpptraj --
     def run_cpptraj(
             self,
@@ -1361,7 +1364,7 @@ class AmberInterface(BaseInterface):
         self,
         # IO data
         dr_prmtop: str, dl_prmtop: str, dc_prmtop: str, sc_prmtop: str, traj_file: str,
-        out_path: str, 
+        out_path: str,
         # choose algorithm
         solvent_model: str,
         # algorithm config
@@ -1397,15 +1400,15 @@ class AmberInterface(BaseInterface):
                 choose between PBSA and GBSA by keywords "pbsa" or "gbsa".
             ion_strength:
                 this is istrng for PB and saltcon for GB.
-            startframe, endframe, interval, keep_files, igb, fillratio, verbose, 
+            startframe, endframe, interval, keep_files, igb, fillratio, verbose,
             use_sander, exdi, indi:
                 These arguments means the same as the original keywords in the .in file of
                 MMPB/GBSA. See the Amber Manual (Section 34.3.1 in Amber20's case) for details.
                 Only commonly used ones are included. Contact developer if you need more.
             cluster_job_config, job_check_period, non_armer_cpu_num:
-                arguments for ARMer setup. 
+                arguments for ARMer setup.
                 (see the docstring of `enzy_htp.analysis.binding.binding_energy`)
-            
+
             keep_in_file:
                 control whether clean up the .in file after finish. (force keep if in_file
                 is provided by user through {in_file})
@@ -1464,7 +1467,7 @@ class AmberInterface(BaseInterface):
             traj_file = traj_file,
             in_path = in_file,
             out_path = out_path,
-            prefix = int_file_prefix, # control the intermediate file 
+            prefix = int_file_prefix, # control the intermediate file
             result_in_each_frames=result_in_each_frames,
             temp_out_path=temp_out_path,
         )
@@ -1484,7 +1487,7 @@ class AmberInterface(BaseInterface):
             res_keywords = cluster_job_config.res_keywords
             env_settings = cluster.AMBER_ENV["CPU"]
             sub_script_path = fs.get_valid_temp_name(f"{work_dir}/submit_mmpbgbsa.cmd")
-            
+
             job = ClusterJob.config_job(
                 commands=mmpbgbsa_command,
                 cluster=cluster,
@@ -1496,7 +1499,7 @@ class AmberInterface(BaseInterface):
             job.wait_to_end(period=job_check_period)
             self.check_mmpbgbsa_error(out_path, job)
             clean_up_targets.extend([job.job_cluster_log, sub_script_path])
-        
+
         # clean up
         if not keep_in_file:
             clean_up_targets.append(in_file)
@@ -1519,7 +1522,7 @@ class AmberInterface(BaseInterface):
         ):
         """create a mmpbgbsa .in file in {in_file}"""
         general_optional_namelist = [
-            "startframe", "endframe", "interval", "verbose", "keep_files", 
+            "startframe", "endframe", "interval", "verbose", "keep_files",
             "use_sander",]
         pb_optional_namelist = [
             "fillratio", "exdi", "indi",]
@@ -1573,7 +1576,7 @@ class AmberInterface(BaseInterface):
                     gb_lines.append(f"  {k}={v},")
             gb_lines.append("/")
             in_file_lines.extend(gb_lines)
-        
+
         else:
             _LOGGER.error(
                 f"solvent_model ({solvent_model}) not supported. Supported: [pbsa, gbsa]")
@@ -1582,8 +1585,8 @@ class AmberInterface(BaseInterface):
         fs.write_lines(in_file, in_file_lines)
 
     def check_mmpbgbsa_error(
-            self, 
-            out_file: str, 
+            self,
+            out_file: str,
             stdstream_source: Union[ClusterJob, CompletedProcess, SubprocessError]
         ):
         """avoid slient error from mmpbsa run"""
@@ -1607,7 +1610,7 @@ class AmberInterface(BaseInterface):
                 raise TypeError
             # 2. mdout file
             # have no experience that error pops here yet. Add when observed
-            # 3. traj analysis 
+            # 3. traj analysis
             # TODO
             # Note that if_report = 0 will make traj_path = None
             # TODO give suggestion for each detected types of errors.
@@ -1616,7 +1619,7 @@ class AmberInterface(BaseInterface):
             raise AmberMDError(error_info_list)
 
     def _make_mmpbgbsa_command(
-            self, 
+            self,
             num_cores: int,
             dr_prmtop: str, dl_prmtop: str, dc_prmtop: str, sc_prmtop: str, traj_file: str,
             in_path: str, out_path: str, temp_out_path: str, prefix: str,
@@ -1681,23 +1684,23 @@ class AmberInterface(BaseInterface):
     def parse_mmpbsa_result(self, mmpbsa_out_file: str, by_frames: bool) -> Dict[str, pd.DataFrame]:
         """parse the resulting mmpbsa.dat file from MMPBSA to a dictionary
         Args:
-            mmpbsa_out_file: 
+            mmpbsa_out_file:
                 the data file generated by MMPBSA.py
-            by_frames: 
+            by_frames:
                 specify the format of the data file to be the average one (.dat) or
                 the by frames one (.csv)"""
         if by_frames:
             result = self._parse_mmpbsa_result_by_frames(mmpbsa_out_file)
         else:
             result = self._parse_mmpbsa_result_average(mmpbsa_out_file)
-    
+
         if not result:
             _LOGGER.warning(
                 f"The provided mmpbsa data file ({mmpbsa_out_file}) does not contain any data!"
             )
 
         return result
-    
+
     def _parse_mmpbsa_result_by_frames(self, mmpbsa_out_file: str) -> Dict[str, pd.DataFrame]:
         """parse the result when -eo is specified for the output"""
         gb_pattern = (
@@ -1760,7 +1763,7 @@ class AmberInterface(BaseInterface):
             result["pbsa"] = pb_result
 
         return result
-    
+
     def _parse_pb_gb_table(self, table_str: str) -> pd.DataFrame:
         """the table looks like this:
         Energy Component            Average              Std. Dev.   Std. Err. of Mean
@@ -1789,13 +1792,13 @@ class AmberInterface(BaseInterface):
         data_dict = {}
         for line in data_lines:
             data_dict[line[0].strip()] = [float(line[1].strip()), float(line[2].strip()), float(line[3].strip())]
-        
+
         result_df = pd.DataFrame.from_dict(
-            data_dict, 
+            data_dict,
             orient="index",
             columns=["mean", "sd", "sem"]
             )
-        
+
         return result_df
 
     # -- parmed --
@@ -1889,12 +1892,12 @@ class AmberInterface(BaseInterface):
 
     def rename_atoms(self, stru: Structure) -> None: # TODO(high piror) move to structure_io https://github.com/ChemBioHTP/EnzyHTP/pull/162#discussion_r1473217587
         """Renames residues and atoms to be compatible with Amber naming and functions.
-        
+
         Args:
             stru: The Structure() to perform renaming on.
 
         Returns:
-            Nothing. 
+            Nothing.
         """
         nterm_mapper:Dict = {"H1":"1H", "H2":"2H", "H3":"3H"}
         leu_mapper:Dict = {
@@ -1911,14 +1914,14 @@ class AmberInterface(BaseInterface):
         for res in stru.residues:
             if not res.is_canonical():
                 continue
-            
+
 
             if res.name == 'LEU':
                 for aa in res.atoms:
                     if aa.name in leu_mapper:
                         aa.name = leu_mapper[aa.name]
-                        changed_atoms += 1                            
-        
+                        changed_atoms += 1
+
         _LOGGER.info(f"Finished renaming! Changed {changed_residues} residues and {changed_atoms} atoms.")
 
     def get_amber_residue_index(self, residues: List[Atom]) -> List[int]:
@@ -1953,12 +1956,12 @@ class AmberInterface(BaseInterface):
         mask = f"'@{reduced_idxes}'"
 
         if reduce:
-            pass 
-            # TODO. reduce based on residue affilation etc. 
+            pass
+            # TODO. reduce based on residue affilation etc.
             # use methods from StruSelection
 
         return mask
-            
+
     # endregion
 
     # -- sander/pmemd --
@@ -2080,7 +2083,7 @@ class AmberInterface(BaseInterface):
             ntt_cntrl = {'ntt': ntt}
             if ntt == 3:
                 ntt_cntrl.update({'gamma_ln': self.config()["HARDCODE_GAMMA_LN"],})
-            
+
             # ntp
             if imin == 1:
                 ntp_cntrl = {}
@@ -2091,7 +2094,7 @@ class AmberInterface(BaseInterface):
                                 f" Supported list: {self.MD_PRESSURE_SCALING_MAPPER.keys()}")
                     raise ValueError
                 ntp_cntrl = {"ntp" : ntp}
-            
+
             # ntb
             if imin == 1:
                 ntb_cntrl = {}
@@ -2227,8 +2230,8 @@ class AmberInterface(BaseInterface):
         # other keys
         for k in target_keys:
             if k in source_dict:
-                v = source_dict[k] 
-    
+                v = source_dict[k]
+
                 # parse x containing value
                 if k in "r1 r2 r3 r4".split():
                     if isinstance(v, str) and v.count("x") > 0:
@@ -2239,7 +2242,7 @@ class AmberInterface(BaseInterface):
                             )
 
                 result[k] = v
-        
+
         return result
 
     def get_restraintmask(self, cons: CartesianFreeze, reduce: bool= True) -> str:
@@ -2273,8 +2276,8 @@ class AmberInterface(BaseInterface):
             'group_info': [],}
             The 4 main keys are required.
         (see example in test_amber_interface.py::test_write_to_mdin_from_raw_dict)
-        
-        path_rel_to: 
+
+        path_rel_to:
             if this argument is specified, the file path inside of the .in file
             will be written as the relative path to {path_rel_to}. However, the
             path stored in python variables are still absolute or relative to cwd
@@ -2343,9 +2346,9 @@ class AmberInterface(BaseInterface):
                 fs.safe_mkdir(eh_config['system.SCRATCH_DIR'])
                 Path(result).symlink_to(target_path)
                 return result
-            
+
             # 3. symlink in SCRATCH relative
-            _LOGGER.debug("2nd attempt failed. making the symlink using relative path.")             
+            _LOGGER.debug("2nd attempt failed. making the symlink using relative path.")
             result = Path(result).relative_to(Path.cwd())
             if len(str(result)) <= 70:
                 fs.safe_mkdir(eh_config['system.SCRATCH_DIR'])
@@ -2358,7 +2361,7 @@ class AmberInterface(BaseInterface):
             if len(result) <= 70:
                 Path(result).symlink_to(target_path)
                 return result
-            
+
             # 5. shortest symlink that have to work
             result = fs.get_valid_temp_name(f"./symlink.lnk", is_symlink=True)
             _LOGGER.warning(f"4nd attempt failed. making {result} for {target_path}.")
@@ -2380,7 +2383,7 @@ class AmberInterface(BaseInterface):
         return the executable and mpi prefix if needed."""
         result = self.config()["HARDCODE_MD_ENGINE"][core_type]
         if core_type == "cpu":
-            
+
             mpi_exec = eh_config._system.get_mpi_executable(num_cores)
             result = f"{mpi_exec} {result}"
         return result
@@ -2498,7 +2501,7 @@ class AmberInterface(BaseInterface):
                 NCAA params goes to. It will prevent redundant generation of same NCAAs.
                 Normally we suggest setting this to a directory that contains all workflows
                 of a same wild-type/template enzyme.
-                * The NCAA-file correspondence is determined by the 
+                * The NCAA-file correspondence is determined by the
                   (1) 3-letter name in the file
                   (2) (if not 1 not exist) the file name
                 * Setting this to a path that is too general may cause conflict when different
@@ -2530,7 +2533,7 @@ class AmberInterface(BaseInterface):
         # init default values
         type_hint_sticker: AmberConfig
         if force_fields == "default":
-            force_fields = self.config()["DEFAULT_FORCE_FIELDS"]        
+            force_fields = self.config()["DEFAULT_FORCE_FIELDS"]
         if charge_method == "default":
             charge_method = self.config()["DEFAULT_CHARGE_METHOD"]
         if resp_engine == "default":
@@ -2645,7 +2648,7 @@ class AmberInterface(BaseInterface):
             _LOGGER.error(f"found unsupported charge method {charge_method}."
                           f"(Supported keywords: {self.SUPPORTED_CHARGE_METHOD_MAPPER.keys()})")
             raise ValueError
-        
+
 
         # 3. run antechamber on the PDB get mol2
         self.run_antechamber(in_file=input_file,
@@ -2723,7 +2726,7 @@ class AmberInterface(BaseInterface):
                 the timestep of the simulation. (unit: ns)
             minimize:
                 whether this md step is performing a minimization.
-            temperature: 
+            temperature:
                 the temperature of the simulation. can be a list of 1d coordinates that indicate
                 a changing temperature. e.g.: [(0,0), (0.5,300)] the 1st element is time in ns and
                 the second is temperature at the time point.
@@ -2854,7 +2857,7 @@ class AmberInterface(BaseInterface):
             record_period = self.config()["DEFAULT_MD_RECORD_PERIOD_FACTOR"] * length
         if work_dir == "default":
             work_dir = self.config()["DEFAULT_MD_WORK_DIR"]
-            
+
 
         return AmberMDStep(
             interface = self,
@@ -2962,7 +2965,7 @@ class AmberInterface(BaseInterface):
             result = False
         # read log and double check it is the right Error not sth else
         result_1 = self._check_atom_number_consistency_cpptraj_log(temp_log_path)
-    
+
         if result == result_1:
             fs.clean_temp_file_n_dir([temp_log_path, temp_dir, temp_in_path])
             return result
@@ -2989,7 +2992,7 @@ class AmberInterface(BaseInterface):
             ".mdcrd" : AmberMDCRDParser(prmtop_file=prmtop_path),
         }
         # san check
-        # - make sure the topology in {prmtop_path} is consistent with {traj_path} 
+        # - make sure the topology in {prmtop_path} is consistent with {traj_path}
         # (check target: atom number)
         consistent = self.check_prmtop_nc_consistency(prmtop_path, traj_path)
         if not consistent:
@@ -3047,18 +3050,18 @@ class AmberInterface(BaseInterface):
             stru_selection: StruSelection,
         ) -> List[float]:
         """Calculate the RMSD value of a specified StruSelection object within a StructureEnsemble instance.
-        
+
         Args:
             stru_esm (StructureEnsemble): A collection of different geometries of the same enzyme structure.
             stru_selection (StruSelection): A StruSelection instance representing the region for calculating RMSD value.
-            
+
         Returns:
-            rmsd_value (List[float]): A list of RMSD values for each frame in a StructureEnsemble instance comparing with the average structure.    
+            rmsd_value (List[float]): A list of RMSD values for each frame in a StructureEnsemble instance comparing with the average structure.
         """
         tmp_dir = eh_config['system.SCRATCH_DIR']
         tmp_nc_path=fs.get_valid_temp_name(os.path.join(tmp_dir, "tmp_amber_traj.nc"))
         tmp_prmtop_path=fs.get_valid_temp_name(os.path.join(tmp_dir, "tmp_amber_topology.prmtop"))
-        
+
         self.convert_top_to_prmtop(stru_esm.topology_source_file, tmp_prmtop_path)
         self.convert_traj_to_nc(stru_esm.coordinate_list, tmp_nc_path, topology_path=tmp_prmtop_path)
 
@@ -3114,7 +3117,7 @@ class AmberInterface(BaseInterface):
         ) -> List[float]:
         """Function that calculate the MMPB/GBSA energy for a given structure/structure ensemble with
         a selection pattern for the ligand.
-        
+
         Args:
             stru, ligand, cluster_job_config, job_check_period, work_dir, keep_in_file:
                 see the docstring of `enzy_htp.analysis.binding.binding_energy`
@@ -3140,7 +3143,7 @@ class AmberInterface(BaseInterface):
             in_file:
                 this argument allows user to provide their own .in files. This will overwrite
                 all the .in file related arguments.
-        
+
         Returns:
             the MMPB/GBSA energies as a list"""
         # init cluster_job_config
@@ -3279,7 +3282,7 @@ class AmberInterface(BaseInterface):
     def make_mmpbgbsa_nc_file(
         self,
         stru_esm: StructureEnsemble,
-        temp_nc: str,    
+        temp_nc: str,
         ) -> None:
         """make the nc file for the MMPB/GBSA calculation.
         Generate the file in {temp_nc}"""
@@ -3301,7 +3304,7 @@ class AmberRSTParser():
     def __init__(self, prmtop_file: str, interface: BaseInterface = amber_interface):
         self.prmtop_file = prmtop_file
         self.parent_interface = interface
-    
+
     def get_structure(self, rst_file: str) -> Structure:
         """parse a rst file to a Structure()."""
 
@@ -3314,7 +3317,7 @@ class AmberMDCRDParser():
     def __init__(self, prmtop_file: str, interface: AmberInterface = amber_interface):
         self.prmtop_file = prmtop_file
         self.parent_interface = interface
-    
+
     def get_coordinates(self, mdcrd: str, remove_solvent: bool=False) -> Generator[List[List[float]], None, None]:
         """parse a mdcrd file to a Generator of coordinates. Intermediate files are created."""
         coord = [] # coords of 1 frame
@@ -3337,14 +3340,14 @@ class AmberMDCRDParser():
         with open(mdcrd) as f:
             while True:
                 # use the while True format to detect the EOF
-                line=f.readline()            
+                line=f.readline()
 
                 if re.match(digit_pattern, line) == None:
                     # not data line
                     if not end_flag_1 and not fake_end_flag:
-                        # last line is not end line & 
+                        # last line is not end line &
                         continue
-                
+
                 if fake_end_flag:
                     # this line is an end line
                     # if next line of end is the file end
@@ -3363,7 +3366,7 @@ class AmberMDCRDParser():
                         end_flag_1 = 0
                         fake_end_flag = 1
                         continue
-                    else:                        
+                    else:
                         # last line is a real end line
                         yield coord
                         # empty for next loop
@@ -3381,7 +3384,7 @@ class AmberMDCRDParser():
                     if re.match(frame_sep_pattern, line) != None:
                         # find line that mark the end of a frame // possible fake line
                         # store the last frame and empty the holder
-                        end_flag_1 = 1 
+                        end_flag_1 = 1
                         lp = re.split(' +', line.strip())
                         # hold the info
                         holder = [float(lp[0]), float(lp[1]), float(lp[2])]
@@ -3397,7 +3400,7 @@ class AmberMDCRDParser():
                         atom_coord.append(float(i))
                         coord.append(atom_coord)
                         # empty for next atom
-                        atom_coord = []        
+                        atom_coord = []
                         counter = 1
 
     def get_structures(self, mdcrd: str) -> Generator[Structure, None, None]:
@@ -3418,7 +3421,7 @@ class AmberNCParser():
         self.parent_interface: AmberInterface = interface
 
         self.mdcrd: Dict = {}
-    
+
     def mdcrd_parser(self) -> AmberMDCRDParser:
         """get an associated mdcrd parser"""
         return AmberMDCRDParser(prmtop_file=self.prmtop_file)
