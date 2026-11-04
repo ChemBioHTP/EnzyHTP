@@ -1,4 +1,4 @@
-"""Define functions for mutate Structure(). 
+"""Define functions for mutate Structure().
 Science API:
     +mutate_stru()
     +assign_mutant()
@@ -144,9 +144,9 @@ def sync_mutation_over_chains(mutants: List[List[Mutation]],
     """synchronize mutations of each mutant in {mutants} to correponding chains. Return a copy
     of mutants with addition mutations in each mutant.
     Args:
-        mutants: 
+        mutants:
             a list of target mutant
-        chain_sync_list: 
+        chain_sync_list:
             a list like [(A,C),(B,D)] to indicate homo-chains in enzyme ploymer
             (like dimer). Mutations will be **copied** to the correponding homo-chains as it
             is maybe experimentally impossible to only do mutations on one chain of a homo-dimer
@@ -267,7 +267,7 @@ def mutate_stru(stru: Structure,
             The method is only used as a place holder for 1st version EnzyHTP. We have encounter any problem
             brought by the accuracy of the mutation when using this method in workflows but users should be
             cautious with it and consider it a potential source of absured results.
-        
+
         Side-chain rotamer library:
         (most used in the field)
         - SCWRL4 (http://dunbrack.fccc.edu/lab/scwrl)
@@ -391,7 +391,7 @@ def mutate_stru_with_pymol(
     Args:
         stru: the 'WT' structure
         mutant: a list of Mutation() which describes a mutant to the 'WT'
-        in_place: if make the changes to the structure in-place 
+        in_place: if make the changes to the structure in-place
     Returns:
         The mutated structure.
     """
@@ -410,15 +410,15 @@ def mutate_stru_with_pymol(
         pymol_obj_name = pi.load_enzy_htp_stru(stru=stru_cpy, session=pms)[0]
         # 2. loop through mutants and apply each one
         for mut in mutant:
-            pi.point_mutate(pos_key=mut.get_position_key(), target=mut.get_target(), 
+            pi.point_mutate(pos_key=mut.get_position_key(), target=mut.get_target(),
                             pymol_obj_name=pymol_obj_name, pymol_session=pms)
         # 3. save to a structure.
         pymol_mutant_stru = pi.export_enzy_htp_stru(pymol_obj_name, pms, if_fix_naming=True)
         stru_oper.align_atom_order_in_each_residue(pymol_mutant_stru, stru_cpy)
-        
+
     # 4. update residues
     stru_oper.update_residues(stru_cpy, pymol_mutant_stru)
-    
+
     if in_place:
         stru_oper.update_residues(stru, stru_cpy)
         return stru
@@ -427,18 +427,30 @@ def mutate_stru_with_pymol(
 
 
 def mutate_stru_with_rosetta(stru: Structure, mutant: List[Mutation], in_place: bool = False, **kwargs) -> Union[Structure, None]:
-    """Applies mutations to a function using the Rosetta engine. 
+    """Applies mutations to a function using the Rosetta engine.
 
     Args:
         stru: the 'WT' structure
         mutant: a list of Mutation() which describes a mutant to the 'WT'
-        in_place: if make the changes to the structure in-place 
+        in_place: if make the changes to the structure in-place
     Returns:
         The mutated structure. May be nothing.
     """
 
     # san check
     elements: List[Dict] = list()
+
+    elements.append( {
+        'parent': 'RESIDUE_LEVEL_TASK_OPERATIONS',
+        'tag': 'PreventRepackingRLT',
+        'name': f"prevent_repacking",
+    })
+    elements.append( {
+        'parent': 'TASKOPERATIONS',
+        'tag': 'RestrictToRepacking',
+        'name': 'repack_only',
+    })
+
     for midx, mut in enumerate(mutant):
         if not isinstance(mut, Mutation):
             _LOGGER.error(f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
@@ -448,13 +460,19 @@ def mutate_stru_with_rosetta(stru: Structure, mutant: List[Mutation], in_place: 
         if len(target) != 3:
             target = chem.convert_to_canonical_three_letter(target)
 
-        #TODO(CJ): remap the residue index here
         elements.extend([
             {
                 'parent': 'RESIDUE_SELECTORS',
                 'tag': 'Index',
                 'name': f"residue{midx+1}",
-                'resnums': str(mut.res_idx)
+                'resnums': str(mut.res_idx)+mut.chain_id
+            },
+            {
+                'parent': 'TASKOPERATIONS',
+                'tag': 'OperateOnResidueSubset',
+                'name': f"operation{midx+1}",
+                'selector_logic': f"!residue{midx+1}",
+                'residue_level_operations': 'prevent_repacking'
             },
             {
                 'parent': 'MOVERS',
@@ -464,9 +482,20 @@ def mutate_stru_with_rosetta(stru: Structure, mutant: List[Mutation], in_place: 
                 'new_res': target
             },
             {
+                'parent': 'MOVERS',
+                'tag': 'PackRotamersMover',
+                'name': f'pack{midx+1}',
+                'task_operations': f"operation{midx+1},repack_only",
+            },
+            {
                 'parent': 'PROTOCOLS',
                 'tag': 'Add',
                 'mover_name': f'mutate{midx+1}'
+            },
+            {
+                'parent': 'PROTOCOLS',
+                'tag': 'Add',
+                'mover_name': f'pack{midx+1}'
             },
         ])
 
@@ -523,8 +552,8 @@ def mutate_stru_with_rosetta(stru: Structure, mutant: List[Mutation], in_place: 
 
 
 MUTATE_STRU_ENGINE = {
-    "tleap_min": mutate_stru_with_tleap, 
-    "pymol": mutate_stru_with_pymol, 
+    "tleap_min": mutate_stru_with_tleap,
+    "pymol": mutate_stru_with_pymol,
     "rosetta": mutate_stru_with_rosetta
 }
 """engines for mutate_stru()"""

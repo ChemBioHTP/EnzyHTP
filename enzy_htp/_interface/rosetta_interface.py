@@ -59,7 +59,7 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
         If the lowest energy scores are within this cutoff the protocol will end early.
     fa_max_dis:
         modify fa_atr and fa_sol behavior, really important for protein stability
-        (default: 9.0)  
+        (default: 9.0)
     scorefxn:
         the name of the Rosetta scoring function used.
     save_mutant_pdb:
@@ -174,14 +174,14 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
     def action_on_wt(self, stru: Structure) -> Structure:
         """apply some action on the wild-type. For cartesian ddg, they are:
         1. relax the structure using the same scoring function.
-        
+
         Returns:
             return a copy of the changed structure."""
         stru = copy.deepcopy(stru)
         # 0. remove ligands
         remove_non_peptide(stru)
         # TODO deal with NCAA
-        
+
         # 1. relax
         fs.safe_mkdir(self.work_dir)
         relax_dir = f"{self.work_dir}/wt_relax/"
@@ -404,7 +404,7 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
         rosetta_stru = copy.deepcopy(stru)
         self.parent_interface.rename_atoms(rosetta_stru)
         PDBParser().save_structure(result, rosetta_stru)
-        
+
         return result
 
     def get_ddg_fold(self, ddg_file: str, method: str="average") -> float:
@@ -428,7 +428,7 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
 
 
 class RosettaInterface(BaseInterface):
-    """Class that provides an interface for enzy_htp to utilize the Rosetta molecular modelling software suite. Supported 
+    """Class that provides an interface for enzy_htp to utilize the Rosetta molecular modelling software suite. Supported
     operations include relaxation (minimzation), scoring, ligand parameterization, and the ability to use RosettaScripts.
 
     Attributes:
@@ -460,7 +460,7 @@ class RosettaInterface(BaseInterface):
         should always be in the current working directory.
 
         Args:
-            Nothing. 
+            Nothing.
 
         Returns:
             Nothing.
@@ -469,12 +469,12 @@ class RosettaInterface(BaseInterface):
 
     def rename_atoms(self, stru: Structure) -> None:
         """Renames residues and atoms to be compatible with Rosetta naming and functions.
-        
+
         Args:
             stru: The Structure() to perform renaming on.
 
         Returns:
-            Nothing. 
+            Nothing.
         """
         nterm_mapper:Dict = {"H1":"1H", "H2":"2H", "H3":"3H"}
         his_mapper:Dict = {"HB2":"1HB", "HB3":"2HB"}
@@ -484,7 +484,7 @@ class RosettaInterface(BaseInterface):
         for res in stru.residues:
             if not res.is_canonical():
                 continue
-            
+
             if res.name in "HID HIS HIE".split():
                 res.name = "HIS"
                 changed_residues += 1
@@ -589,10 +589,10 @@ class RosettaInterface(BaseInterface):
     def parameterize_ligand(self, mol: Ligand, charge:int=None, work_dir:str=None) -> Tuple[str, str]:
         """Parameterizes the input ligand for use in the RosettaLigand protocol. Takes an input file with the ligand,
         as well as the name of the residue in PDB format (3 capitalized letters) as well as optionally where the output
-        directory where the .params and .pdb files should be saved. The underlying script only supports .mol, .mol2, 
-        and .sdf formats. Can also add conformers to end of .params file when conformers file is supplied. Function 
-        exits on invalid inputs. 
-        TODO(CJ): fix this documentation            
+        directory where the .params and .pdb files should be saved. The underlying script only supports .mol, .mol2,
+        and .sdf formats. Can also add conformers to end of .params file when conformers file is supplied. Function
+        exits on invalid inputs.
+        TODO(CJ): fix this documentation
         Args:
             molfile: The name of the input file as a str().
             res_name: The all-capitalized, three letter string of the ligand in PDB format.
@@ -600,7 +600,7 @@ class RosettaInterface(BaseInterface):
             conformers: The conformers file for the given ligand. Optional.
 
         Returns:
-            A tuple() with the layout of (.params file, .pdb file)            
+            A tuple() with the layout of (.params file, .pdb file)
 
         """
         if work_dir is None:
@@ -613,20 +613,20 @@ class RosettaInterface(BaseInterface):
         _parser = Mol2Parser()
         _parser.save_ligand(molfile, mol)
         flags: List[str] = [self.config_.PARAMS_SCRIPT, f"{molfile}", f"--name={res_name}", "--clobber", "--keep-names" ]
-       
+
         indices = list()
         for aidx,aa in enumerate(mol.atoms):
             if aa.element == 'H':
                 continue
             indices.append( aidx + 1 )
-            
-        if len(indices) <= 2:            
+
+        if len(indices) <= 2:
             flags.append( f"--nbr_atom={indices[0]}" )
-        
+
 
         self.env_manager_.run_command(self.config_.PY_2_7, flags)
         fs.safe_rm(f"{res_name}_0001.pdb")
-        
+
         params_file = fs.safe_mv(params_file, work_dir)
         params_content:List[str]=fs.lines_from_file(params_file)
 
@@ -654,20 +654,20 @@ class RosettaInterface(BaseInterface):
 
             conformer_file_content = list(filter(lambda ll: ll.startswith('HETATM') or ll.startswith('END'), conformer_file_content))
 
-            fs.write_lines(conformers, conformer_file_content) 
+            fs.write_lines(conformers, conformer_file_content)
 
             params_content.append(f"PDB_ROTAMERS {conformers}")
 
             fs.safe_rm(mol2_temp)
 
         fs.write_lines(params_file, params_content)
-        
-        return params_file 
+
+        return params_file
 
     def make_cart_ddg_cmd(
-            self, 
-            pdb_path: str, 
-            mut_file: str, 
+            self,
+            pdb_path: str,
+            mut_file: str,
             num_iter: int,
             force_iter: bool,
             score_cutoff: float,
@@ -718,15 +718,15 @@ class RosettaInterface(BaseInterface):
         cluster_job_config: Dict = None,
         job_check_period: int = 180,
     ) -> pd.DataFrame:
-        """Runs Rosetta's relax protocol on the supplied .pdb file, returning the path to the relaxaed structure as 
-        well as a dictionary with all characteristics found in the score.sc file. Function provides direct access to a 
-        number of commandline options and the ability to add arbitrary commandline options at the end. 
+        """Runs Rosetta's relax protocol on the supplied .pdb file, returning the path to the relaxaed structure as
+        well as a dictionary with all characteristics found in the score.sc file. Function provides direct access to a
+        number of commandline options and the ability to add arbitrary commandline options at the end.
 
         NOTE: The majority of crashes from this function are due to bad atom names.
 
         Args:
             infile: A str() with the path to the .pdb file to relax. Or a Structure() in Rosetta naming convention.
-            nstruct: Number of structures to create. 
+            nstruct: Number of structures to create.
             ignore_zero_occupancy: If relax should ignore atoms with zero occupancy. True by default.
             full_atom: If relax should do full atom relaxation. True by default.
             detect_disulf: If Rosetta should detect disulfide bonds. True by default.
@@ -736,14 +736,14 @@ class RosettaInterface(BaseInterface):
             ramp_constraints: If the constraints should be ramped during initial relaxation stage. True by default.
             prefix: str() with prefix for output file names. None and not used by default.
             overwrite: If results should be overwritten. True by default.
-            extra_flags: A List[str] of extra flags to be added to the commandline. Empty by default. NOT CHECKED FOR CORRECTNESS. 
+            extra_flags: A List[str] of extra flags to be added to the commandline. Empty by default. NOT CHECKED FOR CORRECTNESS.
             output_dir: The output directory where the files will be saved. './' by default.
             delete_scores: Whether the score.sc file should be deleted after running. True by default.
             delete_crash: Whether the ROSETTA_CRASH.log file should be deleted after running. True by default.
 
         Returns:
             pandas DataFrame containing the results and energies of the relaxed structures. Description column contains
-            full paths to relaxed files. 
+            full paths to relaxed files.
         """
         # 1. dispatch for input
         clean_targets = []
@@ -800,7 +800,7 @@ class RosettaInterface(BaseInterface):
 
         # 3. execute
         fs.safe_mkdir(output_dir)
-        
+
         if cluster_job_config:  # parallel, armer
             cluster = cluster_job_config["cluster"]
             res_keywords =  self.config().DEFAULT_RELAX_RES_KEYWORDS | cluster_job_config["res_keywords"]
@@ -855,10 +855,10 @@ class RosettaInterface(BaseInterface):
         via supplied extra_flags. Returns the total score in REU.
 
         Arguments:
-            infile: A str() with the path to the .pdb file to relax. 
+            infile: A str() with the path to the .pdb file to relax.
             ignore_zero_occupancy: If relax should ignore atoms with zero occupancy. True by default.
             overwrite: If results should be overwritten. True by default.
-            extra_flags: A List[str] of extra flags to be added to the commandline. Empty by default. NOT CHECKED FOR CORRECTNESS. 
+            extra_flags: A List[str] of extra flags to be added to the commandline. Empty by default. NOT CHECKED FOR CORRECTNESS.
             output_dir: The output directory where the files will be saved. './' by default.
             delete_scores: Whether the score.sc file should be deleted after running. True by default.
             delete_crash: Whether the ROSETTA_CRASH.log file should be deleted after running. True by default.
@@ -924,8 +924,8 @@ class RosettaInterface(BaseInterface):
         """
 
         Args:
-            infile: A str() with the path to the .pdb file to relax. 
-            nstruct: Number of structures to create. 
+            infile: A str() with the path to the .pdb file to relax.
+            nstruct: Number of structures to create.
             ignore_zero_occupancy: If relax should ignore atoms with zero occupancy. True by default.
             full_atom: If relax should do full atom relaxation. True by default.
             detect_disulf: If Rosetta should detect disulfide bonds. True by default.
@@ -935,7 +935,7 @@ class RosettaInterface(BaseInterface):
             ramp_constraints: If the constraints should be ramped during initial relaxation stage. True by default.
             prefix: str() with prefix for output file names. None and not used by default.
             overwrite: If results should be overwritten. True by default.
-            extra_flags: A List[str] of extra flags to be added to the commandline. Empty by default. NOT CHECKED FOR CORRECTNESS. 
+            extra_flags: A List[str] of extra flags to be added to the commandline. Empty by default. NOT CHECKED FOR CORRECTNESS.
             output_dir: The output directory where the files will be saved. './' by default.
             delete_scores: Whether the score.sc file should be deleted after running. True by default.
             delete_crash: Whether the ROSETTA_CRASH.log file should be deleted after running. True by default.
@@ -943,7 +943,7 @@ class RosettaInterface(BaseInterface):
 
         Returns:
             pandas DataFrame containing the results and energies of the relaxed structures. Description column contains
-            full paths to relaxed files. 
+            full paths to relaxed files.
         """
         #TODO(CJ):should also be able to take a Structure as input.
         fs.check_file_exists(infile)
@@ -1005,11 +1005,11 @@ class RosettaInterface(BaseInterface):
         and "tag". "parent" refers to which element it should be nested under. In the case that there are multiple
         levels of nesting, they are joined by "." characters. The "tag" is the tag name of the element but note
         that there is NO checking for whether or not the included element tags are valid.
-        
+
         Args:
             fname: The .xml file to save the script contents to.
-            args: A list() of dict()'s where each is an element in the final .xml file. 
-            
+            args: A list() of dict()'s where each is an element in the final .xml file.
+
         Returns:
             The name of the script file.
         """
@@ -1053,6 +1053,7 @@ class RosettaInterface(BaseInterface):
         ET.SubElement(root, "INTERFACE_BUILDERS")
         ET.SubElement(root, "MOVEMAP_BUILDERS")
         #ET.SubElement(root, "SCORINGGRIDS")
+        ET.SubElement(root, "RESIDUE_LEVEL_TASK_OPERATIONS")
         ET.SubElement(root, "TASKOPERATIONS")
         ET.SubElement(root, "SIMPLE_METRICS")
         ET.SubElement(root, "FILTERS")
@@ -1143,20 +1144,20 @@ class RosettaInterface(BaseInterface):
     ) -> pd.DataFrame:
         """TODO
         Args:
-            infile: A str() with the path to the .pdb file to relax. 
-            nstruct: Number of structures to create. 
+            infile: A str() with the path to the .pdb file to relax.
+            nstruct: Number of structures to create.
             ignore_zero_occupancy: If relax should ignore atoms with zero occupancy. True by default.
             detect_disulf: If Rosetta should detect disulfide bonds. True by default.
             linmem_ig: Number of recent rotamers to store. 10 by default.
             overwrite: If results should be overwritten. True by default.
-            extra_flags: A List[str] of extra flags to be added to the commandline. Empty by default. NOT CHECKED FOR CORRECTNESS. 
+            extra_flags: A List[str] of extra flags to be added to the commandline. Empty by default. NOT CHECKED FOR CORRECTNESS.
             output_dir: The output directory where the files will be saved. './' by default.
             delete_scores: Whether the score.sc file should be deleted after running. True by default.
             delete_crash: Whether the ROSETTA_CRASH.log file should be deleted after running. True by default.
 
         Returns:
             pandas DataFrame containing the results and energies of the relaxed structures. Description column contains
-            full paths to relaxed files. 
+            full paths to relaxed files.
         """
         fs.check_file_exists(infile)
 
@@ -1278,10 +1279,10 @@ class RosettaInterface(BaseInterface):
     def create_cst_pdb_line(self, cst:ResiduePairConstraint, idx: int) -> str:
         """Creates a str() PDB line in the appropriate format so that Rosetta can apply the constrained geometry
         described by the RosettaCst. This line goes in the corresponding PDB file.
-        
+
         Args:
             idx: The index of the RosettaCst as an int().
-            
+
         Returns:
             The PDB line corresponding to the RosettaCst.
 
@@ -1301,7 +1302,7 @@ class RosettaInterface(BaseInterface):
         cst_content.append("")
 
         for ridx, (rname, rule) in enumerate(cst.child_constraints):
-            end = 0                
+            end = 0
             if rule.is_angle_constraint() or rule.is_dihedral_constraint():
                 end = 1
             cst_content.append(f"   CONSTRAINT::  {rname:>10}: {float(rule.target_value):6.2f} {float(rule.params['rosetta']['tolerance']):6.2f} {float(rule.params['rosetta']['penalty']):6.2f} {end}")
@@ -1314,7 +1315,7 @@ class RosettaInterface(BaseInterface):
         #TODO(CJ): this!
         if work_dir is None:
             work_dir = "./"
-    
+
         lines:List[str] = list()
         for cst in constraints:
             if cst.is_distance_constraint():
@@ -1345,7 +1346,7 @@ class RosettaInterface(BaseInterface):
         fs.safe_mkdir(work_dir)
         fname:str = f"{work_dir}/constraints.cst"
         fs.write_lines(fname, lines )
-        return fname 
+        return fname
 
     def integrate_enzdes_constraints(self, stru:Structure, constraints:List[StructureConstraint], work_dir:str=None) -> Tuple[str,str]:
         #TODO(CJ): update this
@@ -1358,7 +1359,7 @@ class RosettaInterface(BaseInterface):
         _LOGGER.info("Beginning RosettaCst constraint integration...")
         parser = PDBParser()
         file_str = parser.get_file_str(stru, if_renumber=False, if_fix_atomname=False)
-    
+
         pdb_content: List[str] = ["HEADER                                            xx-MMM-xx"]
         cst_content: List[str] = list()
         counter = 1
@@ -1367,23 +1368,23 @@ class RosettaInterface(BaseInterface):
                 pdb_content.append(self.create_cst_pdb_line(cst, counter))
                 cst_content.extend(self.create_cst_lines(cst))
                 counter += 1
-    
+
         pdb_file: str = f"{work_dir}/start.pdb"
         cst_file: str = f"{work_dir}/rdock.cst"
-    
+
         if not Path(pdb_file).exists():
             fs.write_lines(pdb_file, pdb_content + file_str.splitlines())
-    
+
         if not Path(cst_file).exists():
             fs.write_lines(cst_file, cst_content)
-    
+
         _LOGGER.info("RosettaCst constraint integration successful! Relevant files:")
         _LOGGER.info(f"\t.pdb file: {Path(pdb_file).absolute()}")
         _LOGGER.info(f"\t.cst file: {Path(cst_file).absolute()}")
-    
+
         return (pdb_file, cst_file)
 
-    def score_energy(self, cst) -> float: 
+    def score_energy(self, cst) -> float:
         """TODO(CJ): add documentation"""
 
         if cst.is_residue_pair_constraint():
@@ -1392,10 +1393,10 @@ class RosettaInterface(BaseInterface):
                 total += self.score_energy(child_cst)
             return total
 
-        penalty:float = cst['rosetta']['penalty'] 
+        penalty:float = cst['rosetta']['penalty']
         tolerance:float = cst['rosetta']['tolerance']
         difference:float = abs(cst.current_geometry() - cst.target_value)
-        
+
         if difference <= tolerance:
             return 0.0
         else:
@@ -1431,7 +1432,7 @@ class RosettaInterface(BaseInterface):
                 If the lowest energy scores are within this cutoff the protocol will end early.
             fa_max_dis:
                 modify fa_atr and fa_sol behavior, really important for protein stability
-                (default: 9.0)  
+                (default: 9.0)
             scorefxn:
                 the name of the Rosetta scoring function used.
             relax_nstruct:
@@ -1508,13 +1509,13 @@ class RosettaInterface(BaseInterface):
 
     # endregion
 
-    def add_missing_residues(self, 
+    def add_missing_residues(self,
             stru: Structure,
             missing_residues:List[chem.SeqRes],
             work_dir:str=None,
             **kwargs
-        ) -> None: 
-        """Uses the LoopRemodel mover to add missing loop residues to a Structure(). All work is done 
+        ) -> None:
+        """Uses the LoopRemodel mover to add missing loop residues to a Structure(). All work is done
         to the Structure() in place.
 
         Args:
@@ -1544,7 +1545,7 @@ class RosettaInterface(BaseInterface):
 <FILTERS>
 </FILTERS>
 <MOVERS>""".split()
-            sr: chem.SeqRes  
+            sr: chem.SeqRes
             muts = list()
             for idx,(res, sr) in enumerate(zip(stru.residues, seq_res)):
                 seq_res_three_letter = chem.convert_to_three_letter(sr.one_letter())
@@ -1557,14 +1558,14 @@ class RosettaInterface(BaseInterface):
                 return stru
             content.extend("""</MOVERS>
 <PROTOCOLS>""".split())
-            
+
             for mm in muts:
                 content.append(f"\t<Add mover_name=\"{mm}\"/>")
 
             content.extend("""</PROTOCOLS>
 <OUTPUT />
 </ROSETTASCRIPTS>""".splitlines())
-            
+
             script_file = f"{work_dir}/fix_remodel_script.xml"
             pdb_infile = f"{work_dir}/fix_remodel.pdb"
             pdb_outfile = f"{work_dir}/fix_remodel_0001.pdb"
@@ -1598,7 +1599,7 @@ class RosettaInterface(BaseInterface):
         fs.safe_mkdir( work_dir )
 
         translate_structure( stru, end_naming='rosetta' )
-        
+
         all_chains:List[Chain] = stru.non_polypeptides
 
         for chain in stru.polypeptides:
@@ -1618,25 +1619,25 @@ class RosettaInterface(BaseInterface):
                     line = f"0 X L PIKAA {sr.one_letter()}"
                 else:
                     borders_loop:bool = (
-                        sidx > 0 and seq_res[sidx-1].missing 
+                        sidx > 0 and seq_res[sidx-1].missing
                     ) or (
-                        sidx < len(seq_res) - 1 and seq_res[sidx+1].missing                
+                        sidx < len(seq_res) - 1 and seq_res[sidx+1].missing
                     )
                     if borders_loop:
                         line = f"{existing} {sr.one_letter()} L PIKAA {sr.one_letter()}"
                     else:
                         line = f"{existing} {sr.one_letter()} ."
                     existing += 1
-            
+
                 content.append(line)
 
 
             remodel_file:str = f"{work_dir}/input.remodel"
-            fs.write_lines( remodel_file, content ) 
+            fs.write_lines( remodel_file, content )
             script_file:str=f"{work_dir}/remodel_script.xml"
             pdb_file = f"{work_dir}/remodel_input.pdb"
             pdb_outfile = f"{work_dir}/remodel_input_0001.pdb"
-            
+
             opts:List[str] = [
                     "-in:file:s", pdb_file,
                     "-remodel:num_trajectory", "1",
@@ -1647,32 +1648,32 @@ class RosettaInterface(BaseInterface):
                     "-remodel:blueprint", remodel_file,
                     "-out:path:all", f"{work_dir}",
                     ]
-            
-            parser = PDBParser() 
+
+            parser = PDBParser()
             parser.save_structure( pdb_file, single_chain_stru )
             self.env_manager_.run_command(
-                self.config_.get_exe("REMODEL"), 
+                self.config_.get_exe("REMODEL"),
                 opts, quiet_fail=True)
-        
+
             if not Path(pdb_outfile).exists():
                 err_msg:str=f"The output file '{pdb_outfile}' was not created. Error during loop reconstruction."
                 _LOGGER.error( err_msg )
                 raise ValueError( err_msg )
 
             filled_single_chain_stru = parser.get_structure( pdb_outfile )
-            
+
             filled_single_chain_stru = fix_remodel(filled_single_chain_stru, seq_res, work_dir)
-            
-            assert len(seq_res) == len(filled_single_chain_stru.residues) 
+
+            assert len(seq_res) == len(filled_single_chain_stru.residues)
 
             for sr, res in zip(seq_res, filled_single_chain_stru.residues ):
                 res.idx = sr.idx
-                res.parent.name = sr.chain 
+                res.parent.name = sr.chain
 
             all_chains.append( filled_single_chain_stru.chains[0] )
-        
+
         filled_stru = Structure(all_chains)
-        
+
         translate_structure(filled_stru, start_naming='rosetta' )
         filled_stru.sort_chains()
         stru.chains = filled_stru.chains
